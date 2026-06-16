@@ -1,62 +1,106 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ──────────────────────────────────────────────
+ * 입시 인사이드 — 디자인 시스템 토큰
+ * 라이트: 화이트 + 레드 / 다크: 블랙 + 레드
+ * ────────────────────────────────────────────── */
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  /* Light theme */
+  --background: #faf9f7;          /* Paper */
+  --foreground: #16140f;          /* Ink */
+  --surface: #ffffff;
+  --surface-2: #f4f0ea;           /* 썸네일/약한면 */
+  --track: #ece8e1;
+  --hairline: #ebe8e3;
+  --border-strong: #dad6ce;
+  --muted: #f4f0ea;
+  --muted-foreground: #6e6b66;
+  --faint: #9c988f;
+  --card: #ffffff;
+  --card-foreground: #16140f;
+  --popover: #ffffff;
+  --popover-foreground: #16140f;
+  --primary: #e11d2e;             /* Red (light) */
+  --primary-hover: #b3152a;
+  --primary-foreground: #ffffff;
+  --primary-tint: #fce9eb;
+  --secondary: #f4f0ea;
+  --secondary-foreground: #16140f;
+  --accent: #fce9eb;
+  --accent-foreground: #e11d2e;
+  --destructive: #e11d2e;
+  --destructive-foreground: #ffffff;
+  --input: #dad6ce;
+  --ring: #e11d2e;
+  --success: #00a838;
+  --orange-promo: #ef6f38;
+  --kakao: #fee500;
+  --kakao-foreground: #3a2929;
+
+  /* Radii */
+  --radius-chip: 6px;
+  --radius-input: 10px;
+  --radius-button: 11px;
+  --radius-card: 14px;
+  --radius-sheet: 16px;
+  --radius-pill: 999px;
+  --radius: 11px;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  /* Dark theme */
+  --background: #0e0e11;          /* Ink */
+  --foreground: #fafafa;
+  --surface: #161619;
+  --surface-2: #1c1c21;
+  --track: #26262b;
+  --hairline: #26262b;
+  --border-strong: #2c2c32;
+  --muted: #1c1c21;
+  --muted-foreground: #9a9aa2;
+  --faint: #65656c;
+  --card: #161619;
+  --card-foreground: #fafafa;
+  --popover: #161619;
+  --popover-foreground: #fafafa;
+  --primary: #ff2e43;             /* Red (dark) */
+  --primary-hover: #e62439;
+  --primary-foreground: #ffffff;
+  --primary-tint: rgba(255, 46, 67, 0.13);
+  --secondary: #1c1c21;
+  --secondary-foreground: #fafafa;
+  --accent: rgba(255, 46, 67, 0.13);
+  --accent-foreground: #ff2e43;
+  --destructive: #ff2e43;
+  --destructive-foreground: #ffffff;
+  --input: #3a3a42;
+  --ring: #ff2e43;
+  --success: #00bf40;
+  --orange-promo: #ef6f38;
+  --kakao: #fee500;
+  --kakao-foreground: #3a2929;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-hairline: var(--hairline);
+  --color-border-strong: var(--border-strong);
+  --color-faint: var(--faint);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-tint: var(--primary-tint);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -65,21 +109,53 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
+  --color-border: var(--hairline);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-success: var(--success);
+  --color-orange-promo: var(--orange-promo);
+  --color-kakao: var(--kakao);
+  --color-kakao-foreground: var(--kakao-foreground);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 11px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+
+  --font-sans: var(--font-pretendard), "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display: var(--font-black-han-sans), "Black Han Sans", system-ui, sans-serif;
+  --font-accent: var(--font-gamja-flower), "Gamja Flower", system-ui, sans-serif;
+  --font-doodle: var(--font-nanum-pen-script), "Nanum Pen Script", system-ui, sans-serif;
 }
 
 @layer base {
   * {
-    border-color: var(--border);
+    border-color: var(--hairline);
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
   }
   body {
     background: var(--background);
     color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 디스플레이용 — 큰 숫자/타이틀 */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  /* 손글씨 악센트 */
+  .font-accent {
+    font-family: var(--font-accent);
+  }
+  /* 텍스처 (낙서, 매우 낮은 불투명도) */
+  .font-doodle {
+    font-family: var(--font-doodle);
   }
 }

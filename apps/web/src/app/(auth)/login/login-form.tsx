@@ -12,7 +12,7 @@ export function LoginForm() {
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       {state && !state.ok && (
         <Alert variant="destructive">
           <AlertDescription>{state.message}</AlertDescription>
@@ -25,11 +25,12 @@ export function LoginForm() {
           name="email"
           type="email"
           autoComplete="email"
+          placeholder="name@example.com"
           required
           aria-invalid={!!fieldErrors?.email}
         />
         {fieldErrors?.email && (
-          <p className="text-xs text-destructive">{fieldErrors.email[0]}</p>
+          <p className="text-xs text-primary">{fieldErrors.email[0]}</p>
         )}
       </div>
       <div className="space-y-2">
@@ -43,11 +44,11 @@ export function LoginForm() {
           aria-invalid={!!fieldErrors?.password}
         />
         {fieldErrors?.password && (
-          <p className="text-xs text-destructive">{fieldErrors.password[0]}</p>
+          <p className="text-xs text-primary">{fieldErrors.password[0]}</p>
         )}
       </div>
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "로그인 중..." : "로그인"}
+      <Button type="submit" disabled={pending} size="lg" className="w-full">
+        {pending ? "로그인 중..." : "로그인 하기"}
       </Button>
     </form>
   );

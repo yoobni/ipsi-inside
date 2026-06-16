@@ -1,10 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState, useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { studentSignupAction } from "../actions";
 
 type FieldName =
@@ -17,6 +24,7 @@ type FieldName =
   | "grade";
 
 export function StudentSignupForm() {
+  const [grade, setGrade] = useState<string>("1");
   const [state, formAction, pending] = useActionState(
     studentSignupAction,
     null,
@@ -46,21 +54,26 @@ export function StudentSignupForm() {
         <div className="col-span-2">
           <Field label="학교명" name="school" placeholder="OO고등학교" required errors={fieldErrors?.school} />
         </div>
-        <div>
-          <Label htmlFor="grade" className="mb-2">학년</Label>
-          <select
-            id="grade"
-            name="grade"
-            required
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-            defaultValue="1"
-          >
-            <option value="1">1학년</option>
-            <option value="2">2학년</option>
-            <option value="3">3학년</option>
-          </select>
+        <div className="space-y-2">
+          <Label htmlFor="grade-trigger">학년</Label>
+          <Select value={grade} onValueChange={setGrade}>
+            <SelectTrigger
+              id="grade-trigger"
+              aria-invalid={!!fieldErrors?.grade}
+              className="w-full"
+            >
+              <SelectValue placeholder="선택" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1학년</SelectItem>
+              <SelectItem value="2">2학년</SelectItem>
+              <SelectItem value="3">3학년</SelectItem>
+            </SelectContent>
+          </Select>
+          {/* Server Action에 값 전달 */}
+          <input type="hidden" name="grade" value={grade} />
           {fieldErrors?.grade && (
-            <p className="text-xs text-destructive mt-1">{fieldErrors.grade[0]}</p>
+            <p className="text-xs text-primary">{fieldErrors.grade[0]}</p>
           )}
         </div>
       </div>
@@ -82,7 +95,7 @@ export function StudentSignupForm() {
         required
         errors={fieldErrors?.passwordConfirm}
       />
-      <Button type="submit" disabled={pending} className="w-full">
+      <Button type="submit" disabled={pending} size="lg" className="w-full">
         {pending ? "가입 중..." : "학생으로 가입 신청"}
       </Button>
     </form>
@@ -118,7 +131,7 @@ function Field({
         required={required}
         aria-invalid={!!errors}
       />
-      {errors && <p className="text-xs text-destructive">{errors[0]}</p>}
+      {errors && <p className="text-xs text-primary">{errors[0]}</p>}
     </div>
   );
 }

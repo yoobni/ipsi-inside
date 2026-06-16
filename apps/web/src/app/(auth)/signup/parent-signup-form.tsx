@@ -32,7 +32,7 @@ export function ParentSignupForm() {
       )}
 
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">학부모 본인 정보</h3>
+        <h3 className="text-sm font-bold text-foreground">학부모 본인 정보</h3>
         <Field label="이름" name="fullName" autoComplete="name" required errors={fieldErrors?.fullName} />
         <Field
           label="휴대폰 번호"
@@ -62,11 +62,11 @@ export function ParentSignupForm() {
         />
       </section>
 
-      <div className="border-t pt-5 space-y-4">
+      <div className="border-t border-hairline pt-5 space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">자녀 매칭 정보</h3>
+          <h3 className="text-sm font-bold text-foreground">자녀 매칭 정보</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            관리자가 자녀와 학부모 계정을 연결할 때 사용합니다.
+            관리자가 자녀와 학부모 계정을 연결할 때 사용해요.
           </p>
         </div>
         <Field
@@ -84,7 +84,7 @@ export function ParentSignupForm() {
         />
       </div>
 
-      <Button type="submit" disabled={pending} className="w-full">
+      <Button type="submit" disabled={pending} size="lg" className="w-full">
         {pending ? "가입 중..." : "학부모로 가입 신청"}
       </Button>
     </form>
@@ -120,7 +120,7 @@ function Field({
         required={required}
         aria-invalid={!!errors}
       />
-      {errors && <p className="text-xs text-destructive">{errors[0]}</p>}
+      {errors && <p className="text-xs text-primary">{errors[0]}</p>}
     </div>
   );
 }

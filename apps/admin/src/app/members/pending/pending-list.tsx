@@ -3,6 +3,15 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { approveProfileAction, rejectProfileAction } from "./actions";
 
 type PendingProfile = {
@@ -76,14 +85,17 @@ function PendingRow({
   const [error, setError] = useState<string | null>(null);
   const [matchedStudentId, setMatchedStudentId] = useState<string>("");
 
-  // 학부모인 경우, 자녀 매칭 후보를 자동 추천 (이름 또는 전화번호 일치)
+  const candidateIds = new Set<string>();
   const candidates = parentRequest
-    ? approvedStudents.filter(
-        (s) =>
+    ? approvedStudents.filter((s) => {
+        const match =
           s.full_name === parentRequest.student_full_name ||
-          s.phone === parentRequest.student_phone,
-      )
+          s.phone === parentRequest.student_phone;
+        if (match) candidateIds.add(s.id);
+        return match;
+      })
     : [];
+  const others = approvedStudents.filter((s) => !candidateIds.has(s.id));
 
   const handleApprove = () => {
     setError(null);
@@ -130,38 +142,52 @@ function PendingRow({
                 / {parentRequest.student_phone}
               </p>
               <div className="mt-2 flex items-center gap-2">
-                <label htmlFor={`match-${profile.id}`} className="text-xs">
+                <label
+                  htmlFor={`match-${profile.id}`}
+                  className="shrink-0 text-xs"
+                >
                   연결할 학생:
                 </label>
-                <select
-                  id={`match-${profile.id}`}
+                <Select
                   value={matchedStudentId}
-                  onChange={(e) => setMatchedStudentId(e.target.value)}
-                  className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                  onValueChange={setMatchedStudentId}
                   disabled={pending}
                 >
-                  <option value="">선택 안 함</option>
-                  {candidates.length > 0 && (
-                    <optgroup label="추천 (이름/전화 일치)">
-                      {candidates.map((s) => (
-                        <option key={s.id} value={s.id}>
+                  <SelectTrigger
+                    id={`match-${profile.id}`}
+                    size="sm"
+                    className="min-w-[280px]"
+                  >
+                    <SelectValue placeholder="선택 안 함" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {candidates.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>추천 (이름/전화 일치)</SelectLabel>
+                        {candidates.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.full_name} · {s.phone} · {s.school}{" "}
+                            {s.grade ? `${s.grade}학년` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    <SelectGroup>
+                      <SelectLabel>전체 승인된 학생</SelectLabel>
+                      {others.length === 0 && (
+                        <div className="px-2 py-2 text-xs text-muted-foreground">
+                          (없음)
+                        </div>
+                      )}
+                      {others.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
                           {s.full_name} · {s.phone} · {s.school}{" "}
                           {s.grade ? `${s.grade}학년` : ""}
-                        </option>
+                        </SelectItem>
                       ))}
-                    </optgroup>
-                  )}
-                  <optgroup label="전체 승인된 학생">
-                    {approvedStudents
-                      .filter((s) => !candidates.includes(s))
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.full_name} · {s.phone} · {s.school}{" "}
-                          {s.grade ? `${s.grade}학년` : ""}
-                        </option>
-                      ))}
-                  </optgroup>
-                </select>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
