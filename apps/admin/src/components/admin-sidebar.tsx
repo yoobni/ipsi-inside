@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserCheck, Users, type LucideIcon } from "lucide-react";
+import {
+  FileText,
+  UserCheck,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type MenuItem = {
@@ -23,8 +28,13 @@ const MENU: MenuItem[] = [
     href: "/members",
     label: "회원 관리",
     icon: Users,
-    // exact match — 그 외 /members/* 는 별도 메뉴
     matchPrefix: undefined,
+  },
+  {
+    href: "/tests",
+    label: "시험 관리",
+    icon: FileText,
+    matchPrefix: "/tests",
   },
 ];
 
