@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  CalendarCheck,
   FileText,
   NotebookPen,
   UserCheck,
@@ -42,6 +43,12 @@ const MENU: MenuItem[] = [
     label: "학습 일지",
     icon: NotebookPen,
     matchPrefix: "/journals",
+  },
+  {
+    href: "/daily",
+    label: "일일 마킹",
+    icon: CalendarCheck,
+    matchPrefix: "/daily",
   },
 ];
 
