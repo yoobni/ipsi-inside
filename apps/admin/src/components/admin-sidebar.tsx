@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   FileText,
+  NotebookPen,
   UserCheck,
   Users,
   type LucideIcon,
@@ -35,6 +36,12 @@ const MENU: MenuItem[] = [
     label: "시험 관리",
     icon: FileText,
     matchPrefix: "/tests",
+  },
+  {
+    href: "/journals",
+    label: "학습 일지",
+    icon: NotebookPen,
+    matchPrefix: "/journals",
   },
 ];
 
