@@ -344,8 +344,7 @@ function FeedbackDrawer({
               <div className="flex w-full items-center justify-between gap-2">
                 {row.feedback?.publish_at ? (
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    variant="outline"
                     onClick={handleUnpublish}
                     disabled={pending}
                   >

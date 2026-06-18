@@ -77,14 +77,13 @@ export function JournalSubmit({ todayDate, existing }: Props) {
           {existing && (
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="outline"
               onClick={() => setEditing(false)}
             >
               취소
             </Button>
           )}
-          <Button type="submit" disabled={pending} size="default">
+          <Button type="submit" disabled={pending}>
             {pending ? "저장 중..." : existing ? "수정 저장" : "제출"}
           </Button>
         </div>
