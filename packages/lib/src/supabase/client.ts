@@ -1,7 +1,10 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@ipsi/db';
-import { getSupabaseAnonKey, getSupabaseUrl } from '../env';
+import { getSupabaseAnonKey, getSupabaseAuthCookieName, getSupabaseUrl } from '../env';
 
 export function createBrowserSupabaseClient() {
-  return createBrowserClient<Database>(getSupabaseUrl(), getSupabaseAnonKey());
+  const cookieName = getSupabaseAuthCookieName();
+  return createBrowserClient<Database>(getSupabaseUrl(), getSupabaseAnonKey(), {
+    cookieOptions: cookieName ? { name: cookieName } : undefined,
+  });
 }

@@ -1,14 +1,17 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@ipsi/db';
-import { getSupabaseAnonKey, getSupabaseUrl } from '../env';
+import { getSupabaseAnonKey, getSupabaseAuthCookieName, getSupabaseUrl } from '../env';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
 
+  const cookieName = getSupabaseAuthCookieName();
+
   return createServerClient<Database>(getSupabaseUrl(), getSupabaseAnonKey(), {
+    cookieOptions: cookieName ? { name: cookieName } : undefined,
     cookies: {
       getAll() {
         return cookieStore.getAll();
