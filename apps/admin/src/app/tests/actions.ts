@@ -1,334 +1,254 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import {
-  studentAnswersInputSchema,
-  testSheetWithQuestionsSchema,
-} from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
-import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
+import {
+  assignmentInputSchema,
+  testSheetCompositionSchema,
+  testSheetInputSchema,
+} from "@ipsi/types";
 
-type Result<T = undefined> =
-  | { ok: true; data?: T }
-  | { ok: false; message: string; fieldErrors?: Record<string, string[]> };
+type Result =
+  | { ok: true; id?: string; count?: number }
+  | { ok: false; message: string };
 
-async function ensureAdmin(): Promise<{ adminId: string } | { error: Result }> {
+export async function createTestSheetAction(
+  _prev: unknown,
+  fd: FormData,
+): Promise<Result> {
+  const payloadRaw = fd.get("payload");
+  if (typeof payloadRaw !== "string") return { ok: false, message: "payload 누락" };
+
+  let parsed;
+  try {
+    parsed = testSheetCompositionSchema.parse(JSON.parse(payloadRaw));
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "검증 실패" };
+  }
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: { ok: false, message: "로그인이 필요합니다" } };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, status")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (profile?.role !== "admin" || profile?.status !== "approved") {
-    return { error: { ok: false, message: "권한이 없습니다" } };
-  }
-  return { adminId: user.id };
-}
+  if (!user) return { ok: false, message: "인증 필요" };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 시험지 생성 (메타 + 문항 일괄)
-// ─────────────────────────────────────────────────────────────────────────────
-export async function createTestSheetAction(
-  _prev: Result<{ id: string }> | null,
-  formData: FormData,
-): Promise<Result<{ id: string }>> {
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
-
-  const payloadRaw = formData.get("payload");
-  if (typeof payloadRaw !== "string") {
-    return { ok: false, message: "잘못된 요청" };
-  }
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(payloadRaw);
-  } catch {
-    return { ok: false, message: "데이터 형식 오류" };
-  }
-  const parsed = testSheetWithQuestionsSchema.safeParse(parsedJson);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message: "입력값을 확인해주세요",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
-    };
-  }
-
-  const db = createAdminSupabaseClient();
-  const meta = parsed.data.meta;
-  const { data: sheet, error: sheetErr } = await db
+  const { data: sheet, error: sErr } = await supabase
     .from("test_sheets")
     .insert({
-      title: meta.title,
-      target_school: meta.targetSchool ?? null,
-      target_grade: meta.targetGrade ?? null,
-      test_date: meta.testDate ?? null,
-      created_by: check.adminId,
+      title: parsed.meta.title,
+      description: parsed.meta.description ?? null,
+      target_school: parsed.meta.target_school ?? null,
+      target_grade: parsed.meta.target_grade ?? null,
+      open_at: parsed.meta.open_at ?? null,
+      due_at: parsed.meta.due_at ?? null,
+      allow_retake: parsed.meta.allow_retake,
+      max_attempts: parsed.meta.max_attempts ?? null,
+      created_by: user.id,
     })
     .select("id")
     .single();
 
-  if (sheetErr || !sheet) {
-    return { ok: false, message: sheetErr?.message ?? "시험지 생성 실패" };
-  }
+  if (sErr || !sheet)
+    return { ok: false, message: `시험지 저장 실패: ${sErr?.message ?? ""}` };
 
-  const rows = parsed.data.questions.map((q) => ({
+  const rows = parsed.question_ids.map((qid, idx) => ({
     test_sheet_id: sheet.id,
-    question_no: q.question_no,
-    correct_answer: q.correct_answer,
-    unit_major: q.unit_major,
-    unit_minor: q.unit_minor ?? null,
-    difficulty: q.difficulty ?? null,
-    points: q.points,
+    question_id: qid,
+    position: idx + 1,
   }));
-
-  const { error: qErr } = await db.from("test_questions").insert(rows);
+  const { error: qErr } = await supabase.from("test_sheet_questions").insert(rows);
   if (qErr) {
-    await db.from("test_sheets").delete().eq("id", sheet.id);
-    return { ok: false, message: `문항 저장 실패: ${qErr.message}` };
+    await supabase.from("test_sheets").delete().eq("id", sheet.id);
+    return { ok: false, message: `문항 매핑 실패: ${qErr.message}` };
   }
 
   revalidatePath("/tests");
-  redirect(`/tests/${sheet.id}`);
+  return { ok: true, id: sheet.id };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 시험지 수정 (메타 + 문항 — 전체 교체 방식, 답안이 있으면 차단)
-// ─────────────────────────────────────────────────────────────────────────────
 export async function updateTestSheetAction(
   testSheetId: string,
-  _prev: Result | null,
-  formData: FormData,
+  _prev: unknown,
+  fd: FormData,
 ): Promise<Result> {
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
+  const payloadRaw = fd.get("payload");
+  if (typeof payloadRaw !== "string") return { ok: false, message: "payload 누락" };
 
-  const payloadRaw = formData.get("payload");
-  if (typeof payloadRaw !== "string") {
-    return { ok: false, message: "잘못된 요청" };
-  }
-  let parsedJson: unknown;
+  let parsed;
   try {
-    parsedJson = JSON.parse(payloadRaw);
-  } catch {
-    return { ok: false, message: "데이터 형식 오류" };
-  }
-  const parsed = testSheetWithQuestionsSchema.safeParse(parsedJson);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message: "입력값을 확인해주세요",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
-    };
+    parsed = testSheetCompositionSchema.parse(JSON.parse(payloadRaw));
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "검증 실패" };
   }
 
-  const db = createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
-  // 답안이 이미 입력된 시험지는 수정 차단 (채점 데이터 보존)
-  const { count } = await db
-    .from("student_answers")
+  // 응시 시작된 적 있으면 거부
+  const { count } = await supabase
+    .from("test_attempts")
     .select("id", { count: "exact", head: true })
-    .eq("test_sheet_id", testSheetId);
-  if (count && count > 0) {
+    .in(
+      "assignment_id",
+      (
+        await supabase
+          .from("test_assignments")
+          .select("id")
+          .eq("test_sheet_id", testSheetId)
+      ).data?.map((a) => a.id) ?? [],
+    );
+  if ((count ?? 0) > 0) {
     return {
       ok: false,
-      message: "이미 학생 답안이 입력된 시험지는 수정할 수 없어요. 새 시험지로 만들어주세요.",
+      message: "학생이 이미 응시를 시작한 시험지는 수정할 수 없어요.",
     };
   }
 
-  const meta = parsed.data.meta;
-  const { error: metaErr } = await db
+  const { error: uErr } = await supabase
     .from("test_sheets")
     .update({
-      title: meta.title,
-      target_school: meta.targetSchool ?? null,
-      target_grade: meta.targetGrade ?? null,
-      test_date: meta.testDate ?? null,
-      updated_at: new Date().toISOString(),
+      title: parsed.meta.title,
+      description: parsed.meta.description ?? null,
+      target_school: parsed.meta.target_school ?? null,
+      target_grade: parsed.meta.target_grade ?? null,
+      open_at: parsed.meta.open_at ?? null,
+      due_at: parsed.meta.due_at ?? null,
+      allow_retake: parsed.meta.allow_retake,
+      max_attempts: parsed.meta.max_attempts ?? null,
     })
     .eq("id", testSheetId);
+  if (uErr) return { ok: false, message: uErr.message };
 
-  if (metaErr) {
-    return { ok: false, message: metaErr.message };
-  }
+  // 매핑 전체 교체
+  await supabase
+    .from("test_sheet_questions")
+    .delete()
+    .eq("test_sheet_id", testSheetId);
 
-  // 문항 전체 교체
-  await db.from("test_questions").delete().eq("test_sheet_id", testSheetId);
-  const rows = parsed.data.questions.map((q) => ({
+  const rows = parsed.question_ids.map((qid, idx) => ({
     test_sheet_id: testSheetId,
-    question_no: q.question_no,
-    correct_answer: q.correct_answer,
-    unit_major: q.unit_major,
-    unit_minor: q.unit_minor ?? null,
-    difficulty: q.difficulty ?? null,
-    points: q.points,
+    question_id: qid,
+    position: idx + 1,
   }));
-  const { error: qErr } = await db.from("test_questions").insert(rows);
-  if (qErr) {
-    return { ok: false, message: `문항 저장 실패: ${qErr.message}` };
-  }
+  const { error: qErr } = await supabase.from("test_sheet_questions").insert(rows);
+  if (qErr) return { ok: false, message: `문항 매핑 실패: ${qErr.message}` };
 
   revalidatePath("/tests");
   revalidatePath(`/tests/${testSheetId}`);
-  return { ok: true };
+  return { ok: true, id: testSheetId };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 시험지 삭제
-// ─────────────────────────────────────────────────────────────────────────────
 export async function deleteTestSheetAction(testSheetId: string): Promise<Result> {
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
-
-  const db = createAdminSupabaseClient();
-  const { error } = await db.from("test_sheets").delete().eq("id", testSheetId);
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase
+    .from("test_sheets")
+    .delete()
+    .eq("id", testSheetId);
   if (error) return { ok: false, message: error.message };
-
   revalidatePath("/tests");
   return { ok: true };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 학생 배정 (다중)
-// ─────────────────────────────────────────────────────────────────────────────
-export async function assignStudentsAction(
-  testSheetId: string,
-  studentIds: string[],
-): Promise<Result<{ added: number }>> {
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
-  if (studentIds.length === 0) {
-    return { ok: false, message: "학생을 선택해주세요" };
+/* ─────────────────────────────────────────────────────────────────────────
+ * 배정 — 학교 단위 자동 + 개별 학생 추가
+ * ───────────────────────────────────────────────────────────────────────── */
+
+export async function assignAction(
+  _prev: unknown,
+  fd: FormData,
+): Promise<Result> {
+  const payloadRaw = fd.get("payload");
+  if (typeof payloadRaw !== "string") return { ok: false, message: "payload 누락" };
+
+  let parsed;
+  try {
+    parsed = assignmentInputSchema.parse(JSON.parse(payloadRaw));
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "검증 실패" };
   }
 
-  const db = createAdminSupabaseClient();
-  const rows = studentIds.map((sid) => ({
-    test_sheet_id: testSheetId,
-    student_id: sid,
-    assigned_by: check.adminId,
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "인증 필요" };
+
+  // 학교 단위 → 그 학교 활성 학생 enum
+  const targets: { student_id: string; school: string | null }[] = [];
+
+  if ((parsed.schools?.length ?? 0) > 0) {
+    const { data: students } = await supabase
+      .from("profiles")
+      .select("id, school")
+      .eq("role", "student")
+      .eq("status", "approved")
+      .in("school", parsed.schools!);
+    (students ?? []).forEach((s) =>
+      targets.push({ student_id: s.id, school: s.school }),
+    );
+  }
+
+  if ((parsed.student_ids?.length ?? 0) > 0) {
+    const { data: students } = await supabase
+      .from("profiles")
+      .select("id, school")
+      .in("id", parsed.student_ids!);
+    (students ?? []).forEach((s) => {
+      if (!targets.find((t) => t.student_id === s.id)) {
+        targets.push({ student_id: s.id, school: null });
+      }
+    });
+  }
+
+  if (targets.length === 0)
+    return { ok: false, message: "배정 대상 학생이 없어요." };
+
+  const rows = targets.map((t) => ({
+    test_sheet_id: parsed.test_sheet_id,
+    student_id: t.student_id,
+    assigned_by: user.id,
+    assigned_by_school: t.school,
   }));
 
-  // 기존 배정 있는 것 무시, 새로운 것만
-  const { data, error } = await db
+  // upsert — 이미 배정된 학생은 무시
+  const { error } = await supabase
     .from("test_assignments")
-    .upsert(rows, { onConflict: "test_sheet_id,student_id", ignoreDuplicates: true })
-    .select("id");
-
+    .upsert(rows, { onConflict: "test_sheet_id,student_id", ignoreDuplicates: true });
   if (error) return { ok: false, message: error.message };
-  revalidatePath(`/tests/${testSheetId}`);
-  return { ok: true, data: { added: data?.length ?? 0 } };
+
+  revalidatePath(`/tests/${parsed.test_sheet_id}`);
+  return { ok: true, count: rows.length };
 }
 
-export async function unassignStudentAction(
+export async function unassignAction(
   testSheetId: string,
   studentId: string,
 ): Promise<Result> {
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
+  const supabase = await createServerSupabaseClient();
 
-  const db = createAdminSupabaseClient();
-
-  // 답안 있으면 차단
-  const { count } = await db
-    .from("student_answers")
+  // 응시 기록 있으면 거부
+  const { count } = await supabase
+    .from("test_attempts")
     .select("id", { count: "exact", head: true })
-    .eq("test_sheet_id", testSheetId)
-    .eq("student_id", studentId);
-  if (count && count > 0) {
-    return {
-      ok: false,
-      message: "이미 답안이 입력된 학생은 배정 해제할 수 없어요.",
-    };
+    .in(
+      "assignment_id",
+      (
+        await supabase
+          .from("test_assignments")
+          .select("id")
+          .eq("test_sheet_id", testSheetId)
+          .eq("student_id", studentId)
+      ).data?.map((a) => a.id) ?? [],
+    );
+  if ((count ?? 0) > 0) {
+    return { ok: false, message: "응시 기록이 있는 학생은 배정 해제할 수 없어요." };
   }
 
-  const { error } = await db
+  const { error } = await supabase
     .from("test_assignments")
     .delete()
     .eq("test_sheet_id", testSheetId)
     .eq("student_id", studentId);
   if (error) return { ok: false, message: error.message };
-
   revalidatePath(`/tests/${testSheetId}`);
-  return { ok: true };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 학생 답안 일괄 저장 (자동 채점은 DB 트리거가 처리)
-// ─────────────────────────────────────────────────────────────────────────────
-export async function saveStudentAnswersAction(
-  _prev: Result | null,
-  formData: FormData,
-): Promise<Result> {
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
-
-  const payloadRaw = formData.get("payload");
-  if (typeof payloadRaw !== "string") {
-    return { ok: false, message: "잘못된 요청" };
-  }
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(payloadRaw);
-  } catch {
-    return { ok: false, message: "데이터 형식 오류" };
-  }
-  const parsed = studentAnswersInputSchema.safeParse(parsedJson);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message: "입력값을 확인해주세요",
-    };
-  }
-
-  const { testSheetId, studentId, answers } = parsed.data;
-  const db = createAdminSupabaseClient();
-
-  // 배정 확인
-  const { data: assn } = await db
-    .from("test_assignments")
-    .select("id")
-    .eq("test_sheet_id", testSheetId)
-    .eq("student_id", studentId)
-    .maybeSingle();
-  if (!assn) {
-    return { ok: false, message: "배정되지 않은 학생입니다" };
-  }
-
-  // 기존 답안 삭제 후 새로 삽입 (간단 + 트리거가 채점)
-  await db
-    .from("student_answers")
-    .delete()
-    .eq("test_sheet_id", testSheetId)
-    .eq("student_id", studentId);
-
-  const rows = answers.map((a) => ({
-    test_sheet_id: testSheetId,
-    student_id: studentId,
-    question_no: a.question_no,
-    selected: a.selected,
-    marked_by: check.adminId,
-  }));
-
-  if (rows.length > 0) {
-    const { error } = await db.from("student_answers").insert(rows);
-    if (error) {
-      return { ok: false, message: `답안 저장 실패: ${error.message}` };
-    }
-  }
-
-  // assignment 상태 graded로 업데이트
-  await db
-    .from("test_assignments")
-    .update({ status: "graded" })
-    .eq("test_sheet_id", testSheetId)
-    .eq("student_id", studentId);
-
-  revalidatePath(`/tests/${testSheetId}`);
-  revalidatePath(`/tests/${testSheetId}/grade`);
   return { ok: true };
 }

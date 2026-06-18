@@ -1,268 +1,160 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ArrowRight, ChevronLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
-import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ReportCharts } from "./report-charts";
+import { TestEntry } from "./test-entry";
 
 export const dynamic = "force-dynamic";
 
-export default async function TestReportPage({
+export default async function TestDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ studentId?: string }>;
 }) {
   const { id } = await params;
-  const { studentId: queryStudentId } = await searchParams;
-
   const supabase = await createServerSupabaseClient();
   const state = await readAuthState(supabase);
 
   if (state.kind === "guest") redirect("/login");
-  if (state.kind !== "ok" || state.status !== "approved") redirect("/dashboard");
-
-  // 대상 학생 결정
-  let studentId: string;
-  if (state.role === "student") {
-    studentId = state.userId;
-  } else {
-    // 학부모: 쿼리 파라미터 또는 첫 자녀
-    const { data: links } = await supabase
-      .from("parent_student_links")
-      .select("student_id")
-      .eq("parent_id", state.userId);
-    const childIds = (links ?? []).map((l) => l.student_id);
-    if (queryStudentId && childIds.includes(queryStudentId)) {
-      studentId = queryStudentId;
-    } else if (childIds[0]) {
-      studentId = childIds[0];
-    } else {
-      redirect("/dashboard/tests");
-    }
-  }
+  if (state.kind !== "ok" || state.status !== "approved") redirect("/pending");
+  if (state.role !== "student") redirect("/dashboard");
 
   const { data: sheet } = await supabase
     .from("test_sheets")
-    .select("id, title, target_school, target_grade, test_date")
+    .select(
+      "id, title, description, open_at, due_at, allow_retake, max_attempts",
+    )
     .eq("id", id)
     .maybeSingle();
   if (!sheet) notFound();
 
   const { data: assignment } = await supabase
     .from("test_assignments")
-    .select("status")
+    .select("id")
     .eq("test_sheet_id", id)
-    .eq("student_id", studentId)
+    .eq("student_id", state.userId)
     .maybeSingle();
   if (!assignment) notFound();
 
-  const { data: student } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", studentId)
-    .maybeSingle();
+  const { count: qCount } = await supabase
+    .from("test_sheet_questions")
+    .select("id", { count: "exact", head: true })
+    .eq("test_sheet_id", id);
 
-  // 채점되기 전이면 안내만
-  const isGraded = assignment.status === "graded";
+  const { data: attempts } = await supabase
+    .from("test_attempts")
+    .select("id, attempt_no, status, score, total_points, submitted_at, started_at")
+    .eq("assignment_id", assignment.id)
+    .order("attempt_no", { ascending: false });
 
-  const [{ data: questions }, { data: answers }, { data: unitStats }, { data: totalScore }] =
-    await Promise.all([
-      supabase
-        .from("test_questions")
-        .select("question_no, correct_answer, unit_major, unit_minor, points, difficulty")
-        .eq("test_sheet_id", id)
-        .order("question_no"),
-      supabase
-        .from("student_answers")
-        .select("question_no, selected, is_correct")
-        .eq("test_sheet_id", id)
-        .eq("student_id", studentId),
-      supabase.rpc("test_unit_stats", {
-        p_test_sheet_id: id,
-        p_student_id: studentId,
-      }),
-      supabase.rpc("test_total_score", {
-        p_test_sheet_id: id,
-        p_student_id: studentId,
-      }),
-    ]);
+  const inProgress = (attempts ?? []).find((a) => a.status === "in_progress");
+  const submitted = (attempts ?? []).filter((a) => a.status === "submitted");
 
-  const total = (totalScore ?? [])[0];
-
-  // 대단원별 집계 (소단원 합산)
-  const majorMap = new Map<string, { total: number; correct: number }>();
-  (unitStats ?? []).forEach((u) => {
-    const cur = majorMap.get(u.unit_major) ?? { total: 0, correct: 0 };
-    cur.total += u.total;
-    cur.correct += u.correct;
-    majorMap.set(u.unit_major, cur);
-  });
-  const radarData = Array.from(majorMap.entries()).map(([k, v]) => ({
-    unit: k,
-    accuracy: v.total === 0 ? 0 : Math.round((v.correct / v.total) * 100),
-  }));
-
-  // 소단원별 오답률 막대
-  const barData = (unitStats ?? [])
-    .filter((u) => u.unit_minor != null && u.unit_minor !== "")
-    .map((u) => ({
-      label: `${u.unit_major} · ${u.unit_minor}`,
-      wrongRate: 100 - Number(u.accuracy),
-      total: u.total,
-    }))
-    .sort((a, b) => b.wrongRate - a.wrongRate)
-    .slice(0, 8);
-
-  const answersMap = new Map(
-    (answers ?? []).map((a) => [a.question_no, a]),
-  );
+  const now = new Date();
+  const isLocked = sheet.open_at != null && new Date(sheet.open_at) > now;
+  const isClosed = sheet.due_at != null && new Date(sheet.due_at) < now;
+  const maxAtt = sheet.allow_retake ? sheet.max_attempts ?? Infinity : 1;
+  const canStart = !isLocked && !isClosed && submitted.length < maxAtt;
 
   return (
-    <div className="bg-background flex min-h-screen flex-col">
-      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-6 py-4 backdrop-blur">
         <Wordmark size="md" />
         <ThemeToggle />
       </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8 space-y-6">
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/dashboard/tests">
-              <ChevronLeft className="size-4" />
-              시험 목록
-            </Link>
-          </Button>
-        </div>
+      <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-10">
+        <Link
+          href="/dashboard/tests"
+          className="text-muted-foreground inline-flex items-center gap-1 text-sm hover:text-foreground"
+        >
+          <ChevronLeft className="size-3.5" />내 시험 목록
+        </Link>
 
-        <div className="space-y-1">
-          <p className="text-muted-foreground text-sm">
-            {student?.full_name}
-            {sheet.target_school ? ` · ${sheet.target_school}` : ""}
-            {sheet.target_grade ? ` ${sheet.target_grade}학년` : ""}
-            {sheet.test_date ? ` · 시험일 ${sheet.test_date}` : ""}
+        <h1 className="font-display mt-3 text-[28px] leading-tight">
+          {sheet.title}
+        </h1>
+        {sheet.description && (
+          <p className="text-muted-foreground mt-1 text-sm">
+            {sheet.description}
           </p>
-          <h1 className="font-display text-[34px] leading-tight">
-            {sheet.title}
-          </h1>
+        )}
+
+        <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <span>{qCount ?? 0}문항</span>
+          {sheet.open_at && <span>오픈 {fmt(sheet.open_at)}</span>}
+          {sheet.due_at && <span>마감 {fmt(sheet.due_at)}</span>}
+          {sheet.allow_retake ? (
+            <span>
+              재응시{" "}
+              {sheet.max_attempts
+                ? `${submitted.length}/${sheet.max_attempts}회`
+                : "무제한"}
+            </span>
+          ) : (
+            <span>1회만</span>
+          )}
         </div>
 
-        {!isGraded ? (
-          <div className="border-hairline rounded-[14px] border bg-surface p-10 text-center">
-            <p className="font-display text-2xl">아직 채점 전이에요</p>
-            <p className="text-muted-foreground mt-2 text-sm">
-              채점이 완료되면 결과 리포트가 여기에 표시돼요.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* 점수 요약 */}
-            <section className="border-hairline grid gap-4 rounded-[14px] border bg-surface p-7 md:grid-cols-4">
-              <ScoreStat
-                label="총점"
-                value={`${total?.earned_points ?? 0}`}
-                suffix={`/ ${total?.total_points ?? 0}점`}
-                accent
-              />
-              <ScoreStat
-                label="정답률"
-                value={`${total?.score_percent ?? 0}`}
-                suffix="%"
-              />
-              <ScoreStat
-                label="맞힌 문항"
-                value={`${total?.correct_count ?? 0}`}
-                suffix={`/ ${total?.total_questions ?? 0}`}
-              />
-              <ScoreStat
-                label="틀린 문항"
-                value={`${(total?.total_questions ?? 0) - (total?.correct_count ?? 0)}`}
-                suffix={`/ ${total?.total_questions ?? 0}`}
-              />
-            </section>
+        <div className="mt-8">
+          <TestEntry
+            testSheetId={id}
+            hasInProgress={!!inProgress}
+            inProgressId={inProgress?.id ?? null}
+            canStart={canStart}
+            isLocked={isLocked}
+            isClosed={isClosed}
+          />
+        </div>
 
-            {/* 차트 */}
-            <ReportCharts radarData={radarData} barData={barData} />
-
-            {/* 문항별 정오답 */}
-            <section className="border-hairline rounded-[14px] border bg-surface">
-              <h2 className="border-hairline border-b px-7 py-4 text-base font-extrabold">
-                문항별 정오답
-              </h2>
-              <div className="grid grid-cols-5 gap-2 p-5 sm:grid-cols-8 md:grid-cols-10">
-                {(questions ?? []).map((q) => {
-                  const a = answersMap.get(q.question_no);
-                  const ok = a?.is_correct === true;
-                  const wrong = a && !a.is_correct;
-                  return (
-                    <div
-                      key={q.question_no}
-                      className="flex flex-col items-center gap-1"
-                    >
-                      <span className="text-muted-foreground text-xs tabular-nums">
-                        {q.question_no}
+        {submitted.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-foreground text-sm font-bold">응시 기록</h2>
+            <ul className="mt-3 space-y-2">
+              {submitted.map((a) => (
+                <li
+                  key={a.id}
+                  className="border-hairline flex items-center justify-between gap-3 rounded-[12px] border bg-surface px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium">
+                      {a.attempt_no}회차
+                      <span className="text-muted-foreground ml-2 text-xs font-normal">
+                        {a.submitted_at ? fmt(a.submitted_at) : ""}
                       </span>
-                      <div
-                        className={
-                          "flex size-10 items-center justify-center rounded-md text-base font-bold " +
-                          (ok
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                            : wrong
-                              ? "bg-destructive/10 text-destructive"
-                              : "bg-muted text-muted-foreground")
-                        }
-                      >
-                        {a?.selected ?? "-"}
-                      </div>
-                      {wrong && (
-                        <span className="text-muted-foreground text-[10px]">
-                          정답 {q.correct_answer}
-                        </span>
-                      )}
-                      {ok && (
-                        <span className="text-[10px] text-emerald-600">정답</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          </>
+                    </p>
+                    <p className="mt-0.5 text-xs">
+                      <span className="text-primary tabular-nums text-sm font-bold">
+                        {a.score} / {a.total_points}
+                      </span>
+                      <span className="text-muted-foreground ml-0.5">점</span>
+                    </p>
+                  </div>
+                  <Link
+                    href={`/dashboard/tests/${id}/result?attempt=${a.id}`}
+                    className="text-primary inline-flex items-center gap-1 text-xs font-bold hover:underline"
+                  >
+                    결과 보기
+                    <ArrowRight className="size-3" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
       </main>
     </div>
   );
 }
 
-function ScoreStat({
-  label,
-  value,
-  suffix,
-  accent,
-}: {
-  label: string;
-  value: string;
-  suffix: string;
-  accent?: boolean;
-}) {
-  return (
-    <div>
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="mt-1 flex items-baseline gap-1">
-        <span
-          className={
-            "font-display text-[40px] leading-none " +
-            (accent ? "text-primary" : "")
-          }
-        >
-          {value}
-        </span>
-        <span className="text-muted-foreground text-sm">{suffix}</span>
-      </p>
-    </div>
-  );
+function fmt(iso: string) {
+  return new Date(iso).toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

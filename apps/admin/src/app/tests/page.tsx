@@ -19,37 +19,32 @@ export default async function TestsListPage() {
 
   const { data: sheets } = await supabase
     .from("test_sheets")
-    .select("id, title, target_school, target_grade, test_date, created_at")
+    .select(
+      "id, title, target_school, target_grade, open_at, due_at, allow_retake, created_at",
+    )
     .order("created_at", { ascending: false });
 
-  // 시험지별 문항/배정/채점 카운트
   const sheetIds = (sheets ?? []).map((s) => s.id);
 
-  let questionCounts = new Map<string, number>();
-  let assignedCounts = new Map<string, number>();
-  let gradedCounts = new Map<string, number>();
-
+  const qCount = new Map<string, number>();
+  const aCount = new Map<string, number>();
   if (sheetIds.length > 0) {
-    const [qRes, aRes] = await Promise.all([
+    const [tsq, ta] = await Promise.all([
       supabase
-        .from("test_questions")
+        .from("test_sheet_questions")
         .select("test_sheet_id")
         .in("test_sheet_id", sheetIds),
       supabase
         .from("test_assignments")
-        .select("test_sheet_id, status")
+        .select("test_sheet_id")
         .in("test_sheet_id", sheetIds),
     ]);
-
-    (qRes.data ?? []).forEach((q) => {
-      questionCounts.set(q.test_sheet_id, (questionCounts.get(q.test_sheet_id) ?? 0) + 1);
-    });
-    (aRes.data ?? []).forEach((a) => {
-      assignedCounts.set(a.test_sheet_id, (assignedCounts.get(a.test_sheet_id) ?? 0) + 1);
-      if (a.status === "graded") {
-        gradedCounts.set(a.test_sheet_id, (gradedCounts.get(a.test_sheet_id) ?? 0) + 1);
-      }
-    });
+    (tsq.data ?? []).forEach((r) =>
+      qCount.set(r.test_sheet_id, (qCount.get(r.test_sheet_id) ?? 0) + 1),
+    );
+    (ta.data ?? []).forEach((r) =>
+      aCount.set(r.test_sheet_id, (aCount.get(r.test_sheet_id) ?? 0) + 1),
+    );
   }
 
   return (
@@ -58,7 +53,7 @@ export default async function TestsListPage() {
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">시험 관리</h1>
           <p className="text-muted-foreground text-sm">
-            시험지를 만들고, 학생에게 배정하고, 답안을 마킹하면 자동으로 리포트가 생성돼요.
+            등록된 문항을 골라 시험지를 만들고 학교/학생에게 배정해요.
           </p>
         </div>
         <Button asChild>
@@ -74,9 +69,9 @@ export default async function TestsListPage() {
             <TableRow>
               <TableHead className="pl-4">제목</TableHead>
               <TableHead>대상</TableHead>
-              <TableHead>시험일</TableHead>
+              <TableHead>일정</TableHead>
               <TableHead>문항</TableHead>
-              <TableHead>배정 / 채점</TableHead>
+              <TableHead>배정</TableHead>
               <TableHead className="pr-4 text-right">생성일</TableHead>
             </TableRow>
           </TableHeader>
@@ -91,54 +86,34 @@ export default async function TestsListPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              (sheets ?? []).map((s) => {
-                const qCount = questionCounts.get(s.id) ?? 0;
-                const aCount = assignedCounts.get(s.id) ?? 0;
-                const gCount = gradedCounts.get(s.id) ?? 0;
-                return (
-                  <TableRow key={s.id} className="cursor-pointer">
-                    <TableCell className="pl-4 font-medium">
-                      <Link
-                        href={`/tests/${s.id}`}
-                        className="hover:underline"
-                      >
-                        {s.title}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {s.target_school
-                        ? `${s.target_school}${s.target_grade ? ` · ${s.target_grade}학년` : ""}`
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {s.test_date ?? "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{qCount}문항</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="inline-flex items-center gap-1.5 text-sm">
-                        <Badge variant={aCount > 0 ? "primary" : "outline"}>
-                          {aCount}명 배정
-                        </Badge>
-                        <span className="text-muted-foreground">/</span>
-                        <Badge
-                          variant={
-                            gCount === aCount && aCount > 0
-                              ? "success"
-                              : "outline"
-                          }
-                        >
-                          {gCount}명 채점
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground pr-4 text-right">
-                      {formatDate(s.created_at)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+              (sheets ?? []).map((s) => (
+                <TableRow key={s.id} className="cursor-pointer">
+                  <TableCell className="pl-4 font-medium">
+                    <Link href={`/tests/${s.id}`} className="hover:underline">
+                      {s.title}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {s.target_school
+                      ? `${s.target_school}${s.target_grade ? ` · ${s.target_grade}학년` : ""}`
+                      : "-"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    <ScheduleLabel openAt={s.open_at} dueAt={s.due_at} />
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{qCount.get(s.id) ?? 0}문항</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={(aCount.get(s.id) ?? 0) > 0 ? "primary" : "outline"}>
+                      {aCount.get(s.id) ?? 0}명
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground pr-4 text-right text-sm">
+                    {new Date(s.created_at).toLocaleDateString("ko-KR")}
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
@@ -147,11 +122,22 @@ export default async function TestsListPage() {
   );
 }
 
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+function ScheduleLabel({
+  openAt,
+  dueAt,
+}: {
+  openAt: string | null;
+  dueAt: string | null;
+}) {
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString("ko-KR", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  if (!openAt && !dueAt) return <span>제한 없음</span>;
+  if (openAt && dueAt) return <span>{fmt(openAt)} ~ {fmt(dueAt)}</span>;
+  if (openAt) return <span>{fmt(openAt)} 부터</span>;
+  return <span>~ {fmt(dueAt!)}</span>;
 }

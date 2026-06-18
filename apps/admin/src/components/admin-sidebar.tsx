@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BookOpen,
   CalendarCheck,
   FileText,
   NotebookPen,
@@ -31,6 +32,12 @@ const MENU: MenuItem[] = [
     label: "회원 관리",
     icon: Users,
     matchPrefix: undefined,
+  },
+  {
+    href: "/passages",
+    label: "지문/문항",
+    icon: BookOpen,
+    matchPrefix: "/passages",
   },
   {
     href: "/tests",

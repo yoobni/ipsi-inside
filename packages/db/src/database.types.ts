@@ -13,7 +13,16 @@ export type ProfileStatus = "pending" | "approved" | "rejected" | "suspended";
 
 export type UnitMajor = "문법" | "문학" | "독서" | "화작" | "언매" | (string & {});
 export type Difficulty = "상" | "중" | "하";
-export type AssignmentStatus = "assigned" | "graded";
+
+export type PassageSource =
+  | "reading"          // 비문학(독서)
+  | "literature"       // 문학
+  | "speech_writing"   // 화법과작문
+  | "language_media";  // 언어와매체
+
+export type AttemptStatus = "in_progress" | "submitted";
+
+export type QuestionChoice = { no: number; text: string };
 
 export type Database = {
   public: {
@@ -87,13 +96,16 @@ export type Database = {
         };
         Relationships: [];
       };
-      test_sheets: {
+
+      // ─── v2 시험 시스템 ──────────────────────────────────────────────────────
+      passages: {
         Row: {
           id: string;
           title: string;
-          target_school: string | null;
-          target_grade: number | null;
-          test_date: string | null;
+          source_type: PassageSource;
+          content: string;            // HTML
+          unit_major: string;
+          unit_minor: string | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -101,9 +113,10 @@ export type Database = {
         Insert: {
           id?: string;
           title: string;
-          target_school?: string | null;
-          target_grade?: number | null;
-          test_date?: string | null;
+          source_type: PassageSource;
+          content: string;
+          unit_major: string;
+          unit_minor?: string | null;
           created_by: string;
           created_at?: string;
           updated_at?: string;
@@ -111,45 +124,127 @@ export type Database = {
         Update: {
           id?: string;
           title?: string;
-          target_school?: string | null;
-          target_grade?: number | null;
-          test_date?: string | null;
+          source_type?: PassageSource;
+          content?: string;
+          unit_major?: string;
+          unit_minor?: string | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [];
       };
-      test_questions: {
+      questions: {
+        Row: {
+          id: string;
+          passage_id: string;
+          position_in_passage: number;
+          stem: string;                  // HTML
+          supplementary: string | null;  // 〈보기〉 HTML
+          choices: QuestionChoice[];     // jsonb
+          correct_answer: number;
+          points: number;
+          difficulty: Difficulty | null;
+          unit_minor: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          passage_id: string;
+          position_in_passage: number;
+          stem: string;
+          supplementary?: string | null;
+          choices: QuestionChoice[];
+          correct_answer: number;
+          points?: number;
+          difficulty?: Difficulty | null;
+          unit_minor?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          passage_id?: string;
+          position_in_passage?: number;
+          stem?: string;
+          supplementary?: string | null;
+          choices?: QuestionChoice[];
+          correct_answer?: number;
+          points?: number;
+          difficulty?: Difficulty | null;
+          unit_minor?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      test_sheets: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          target_school: string | null;
+          target_grade: number | null;
+          open_at: string | null;
+          due_at: string | null;
+          allow_retake: boolean;
+          max_attempts: number | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          target_school?: string | null;
+          target_grade?: number | null;
+          open_at?: string | null;
+          due_at?: string | null;
+          allow_retake?: boolean;
+          max_attempts?: number | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          target_school?: string | null;
+          target_grade?: number | null;
+          open_at?: string | null;
+          due_at?: string | null;
+          allow_retake?: boolean;
+          max_attempts?: number | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      test_sheet_questions: {
         Row: {
           id: string;
           test_sheet_id: string;
-          question_no: number;
-          correct_answer: number;
-          unit_major: string;
-          unit_minor: string | null;
-          difficulty: Difficulty | null;
-          points: number;
+          question_id: string;
+          position: number;
+          created_at: string;
         };
         Insert: {
           id?: string;
           test_sheet_id: string;
-          question_no: number;
-          correct_answer: number;
-          unit_major: string;
-          unit_minor?: string | null;
-          difficulty?: Difficulty | null;
-          points?: number;
+          question_id: string;
+          position: number;
+          created_at?: string;
         };
         Update: {
           id?: string;
           test_sheet_id?: string;
-          question_no?: number;
-          correct_answer?: number;
-          unit_major?: string;
-          unit_minor?: string | null;
-          difficulty?: Difficulty | null;
-          points?: number;
+          question_id?: string;
+          position?: number;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -160,8 +255,7 @@ export type Database = {
           student_id: string;
           assigned_by: string;
           assigned_at: string;
-          due_at: string | null;
-          status: AssignmentStatus;
+          assigned_by_school: string | null;
         };
         Insert: {
           id?: string;
@@ -169,8 +263,7 @@ export type Database = {
           student_id: string;
           assigned_by: string;
           assigned_at?: string;
-          due_at?: string | null;
-          status?: AssignmentStatus;
+          assigned_by_school?: string | null;
         };
         Update: {
           id?: string;
@@ -178,11 +271,72 @@ export type Database = {
           student_id?: string;
           assigned_by?: string;
           assigned_at?: string;
-          due_at?: string | null;
-          status?: AssignmentStatus;
+          assigned_by_school?: string | null;
         };
         Relationships: [];
       };
+      test_attempts: {
+        Row: {
+          id: string;
+          assignment_id: string;
+          attempt_no: number;
+          started_at: string;
+          submitted_at: string | null;
+          score: number | null;
+          total_points: number | null;
+          status: AttemptStatus;
+        };
+        Insert: {
+          id?: string;
+          assignment_id: string;
+          attempt_no: number;
+          started_at?: string;
+          submitted_at?: string | null;
+          score?: number | null;
+          total_points?: number | null;
+          status?: AttemptStatus;
+        };
+        Update: {
+          id?: string;
+          assignment_id?: string;
+          attempt_no?: number;
+          started_at?: string;
+          submitted_at?: string | null;
+          score?: number | null;
+          total_points?: number | null;
+          status?: AttemptStatus;
+        };
+        Relationships: [];
+      };
+      student_answers: {
+        Row: {
+          id: string;
+          attempt_id: string;
+          question_id: string;
+          selected: number | null;
+          is_correct: boolean | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          attempt_id: string;
+          question_id: string;
+          selected?: number | null;
+          is_correct?: boolean | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          attempt_id?: string;
+          question_id?: string;
+          selected?: number | null;
+          is_correct?: boolean | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      // ─── 일일 마킹 / 학습 일지 ──────────────────────────────────────────────
       daily_attendance: {
         Row: {
           id: string;
@@ -285,57 +439,14 @@ export type Database = {
         };
         Relationships: [];
       };
-      student_answers: {
-        Row: {
-          id: string;
-          test_sheet_id: string;
-          student_id: string;
-          question_no: number;
-          selected: number | null;
-          is_correct: boolean;
-          marked_by: string;
-          marked_at: string;
-        };
-        Insert: {
-          id?: string;
-          test_sheet_id: string;
-          student_id: string;
-          question_no: number;
-          selected?: number | null;
-          is_correct?: boolean;
-          marked_by: string;
-          marked_at?: string;
-        };
-        Update: {
-          id?: string;
-          test_sheet_id?: string;
-          student_id?: string;
-          question_no?: number;
-          selected?: number | null;
-          is_correct?: boolean;
-          marked_by?: string;
-          marked_at?: string;
-        };
-        Relationships: [];
-      };
     };
     Views: Record<string, never>;
     Functions: {
       current_profile_role: { Args: Record<string, never>; Returns: string };
       current_profile_status: { Args: Record<string, never>; Returns: string };
       is_admin: { Args: Record<string, never>; Returns: boolean };
-      test_unit_stats: {
-        Args: { p_test_sheet_id: string; p_student_id: string };
-        Returns: {
-          unit_major: string;
-          unit_minor: string | null;
-          total: number;
-          correct: number;
-          accuracy: number;
-        }[];
-      };
-      test_total_score: {
-        Args: { p_test_sheet_id: string; p_student_id: string };
+      attempt_total_score: {
+        Args: { p_attempt_id: string };
         Returns: {
           total_questions: number;
           correct_count: number;
@@ -344,7 +455,19 @@ export type Database = {
           score_percent: number;
         }[];
       };
+      attempt_unit_stats: {
+        Args: { p_attempt_id: string };
+        Returns: {
+          unit_major: string;
+          unit_minor: string | null;
+          total: number;
+          correct: number;
+          accuracy: number;
+        }[];
+      };
     };
-    Enums: Record<string, never>;
+    Enums: {
+      passage_source: PassageSource;
+    };
   };
 };
