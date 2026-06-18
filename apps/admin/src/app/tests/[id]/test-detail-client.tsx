@@ -53,8 +53,8 @@ export function TestDetailClient({
 
   return (
     <>
-      <section className="bg-background rounded-md border">
-        <div className="flex items-center justify-between border-b px-5 py-3">
+      <section className="rounded-md border bg-card">
+        <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold">배정된 학생</h2>
             <Badge variant="primary">{assignedStudents.length}명</Badge>

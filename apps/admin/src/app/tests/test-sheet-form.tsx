@@ -168,9 +168,11 @@ export function TestSheetForm({
       )}
 
       {/* 메타 */}
-      <section className="bg-background rounded-md border p-5">
-        <h2 className="mb-4 text-sm font-semibold">시험지 정보</h2>
-        <div className="grid gap-4 md:grid-cols-2">
+      <section className="rounded-md border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">시험지 정보</h2>
+        </div>
+        <div className="grid gap-4 p-4 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="title">제목 *</Label>
             <Input
@@ -219,8 +221,8 @@ export function TestSheetForm({
       </section>
 
       {/* 문항 그리드 */}
-      <section className="bg-background rounded-md border">
-        <div className="flex items-center justify-between border-b px-5 py-4">
+      <section className="rounded-md border bg-card">
+        <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-sm font-semibold">문항 ({rows.length}문항)</h2>
           <Button type="button" size="sm" variant="outline" onClick={addRow}>
             <Plus className="size-4" /> 문항 추가
@@ -276,7 +278,6 @@ export function TestSheetForm({
                       updateRow(idx, { unit_minor: e.target.value })
                     }
                     placeholder="(선택)"
-                    className="h-9"
                   />
                 </TableCell>
                 <TableCell>
@@ -306,7 +307,6 @@ export function TestSheetForm({
                     onChange={(e) =>
                       updateRow(idx, { points: Number(e.target.value) || 1 })
                     }
-                    className="h-9"
                   />
                 </TableCell>
                 <TableCell className="pr-4">
@@ -367,7 +367,7 @@ function UnitInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="또는 직접 입력"
-        className="h-9 flex-1"
+        className="flex-1"
       />
     </div>
   );

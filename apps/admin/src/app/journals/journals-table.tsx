@@ -97,7 +97,7 @@ export function JournalsTable({
         </TabsList>
       </Tabs>
 
-      <div className="bg-background rounded-md border">
+      <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>

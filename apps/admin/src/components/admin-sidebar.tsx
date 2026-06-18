@@ -56,7 +56,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-60 shrink-0 border-r bg-surface md:flex md:flex-col">
+    <aside className="hidden w-60 shrink-0 border-r bg-card md:flex md:flex-col">
       <div className="border-b px-5 py-4">
         <Link
           href="/"

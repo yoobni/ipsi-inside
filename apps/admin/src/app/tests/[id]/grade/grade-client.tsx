@@ -96,7 +96,7 @@ function StudentPicker({
   onChange: (sid: string) => void;
 }) {
   return (
-    <div className="bg-background flex flex-wrap items-center gap-3 rounded-md border px-4 py-3">
+    <div className="flex flex-wrap items-center gap-3 rounded-md border bg-card px-4 py-3">
       <span className="text-muted-foreground text-sm">학생</span>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="w-[280px]">
@@ -239,7 +239,7 @@ function GradeForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* 진행 통계 */}
-      <div className="bg-background grid grid-cols-2 gap-3 rounded-md border p-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 rounded-md border bg-card p-4 sm:grid-cols-4">
         <Stat label="응답" value={`${stats.answered} / ${stats.totalQ}`} />
         <Stat label="정답" value={`${stats.correct} / ${stats.totalQ}`} />
         <Stat label="획득" value={`${stats.earned} / ${stats.total}점`} />
@@ -250,7 +250,7 @@ function GradeForm({
       </div>
 
       {/* 답안 그리드 */}
-      <div className="bg-background rounded-md border p-4">
+      <div className="rounded-md border bg-card p-4">
         <p className="text-muted-foreground mb-3 text-xs">
           {currentStudent?.full_name} · 1~5 숫자만 입력하면 자동으로 다음 칸으로
         </p>

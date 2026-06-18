@@ -96,13 +96,13 @@ export default async function TestDetailPage({
       </div>
 
       {/* 문항 요약 */}
-      <section className="bg-background rounded-md border">
-        <div className="flex items-center justify-between border-b px-5 py-3">
+      <section className="rounded-md border bg-card">
+        <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
             <FileText className="size-4" /> 문항 요약
           </h2>
         </div>
-        <div className="px-5 py-4">
+        <div className="p-4">
           {questions && questions.length > 0 ? (
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 md:grid-cols-5">
               {questions.map((q) => (

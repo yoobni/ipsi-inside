@@ -128,7 +128,7 @@ export function MembersTable({
         </div>
       </div>
 
-      <div className="bg-background rounded-md border">
+      <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -398,7 +398,6 @@ function MemberDrawer({
                             </SelectContent>
                           </Select>
                           <Button
-                            size="default"
                             variant="outline"
                             disabled={pending || !addStudentId}
                             onClick={() => {

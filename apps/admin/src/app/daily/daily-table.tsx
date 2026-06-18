@@ -67,7 +67,7 @@ export function DailyTable({ date, rows }: { date: string; rows: Row[] }) {
           type="date"
           value={date}
           onChange={(e) => e.target.value && goDate(e.target.value)}
-          className="h-9 w-[150px]"
+          className="w-[150px]"
         />
         <Button variant="outline" size="icon" onClick={() => shiftDate(1)}>
           <ChevronRight className="size-4" />
@@ -75,7 +75,7 @@ export function DailyTable({ date, rows }: { date: string; rows: Row[] }) {
         <span className="text-muted-foreground ml-2 text-sm">{dateLabel}</span>
       </div>
 
-      <div className="bg-background rounded-md border">
+      <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -205,7 +205,7 @@ function StudentDailyRow({ date, row }: { date: string; row: Row }) {
             }
           }}
           placeholder="-"
-          className="h-9 w-20 tabular-nums"
+          className="w-20 tabular-nums"
           disabled={pending}
         />
       </TableCell>
@@ -222,7 +222,6 @@ function StudentDailyRow({ date, row }: { date: string; row: Row }) {
             }
           }}
           placeholder="(선택)"
-          className="h-9"
           disabled={pending}
         />
       </TableCell>

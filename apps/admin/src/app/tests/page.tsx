@@ -68,7 +68,7 @@ export default async function TestsListPage() {
         </Button>
       </div>
 
-      <div className="bg-background rounded-md border">
+      <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
