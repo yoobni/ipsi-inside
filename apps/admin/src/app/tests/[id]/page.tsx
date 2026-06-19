@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Pencil } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
-import { PASSAGE_SOURCE_LABEL, type PassageSource } from "@ipsi/types";
+import type { QuestionChoice } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TestPreview, type PreviewQuestion } from "@/components/test-preview";
+import { DuplicateButton } from "./duplicate-button";
 import { TestDetailClient, type AssignedRow, type AvailableStudent } from "./test-detail-client";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +42,7 @@ export default async function TestDetailPage({
       ? await supabase
           .from("questions")
           .select(
-            "id, passage_id, position_in_passage, stem, correct_answer, points, difficulty",
+            "id, passage_id, position_in_passage, stem, supplementary, choices, correct_answer, points, difficulty",
           )
           .in("id", questionIds)
       : { data: [] };
@@ -52,7 +54,7 @@ export default async function TestDetailPage({
     passageIds.length > 0
       ? await supabase
           .from("passages")
-          .select("id, title, source_type, unit_major")
+          .select("id, title, source_type, unit_major, content")
           .in("id", passageIds)
       : { data: [] };
 
@@ -70,6 +72,26 @@ export default async function TestDetailPage({
     (s, r) => s + (r.q?.points ?? 0),
     0,
   );
+
+  // 미리보기용
+  const previewQuestions: PreviewQuestion[] = orderedQuestions
+    .map(({ position, q }) => {
+      if (!q) return null;
+      const p = passageMap.get(q.passage_id);
+      return {
+        position,
+        passage: p
+          ? { id: p.id, title: p.title, content: p.content }
+          : null,
+        position_in_passage: q.position_in_passage,
+        stem: q.stem,
+        supplementary: q.supplementary,
+        choices: q.choices as QuestionChoice[],
+        correct_answer: q.correct_answer,
+        points: q.points,
+      };
+    })
+    .filter((x): x is PreviewQuestion => x !== null);
 
   // 배정 학생
   const { data: assignments } = await supabase
@@ -91,7 +113,9 @@ export default async function TestDetailPage({
     assignmentIds.length > 0
       ? await supabase
           .from("test_attempts")
-          .select("assignment_id, attempt_no, status, score, total_points, submitted_at")
+          .select(
+            "id, assignment_id, attempt_no, status, score, total_points, submitted_at",
+          )
           .in("assignment_id", assignmentIds)
           .order("attempt_no", { ascending: false })
       : { data: [] };
@@ -122,6 +146,7 @@ export default async function TestDetailPage({
       grade: p?.grade ?? null,
       assigned_at: a.assigned_at,
       assigned_by_school: a.assigned_by_school,
+      latest_attempt_id: latest?.id ?? null,
       latest_status: latest?.status ?? null,
       latest_score: latest?.score ?? null,
       latest_total_points: latest?.total_points ?? null,
@@ -193,6 +218,7 @@ export default async function TestDetailPage({
           </div>
         </div>
         <div className="flex gap-2">
+          <DuplicateButton testSheetId={id} />
           <Button asChild variant="outline" size="sm">
             <Link href={`/tests/${id}/edit`}>
               <Pencil className="size-4" /> 편집
@@ -226,37 +252,46 @@ export default async function TestDetailPage({
         </div>
       </section>
 
-      {/* 문항 요약 */}
+      {/* 문항 요약 + 미리보기 */}
       <section className="rounded-md border bg-card">
         <div className="border-b px-4 py-3">
-          <h2 className="text-sm font-semibold">문항 요약</h2>
+          <h2 className="text-sm font-semibold">시험지 미리보기</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            학생이 보는 모바일 화면 그대로. 정답은 admin에게만 표시돼요.
+          </p>
         </div>
-        <div className="p-4">
-          {orderedQuestions.length === 0 ? (
-            <p className="text-muted-foreground text-sm">문항이 없어요.</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 md:grid-cols-4">
-              {orderedQuestions.map(({ position, q }) => {
-                if (!q) return null;
-                const p = passageMap.get(q.passage_id);
-                return (
-                  <div key={q.id} className="flex items-center gap-2">
-                    <span className="text-muted-foreground w-8 shrink-0 tabular-nums">
-                      {position}.
-                    </span>
-                    <span className="font-semibold">
-                      {["", "①", "②", "③", "④", "⑤"][q.correct_answer]}
-                    </span>
-                    <span className="text-muted-foreground truncate">
-                      {p?.title}
-                      <span className="text-foreground/70 ml-1">
-                        #{q.position_in_passage}
+        <div className="grid gap-6 p-4 md:grid-cols-[1fr_auto]">
+          <div>
+            <h3 className="text-foreground text-xs font-semibold">정답 요약</h3>
+            {orderedQuestions.length === 0 ? (
+              <p className="text-muted-foreground mt-2 text-sm">문항이 없어요.</p>
+            ) : (
+              <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+                {orderedQuestions.map(({ position, q }) => {
+                  if (!q) return null;
+                  const p = passageMap.get(q.passage_id);
+                  return (
+                    <div key={q.id} className="flex items-center gap-2">
+                      <span className="text-muted-foreground w-8 shrink-0 tabular-nums">
+                        {position}.
                       </span>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                      <span className="font-semibold">
+                        {["", "①", "②", "③", "④", "⑤"][q.correct_answer]}
+                      </span>
+                      <span className="text-muted-foreground truncate text-xs">
+                        {p?.title}
+                        <span className="text-foreground/70 ml-1">
+                          #{q.position_in_passage}
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {previewQuestions.length > 0 && (
+            <TestPreview questions={previewQuestions} />
           )}
         </div>
       </section>

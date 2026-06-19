@@ -137,6 +137,67 @@ export async function updateTestSheetAction(
   return { ok: true, id: testSheetId };
 }
 
+export async function duplicateTestSheetAction(
+  sourceId: string,
+): Promise<Result> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "인증 필요" };
+
+  const { data: source } = await supabase
+    .from("test_sheets")
+    .select(
+      "title, description, target_school, target_grade, open_at, due_at, allow_retake, max_attempts",
+    )
+    .eq("id", sourceId)
+    .maybeSingle();
+  if (!source) return { ok: false, message: "원본 시험지를 찾을 수 없어요." };
+
+  const { data: copy, error: cErr } = await supabase
+    .from("test_sheets")
+    .insert({
+      title: `${source.title} (복제)`,
+      description: source.description,
+      target_school: source.target_school,
+      target_grade: source.target_grade,
+      // 일정은 비움 (복제본 새로 배정될 때 다시 정하라고)
+      open_at: null,
+      due_at: null,
+      allow_retake: source.allow_retake,
+      max_attempts: source.max_attempts,
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
+  if (cErr || !copy) return { ok: false, message: cErr?.message ?? "복제 실패" };
+
+  const { data: tsq } = await supabase
+    .from("test_sheet_questions")
+    .select("question_id, position")
+    .eq("test_sheet_id", sourceId)
+    .order("position");
+
+  if ((tsq ?? []).length > 0) {
+    const rows = (tsq ?? []).map((r) => ({
+      test_sheet_id: copy.id,
+      question_id: r.question_id,
+      position: r.position,
+    }));
+    const { error: qErr } = await supabase
+      .from("test_sheet_questions")
+      .insert(rows);
+    if (qErr) {
+      await supabase.from("test_sheets").delete().eq("id", copy.id);
+      return { ok: false, message: `문항 복제 실패: ${qErr.message}` };
+    }
+  }
+
+  revalidatePath("/tests");
+  return { ok: true, id: copy.id };
+}
+
 export async function deleteTestSheetAction(testSheetId: string): Promise<Result> {
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase

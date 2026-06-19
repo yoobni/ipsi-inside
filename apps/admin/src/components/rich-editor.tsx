@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Image } from "@tiptap/extension-image";
@@ -10,9 +11,11 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TableCell } from "@tiptap/extension-table-cell";
 import {
   Bold,
+  ImageIcon,
   Italic,
   List,
   ListOrdered,
+  Loader2,
   Quote,
   Redo2,
   Strikethrough,
@@ -20,6 +23,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { uploadImageAction } from "@/app/passages/upload-image";
 
 type Props = {
   value: string;
@@ -91,6 +95,28 @@ export function RichEditor({
 }
 
 function Toolbar({ editor, size }: { editor: Editor; size: "small" | "default" }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleFile = async (file: File) => {
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      const r = await uploadImageAction(fd);
+      if (r.ok) {
+        editor.chain().focus().setImage({ src: r.url, alt: file.name }).run();
+      } else {
+        setUploadError(r.message);
+      }
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-0.5 border-b px-1 py-1">
       <Btn
@@ -152,6 +178,33 @@ function Toolbar({ editor, size }: { editor: Editor; size: "small" | "default" }
             <TableIcon className="size-3.5" />
           </Btn>
         </>
+      )}
+      <Sep />
+      <Btn
+        onClick={() => fileRef.current?.click()}
+        label={uploadError ?? "이미지 업로드"}
+        disabled={uploading}
+      >
+        {uploading ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <ImageIcon className="size-3.5" />
+        )}
+      </Btn>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleFile(f);
+        }}
+        className="hidden"
+      />
+      {uploadError && (
+        <span className="text-destructive ml-2 text-[10px]">
+          {uploadError}
+        </span>
       )}
       <div className="ml-auto flex items-center gap-0.5">
         <Btn

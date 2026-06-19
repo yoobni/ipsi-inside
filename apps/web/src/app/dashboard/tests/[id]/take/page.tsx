@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
 import type { QuestionChoice } from "@ipsi/types";
+import { submitAttemptAction } from "../../actions";
 import { ExamRunner, type ExamQuestion } from "./exam-runner";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,12 @@ export default async function TakePage({
     .eq("id", id)
     .maybeSingle();
   if (!sheet) notFound();
+
+  // 마감 지났는데 아직 진행 중이면 자동 제출하고 결과로
+  if (sheet.due_at && new Date(sheet.due_at) < new Date()) {
+    await submitAttemptAction(attemptId);
+    redirect(`/dashboard/tests/${id}/result?attempt=${attemptId}`);
+  }
 
   // 시험지 → 문항 (지문 포함)
   const { data: tsq } = await supabase

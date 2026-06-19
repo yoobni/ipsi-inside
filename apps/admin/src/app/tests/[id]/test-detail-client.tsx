@@ -1,7 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { CheckCircle2, Loader2, Trash2, UserPlus } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -34,6 +41,7 @@ export type AssignedRow = {
   grade: number | null;
   assigned_at: string;
   assigned_by_school: string | null;
+  latest_attempt_id: string | null;
   latest_status: "in_progress" | "submitted" | null;
   latest_score: number | null;
   latest_total_points: number | null;
@@ -169,15 +177,22 @@ function AssignedRowItem({
           <StatusBadge status={row.latest_status} />
         </TableCell>
         <TableCell className="tabular-nums text-sm">
-          {row.latest_status === "submitted" && row.latest_score != null && row.latest_total_points != null ? (
-            <span className="font-medium">
+          {row.latest_status === "submitted" &&
+          row.latest_score != null &&
+          row.latest_total_points != null &&
+          row.latest_attempt_id ? (
+            <Link
+              href={`/tests/${testSheetId}/attempts/${row.latest_attempt_id}`}
+              className="inline-flex items-center gap-1 font-medium hover:underline"
+            >
               {row.latest_score} / {row.latest_total_points}점
               {row.latest_attempt_no && row.latest_attempt_no > 1 && (
                 <span className="text-muted-foreground ml-1 text-xs">
                   ({row.latest_attempt_no}회차)
                 </span>
               )}
-            </span>
+              <ArrowRight className="size-3" />
+            </Link>
           ) : (
             <span className="text-muted-foreground">-</span>
           )}

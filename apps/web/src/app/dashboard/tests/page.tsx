@@ -9,77 +9,130 @@ import { LogoutButton } from "@/components/logout-button";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudentTestsPage() {
+type Sheet = {
+  id: string;
+  title: string;
+  description: string | null;
+  open_at: string | null;
+  due_at: string | null;
+  allow_retake: boolean;
+  max_attempts: number | null;
+};
+type Attempt = {
+  id: string;
+  assignment_id: string;
+  attempt_no: number;
+  status: "in_progress" | "submitted";
+  score: number | null;
+  total_points: number | null;
+};
+
+type Item = {
+  assignmentId: string;
+  studentName?: string;
+  sheet: Sheet;
+  inProgress?: Attempt;
+  latestSubmitted: Attempt | null;
+  submittedCount: number;
+  maxAtt: number;
+  isLocked: boolean;
+  isClosed: boolean;
+  canTake: boolean;
+  latestAttemptId: string | null;
+};
+
+export default async function TestsPage() {
   const supabase = await createServerSupabaseClient();
   const state = await readAuthState(supabase);
 
   if (state.kind === "guest") redirect("/login");
   if (state.kind !== "ok" || state.status !== "approved") redirect("/pending");
-  if (state.role !== "student") redirect("/dashboard");
+  if (state.role !== "student" && state.role !== "parent")
+    redirect("/dashboard");
 
-  // 배정 + 시험지 메타
-  const { data: assignments } = await supabase
-    .from("test_assignments")
-    .select(
-      "id, test_sheet_id, assigned_at, test_sheets(id, title, description, target_school, target_grade, open_at, due_at, allow_retake, max_attempts)",
-    )
-    .eq("student_id", state.userId)
-    .order("assigned_at", { ascending: false });
+  // 대상 학생 id 결정
+  let studentIds: string[] = [];
+  let studentNameById: Record<string, string> = {};
+  if (state.role === "student") {
+    studentIds = [state.userId];
+  } else {
+    const { data: links } = await supabase
+      .from("parent_student_links")
+      .select("student_id, profiles!parent_student_links_student_id_fkey(full_name)")
+      .eq("parent_id", state.userId);
+    studentIds = (links ?? []).map((l) => l.student_id);
+    studentNameById = Object.fromEntries(
+      (links ?? []).map((l) => {
+        const p = Array.isArray(l.profiles) ? l.profiles[0] : l.profiles;
+        return [l.student_id, p?.full_name ?? "자녀"];
+      }),
+    );
+  }
 
-  const assignmentIds = (assignments ?? []).map((a) => a.id);
+  let items: Item[] = [];
+  if (studentIds.length > 0) {
+    const { data: assignments } = await supabase
+      .from("test_assignments")
+      .select(
+        "id, test_sheet_id, student_id, assigned_at, test_sheets(id, title, description, open_at, due_at, allow_retake, max_attempts)",
+      )
+      .in("student_id", studentIds)
+      .order("assigned_at", { ascending: false });
 
-  const { data: attempts } =
-    assignmentIds.length > 0
-      ? await supabase
-          .from("test_attempts")
-          .select("assignment_id, attempt_no, status, score, total_points, submitted_at")
-          .in("assignment_id", assignmentIds)
-          .order("attempt_no", { ascending: false })
-      : { data: [] };
+    const assignmentIds = (assignments ?? []).map((a) => a.id);
+    const { data: attempts } =
+      assignmentIds.length > 0
+        ? await supabase
+            .from("test_attempts")
+            .select(
+              "id, assignment_id, attempt_no, status, score, total_points",
+            )
+            .in("assignment_id", assignmentIds)
+            .order("attempt_no", { ascending: false })
+        : { data: [] };
 
-  // 학생 시점 timeline
-  const now = new Date();
-  const items = (assignments ?? [])
-    .map((a) => {
-      const sheet = (Array.isArray(a.test_sheets) ? a.test_sheets[0] : a.test_sheets) as
-        | {
-            id: string;
-            title: string;
-            description: string | null;
-            target_school: string | null;
-            target_grade: number | null;
-            open_at: string | null;
-            due_at: string | null;
-            allow_retake: boolean;
-            max_attempts: number | null;
-          }
-        | null;
-      if (!sheet) return null;
-      const mine = (attempts ?? []).filter((t) => t.assignment_id === a.id);
-      const inProgress = mine.find((t) => t.status === "in_progress");
-      const submittedSorted = mine.filter((t) => t.status === "submitted");
-      const latestSubmitted = submittedSorted[0] ?? null;
-      const submittedCount = submittedSorted.length;
-      const isLocked = sheet.open_at != null && new Date(sheet.open_at) > now;
-      const isClosed = sheet.due_at != null && new Date(sheet.due_at) < now;
-      const maxAtt = sheet.allow_retake ? sheet.max_attempts ?? Infinity : 1;
-      const canTake =
-        !isLocked &&
-        !isClosed &&
-        (inProgress != null || submittedCount < maxAtt);
-      return {
-        assignmentId: a.id,
-        sheet,
-        inProgress,
-        latestSubmitted,
-        submittedCount,
-        maxAtt,
-        isLocked,
-        isClosed,
-        canTake,
-      };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null);
+    const now = new Date();
+    items = (assignments ?? [])
+      .map((a) => {
+        const sheet = (Array.isArray(a.test_sheets)
+          ? a.test_sheets[0]
+          : a.test_sheets) as Sheet | null;
+        if (!sheet) return null;
+        const mine = (attempts ?? []).filter((t) => t.assignment_id === a.id) as Attempt[];
+        const inProgress = mine.find((t) => t.status === "in_progress");
+        const submittedSorted = mine.filter((t) => t.status === "submitted");
+        const latestSubmitted = submittedSorted[0] ?? null;
+        const submittedCount = submittedSorted.length;
+        const isLocked = sheet.open_at != null && new Date(sheet.open_at) > now;
+        const isClosed = sheet.due_at != null && new Date(sheet.due_at) < now;
+        const maxAtt = sheet.allow_retake
+          ? sheet.max_attempts ?? Infinity
+          : 1;
+        const canTake =
+          !isLocked &&
+          !isClosed &&
+          (inProgress != null || submittedCount < maxAtt);
+        const latestAttemptId =
+          inProgress?.id ?? latestSubmitted?.id ?? null;
+        return {
+          assignmentId: a.id,
+          studentName:
+            state.role === "parent" ? studentNameById[a.student_id] : undefined,
+          sheet,
+          inProgress,
+          latestSubmitted,
+          submittedCount,
+          maxAtt,
+          isLocked,
+          isClosed,
+          canTake,
+          latestAttemptId,
+        } satisfies Item;
+      })
+      .filter((x): x is Item => x !== null);
+  }
+
+  const isParent = state.role === "parent";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -104,16 +157,22 @@ export default async function StudentTestsPage() {
       <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-10">
         <div className="space-y-1">
           <p className="font-accent text-2xl text-muted-foreground">
-            오늘 시험을 풀어볼까요?
+            {isParent
+              ? "자녀의 시험 현황이에요."
+              : "오늘 시험을 풀어볼까요?"}
           </p>
-          <h1 className="font-display text-[34px] leading-tight mt-1">내 시험</h1>
+          <h1 className="font-display text-[34px] leading-tight mt-1">
+            {isParent ? "자녀 시험" : "내 시험"}
+          </h1>
         </div>
 
         <ul className="mt-8 space-y-3">
           {items.length === 0 ? (
             <li className="rounded-[16px] border border-hairline bg-surface p-7 text-center">
               <p className="text-muted-foreground text-sm">
-                아직 배정된 시험이 없어요.
+                {isParent
+                  ? "자녀에게 배정된 시험이 없어요."
+                  : "아직 배정된 시험이 없어요."}
               </p>
             </li>
           ) : (
@@ -124,6 +183,11 @@ export default async function StudentTestsPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
+                    {it.studentName && (
+                      <p className="text-muted-foreground text-xs font-bold">
+                        {it.studentName}
+                      </p>
+                    )}
                     <h2 className="font-display text-lg text-foreground">
                       {it.sheet.title}
                     </h2>
@@ -134,9 +198,7 @@ export default async function StudentTestsPage() {
                     )}
                     <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                       {it.sheet.open_at && (
-                        <span>
-                          오픈 {fmt(it.sheet.open_at)}
-                        </span>
+                        <span>오픈 {fmt(it.sheet.open_at)}</span>
                       )}
                       {it.sheet.due_at && <span>마감 {fmt(it.sheet.due_at)}</span>}
                       {it.sheet.allow_retake ? (
@@ -165,13 +227,29 @@ export default async function StudentTestsPage() {
                 )}
 
                 <div className="mt-4 flex justify-end">
-                  <Link
-                    href={`/dashboard/tests/${it.sheet.id}`}
-                    className="text-primary inline-flex items-center gap-1 text-sm font-bold hover:underline"
-                  >
-                    상세 보기
-                    <ArrowRight className="size-3.5" />
-                  </Link>
+                  {isParent ? (
+                    it.latestSubmitted ? (
+                      <Link
+                        href={`/dashboard/tests/${it.sheet.id}/result?attempt=${it.latestSubmitted.id}`}
+                        className="text-primary inline-flex items-center gap-1 text-sm font-bold hover:underline"
+                      >
+                        결과 보기
+                        <ArrowRight className="size-3.5" />
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">
+                        자녀가 응시하면 결과가 표시돼요
+                      </span>
+                    )
+                  ) : (
+                    <Link
+                      href={`/dashboard/tests/${it.sheet.id}`}
+                      className="text-primary inline-flex items-center gap-1 text-sm font-bold hover:underline"
+                    >
+                      상세 보기
+                      <ArrowRight className="size-3.5" />
+                    </Link>
+                  )}
                 </div>
               </li>
             ))
@@ -192,7 +270,7 @@ type Status =
 function statusOf(it: {
   isLocked: boolean;
   isClosed: boolean;
-  inProgress?: { status: string } | null;
+  inProgress?: Attempt;
   submittedCount: number;
 }): Status {
   if (it.isLocked) return "locked";
@@ -249,4 +327,3 @@ function fmt(iso: string) {
     minute: "2-digit",
   });
 }
-
