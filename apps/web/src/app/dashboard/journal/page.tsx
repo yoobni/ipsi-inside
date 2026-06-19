@@ -64,8 +64,9 @@ export default async function JournalArchivePage({
   }
 
   if (targetStudentIds.length === 0) {
+    const earlyNotif = await getMyNotifications(supabase, state.userId);
     return (
-      <Shell>
+      <Shell notif={earlyNotif}>
         <p className="text-muted-foreground text-sm">연결된 학생이 없어요.</p>
       </Shell>
     );
