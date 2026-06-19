@@ -6,6 +6,8 @@ import { readAuthState } from "@/lib/auth-state";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoutButton } from "@/components/logout-button";
+import { NotificationBell } from "@/components/notification-bell";
+import { getMyNotifications } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +136,8 @@ export default async function TestsPage() {
 
   const isParent = state.role === "parent";
 
+  const notif = await getMyNotifications(supabase, state.userId);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-6 py-4 backdrop-blur">
@@ -147,6 +151,7 @@ export default async function TestsPage() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          <NotificationBell items={notif.items} unreadCount={notif.unreadCount} />
           <ThemeToggle />
           <div className="hidden md:block">
             <LogoutButton />

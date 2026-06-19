@@ -276,6 +276,47 @@ export async function assignAction(
     .upsert(rows, { onConflict: "test_sheet_id,student_id", ignoreDuplicates: true });
   if (error) return { ok: false, message: error.message };
 
+  // 알림 — 학생 + 연결된 학부모
+  const { data: sheet } = await supabase
+    .from("test_sheets")
+    .select("title")
+    .eq("id", parsed.test_sheet_id)
+    .maybeSingle();
+  const studentIds = targets.map((t) => t.student_id);
+  const { data: parentLinks } = await supabase
+    .from("parent_student_links")
+    .select("parent_id, student_id")
+    .in("student_id", studentIds);
+
+  const notifs: Array<{
+    user_id: string;
+    type: string;
+    title: string;
+    body: string | null;
+    link: string;
+  }> = [];
+  studentIds.forEach((sid) => {
+    notifs.push({
+      user_id: sid,
+      type: "test_assigned",
+      title: `시험 배정: ${sheet?.title ?? ""}`,
+      body: "시험 페이지에서 응시하세요.",
+      link: `/dashboard/tests/${parsed.test_sheet_id}`,
+    });
+  });
+  (parentLinks ?? []).forEach((l) => {
+    notifs.push({
+      user_id: l.parent_id,
+      type: "test_assigned",
+      title: `자녀에게 시험 배정`,
+      body: sheet?.title ?? "",
+      link: `/dashboard/tests/${parsed.test_sheet_id}`,
+    });
+  });
+  if (notifs.length > 0) {
+    await supabase.from("notifications").insert(notifs);
+  }
+
   revalidatePath(`/tests/${parsed.test_sheet_id}`);
   return { ok: true, count: rows.length };
 }

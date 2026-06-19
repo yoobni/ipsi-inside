@@ -7,6 +7,8 @@ import { todayKst } from "@/lib/kst";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
+import { getMyNotifications, type NotificationItem } from "@/lib/notifications";
 import { JournalCalendar } from "./journal-calendar";
 
 export const dynamic = "force-dynamic";
@@ -106,8 +108,10 @@ export default async function JournalArchivePage({
     feedback: feedbackByJournalId.get(j.id) ?? null,
   }));
 
+  const notif = await getMyNotifications(supabase, state.userId);
+
   return (
-    <Shell>
+    <Shell notif={notif}>
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="sm">
           <Link href="/dashboard">
@@ -136,12 +140,21 @@ export default async function JournalArchivePage({
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({
+  children,
+  notif,
+}: {
+  children: React.ReactNode;
+  notif: { items: NotificationItem[]; unreadCount: number };
+}) {
   return (
     <div className="bg-background flex min-h-screen flex-col">
       <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
         <Wordmark size="md" />
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <NotificationBell items={notif.items} unreadCount={notif.unreadCount} />
+          <ThemeToggle />
+        </div>
       </header>
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8 space-y-6">
         {children}

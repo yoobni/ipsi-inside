@@ -6,7 +6,9 @@ import { todayKst } from "@/lib/kst";
 import { LogoutButton } from "@/components/logout-button";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
 import { WrongAccountNotice } from "@/components/wrong-account-notice";
+import { getMyNotifications } from "@/lib/notifications";
 import { JournalSubmit } from "./journal-submit";
 import { TodayReportCard } from "./today-report";
 import { WeeklySummary, type DailyRecord } from "./weekly-summary";
@@ -168,6 +170,12 @@ export default async function DashboardPage() {
     }
   }
 
+  // 알림
+  const notif =
+    state.kind === "ok"
+      ? await getMyNotifications(supabase, state.userId)
+      : { items: [], unreadCount: 0 };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-6 py-4 backdrop-blur">
@@ -181,6 +189,7 @@ export default async function DashboardPage() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          <NotificationBell items={notif.items} unreadCount={notif.unreadCount} />
           <ThemeToggle />
           <div className="hidden md:block">
             <LogoutButton />

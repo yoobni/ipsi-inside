@@ -92,6 +92,42 @@ export async function publishFeedbackAction(
 
   if (error) return { ok: false, message: error.message };
 
+  // 알림 — publish_at(다음날 06:00 KST) 시각으로 created_at을 설정해서
+  // 학생/학부모 종 아이콘이 그 시각부터 노출되게.
+  const { data: journal } = await db
+    .from("study_journals")
+    .select("student_id, journal_date")
+    .eq("id", journalId)
+    .maybeSingle();
+  if (journal) {
+    const { data: links } = await db
+      .from("parent_student_links")
+      .select("parent_id")
+      .eq("student_id", journal.student_id);
+
+    const notifs = [
+      {
+        user_id: journal.student_id,
+        type: "journal_feedback_published",
+        title: "원장님 피드백 도착",
+        body: `${journal.journal_date} 일지 피드백`,
+        link: "/dashboard",
+        created_at: publishAt.toISOString(),
+      },
+      ...(links ?? []).map((l) => ({
+        user_id: l.parent_id,
+        type: "journal_feedback_published",
+        title: "자녀 일지 피드백 도착",
+        body: `${journal.journal_date} 자녀 학습 피드백`,
+        link: "/dashboard",
+        created_at: publishAt.toISOString(),
+      })),
+    ];
+    if (notifs.length > 0) {
+      await db.from("notifications").insert(notifs);
+    }
+  }
+
   revalidatePath("/journals");
   return { ok: true };
 }
@@ -111,6 +147,26 @@ export async function unpublishFeedbackAction(
     .update({ publish_at: null })
     .eq("journal_id", journalId);
   if (error) return { ok: false, message: error.message };
+
+  // 발행 취소: 관련 알림 정리 (저널의 학생/학부모, type='journal_feedback_published')
+  const { data: journal } = await db
+    .from("study_journals")
+    .select("student_id, journal_date")
+    .eq("id", journalId)
+    .maybeSingle();
+  if (journal) {
+    const { data: links } = await db
+      .from("parent_student_links")
+      .select("parent_id")
+      .eq("student_id", journal.student_id);
+    const userIds = [journal.student_id, ...(links ?? []).map((l) => l.parent_id)];
+    await db
+      .from("notifications")
+      .delete()
+      .in("user_id", userIds)
+      .eq("type", "journal_feedback_published")
+      .like("body", `%${journal.journal_date}%`);
+  }
 
   revalidatePath("/journals");
   return { ok: true };
