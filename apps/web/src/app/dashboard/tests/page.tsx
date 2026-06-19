@@ -94,32 +94,33 @@ export default async function TestsPage() {
         : { data: [] };
 
     const now = new Date();
-    items = (assignments ?? [])
-      .map((a) => {
-        const sheet = (Array.isArray(a.test_sheets)
-          ? a.test_sheets[0]
-          : a.test_sheets) as Sheet | null;
-        if (!sheet) return null;
-        const mine = (attempts ?? []).filter((t) => t.assignment_id === a.id) as Attempt[];
-        const inProgress = mine.find((t) => t.status === "in_progress");
-        const submittedSorted = mine.filter((t) => t.status === "submitted");
-        const latestSubmitted = submittedSorted[0] ?? null;
-        const submittedCount = submittedSorted.length;
-        const isLocked = sheet.open_at != null && new Date(sheet.open_at) > now;
-        const isClosed = sheet.due_at != null && new Date(sheet.due_at) < now;
-        const maxAtt = sheet.allow_retake
-          ? sheet.max_attempts ?? Infinity
-          : 1;
-        const canTake =
-          !isLocked &&
-          !isClosed &&
-          (inProgress != null || submittedCount < maxAtt);
-        const latestAttemptId =
-          inProgress?.id ?? latestSubmitted?.id ?? null;
-        return {
+    items = (assignments ?? []).flatMap<Item>((a) => {
+      const sheet = (Array.isArray(a.test_sheets)
+        ? a.test_sheets[0]
+        : a.test_sheets) as Sheet | null;
+      if (!sheet) return [];
+      const mine = (attempts ?? []).filter(
+        (t) => t.assignment_id === a.id,
+      ) as Attempt[];
+      const inProgress = mine.find((t) => t.status === "in_progress");
+      const submittedSorted = mine.filter((t) => t.status === "submitted");
+      const latestSubmitted = submittedSorted[0] ?? null;
+      const submittedCount = submittedSorted.length;
+      const isLocked = sheet.open_at != null && new Date(sheet.open_at) > now;
+      const isClosed = sheet.due_at != null && new Date(sheet.due_at) < now;
+      const maxAtt = sheet.allow_retake ? sheet.max_attempts ?? Infinity : 1;
+      const canTake =
+        !isLocked &&
+        !isClosed &&
+        (inProgress != null || submittedCount < maxAtt);
+      const latestAttemptId = inProgress?.id ?? latestSubmitted?.id ?? null;
+      return [
+        {
           assignmentId: a.id,
           studentName:
-            state.role === "parent" ? studentNameById[a.student_id] : undefined,
+            state.role === "parent"
+              ? studentNameById[a.student_id]
+              : undefined,
           sheet,
           inProgress,
           latestSubmitted,
@@ -129,9 +130,9 @@ export default async function TestsPage() {
           isClosed,
           canTake,
           latestAttemptId,
-        } satisfies Item;
-      })
-      .filter((x): x is Item => x !== null);
+        },
+      ];
+    });
   }
 
   const isParent = state.role === "parent";
