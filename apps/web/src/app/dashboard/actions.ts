@@ -31,11 +31,19 @@ export async function submitJournalAction(
   }
 
   const parsed = journalSubmitSchema.safeParse({
-    content: formData.get("content"),
+    class_question: formData.get("class_question") ?? null,
+    test_question: formData.get("test_question") ?? null,
+    message_to_teacher: formData.get("message_to_teacher") ?? null,
+    learning_log: formData.get("learning_log") ?? null,
   });
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "입력 오류" };
   }
+
+  const norm = (s: string | null | undefined) => {
+    const t = (s ?? "").trim();
+    return t.length > 0 ? t : null;
+  };
 
   const today = todayKst();
 
@@ -45,7 +53,11 @@ export async function submitJournalAction(
       {
         student_id: user.id,
         journal_date: today,
-        content: parsed.data.content,
+        // content는 deprecated — 4갈래만 채움
+        class_question: norm(parsed.data.class_question),
+        test_question: norm(parsed.data.test_question),
+        message_to_teacher: norm(parsed.data.message_to_teacher),
+        learning_log: norm(parsed.data.learning_log),
         updated_at: new Date().toISOString(),
       },
       { onConflict: "student_id,journal_date" },

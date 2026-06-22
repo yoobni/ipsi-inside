@@ -25,7 +25,10 @@ type Feedback = {
 type DayItem = {
   date: string;
   journalId: string;
-  content: string;
+  class_question: string | null;
+  test_question: string | null;
+  message_to_teacher: string | null;
+  learning_log: string | null;
   feedback: Feedback | null;
 };
 
@@ -237,14 +240,27 @@ function DayDetailPanel({
       </div>
 
       <div className="mt-4 space-y-5">
-        {/* 학생 일지 */}
-        <div>
-          <p className="text-muted-foreground text-xs font-bold uppercase tracking-wider">
-            학생 일지
-          </p>
-          <p className="text-foreground mt-2 whitespace-pre-wrap text-sm leading-relaxed">
-            {item.content}
-          </p>
+        {/* 학생 일지 — 4갈래 */}
+        <div className="space-y-3">
+          {(
+            [
+              ["수업 내용 질문", item.class_question],
+              ["시험 내용 질문", item.test_question],
+              ["선생님께 전달하고 싶은 것", item.message_to_teacher],
+              ["오늘 새로 알게 된 것", item.learning_log],
+            ] as const
+          )
+            .filter(([, v]) => !!v && v.trim().length > 0)
+            .map(([label, v]) => (
+              <div key={label}>
+                <p className="text-muted-foreground text-[11px] font-bold">
+                  {label}
+                </p>
+                <p className="text-foreground mt-1 whitespace-pre-wrap text-sm leading-relaxed">
+                  {v}
+                </p>
+              </div>
+            ))}
         </div>
 
         {/* 피드백 */}

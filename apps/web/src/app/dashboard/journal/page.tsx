@@ -79,7 +79,9 @@ export default async function JournalArchivePage({
 
   const { data: journals } = await supabase
     .from("study_journals")
-    .select("id, journal_date, content")
+    .select(
+      "id, journal_date, content, class_question, test_question, message_to_teacher, learning_log",
+    )
     .in("student_id", targetStudentIds)
     .gte("journal_date", monthStart)
     .lt("journal_date", monthEnd)
@@ -102,12 +104,23 @@ export default async function JournalArchivePage({
     (feedbacks ?? []).map((f) => [f.journal_id, f] as const),
   );
 
-  const dayItems = (journals ?? []).map((j) => ({
-    date: j.journal_date,
-    journalId: j.id,
-    content: j.content,
-    feedback: feedbackByJournalId.get(j.id) ?? null,
-  }));
+  const dayItems = (journals ?? []).map((j) => {
+    const hasNew =
+      !!j.class_question ||
+      !!j.test_question ||
+      !!j.message_to_teacher ||
+      !!j.learning_log;
+    return {
+      date: j.journal_date,
+      journalId: j.id,
+      // 4갈래 (옛 레코드는 content를 message_to_teacher로 폴백)
+      class_question: j.class_question,
+      test_question: j.test_question,
+      message_to_teacher: !hasNew && j.content ? j.content : j.message_to_teacher,
+      learning_log: j.learning_log,
+      feedback: feedbackByJournalId.get(j.id) ?? null,
+    };
+  });
 
   const notif = await getMyNotifications(supabase, state.userId);
 

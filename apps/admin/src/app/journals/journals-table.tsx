@@ -34,7 +34,11 @@ type Journal = {
   id: string;
   student_id: string;
   journal_date: string;
-  content: string;
+  content: string | null;
+  class_question: string | null;
+  test_question: string | null;
+  message_to_teacher: string | null;
+  learning_log: string | null;
   submitted_at: string;
   updated_at: string;
 };
@@ -143,7 +147,7 @@ export function JournalsTable({
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-md truncate text-sm">
-                    {r.journal.content}
+                    {summarizeJournal(r.journal)}
                   </TableCell>
                   <TableCell>
                     <FeedbackBadge feedback={r.feedback} />
@@ -292,14 +296,12 @@ function FeedbackDrawer({
 
             <div className="flex-1 overflow-y-auto px-4 pb-4">
               <div className="grid auto-rows-min gap-5">
-                {/* 학생 일지 원문 */}
+                {/* 학생 일지 — 4갈래 */}
                 <section className="space-y-2">
                   <h3 className="text-foreground text-sm font-semibold">
                     학생 일지
                   </h3>
-                  <div className="bg-muted/40 rounded-md border px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-                    {row.journal.content}
-                  </div>
+                  <StudentJournalSections journal={row.journal} />
                 </section>
 
                 {/* 4필드 피드백 */}
@@ -414,4 +416,58 @@ function formatDateTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+const JOURNAL_LABELS: ReadonlyArray<readonly [keyof Journal, string]> = [
+  ["class_question", "수업 내용 질문"],
+  ["test_question", "시험 내용 질문"],
+  ["message_to_teacher", "선생님께 전달하고 싶은 것"],
+  ["learning_log", "오늘 새로 알게 된 것"],
+];
+
+function StudentJournalSections({ journal }: { journal: Journal }) {
+  const sections = JOURNAL_LABELS.map(
+    ([key, label]) => [label, journal[key]] as const,
+  ).filter(([, v]) => typeof v === "string" && v.trim().length > 0);
+
+  // 옛 레코드 (4갈래 비어있고 content만 있음) → "기타"로 표시
+  if (sections.length === 0 && journal.content && journal.content.trim()) {
+    return (
+      <div className="bg-muted/40 rounded-md border px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+        {journal.content}
+      </div>
+    );
+  }
+  if (sections.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">내용이 없어요.</p>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {sections.map(([label, v]) => (
+        <div
+          key={label}
+          className="bg-muted/40 rounded-md border px-3 py-2.5"
+        >
+          <p className="text-muted-foreground text-[10px] font-bold">{label}</p>
+          <p className="text-foreground mt-1 whitespace-pre-wrap text-sm leading-relaxed">
+            {v as string}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 테이블 행 — 줄임 표시용 한 줄 요약 */
+function summarizeJournal(journal: Journal): string {
+  const parts = JOURNAL_LABELS.map(([key, label]) => {
+    const v = journal[key];
+    if (typeof v !== "string" || !v.trim()) return null;
+    return `[${label}] ${v.trim()}`;
+  }).filter(Boolean) as string[];
+  if (parts.length > 0) return parts.join(" / ");
+  return journal.content ?? "";
 }

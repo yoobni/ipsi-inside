@@ -25,7 +25,10 @@ export default async function DashboardPage() {
   // 학생/학부모일 때 일지 + 발행된 피드백 조회
   const today = todayKst();
   let todaysJournal: {
-    content: string;
+    class_question: string | null;
+    test_question: string | null;
+    message_to_teacher: string | null;
+    learning_log: string | null;
     submitted_at: string;
     updated_at: string;
   } | null = null;
@@ -58,11 +61,29 @@ export default async function DashboardPage() {
     if (state.role === "student") {
       const { data: j } = await supabase
         .from("study_journals")
-        .select("content, submitted_at, updated_at")
+        .select(
+          "class_question, test_question, message_to_teacher, learning_log, content, submitted_at, updated_at",
+        )
         .eq("student_id", state.userId)
         .eq("journal_date", today)
         .maybeSingle();
-      todaysJournal = j;
+      if (j) {
+        // 4갈래가 모두 비어있고 content만 있는 옛 레코드는 message_to_teacher로 폴백
+        const hasNew =
+          !!j.class_question ||
+          !!j.test_question ||
+          !!j.message_to_teacher ||
+          !!j.learning_log;
+        todaysJournal = {
+          class_question: j.class_question,
+          test_question: j.test_question,
+          message_to_teacher:
+            !hasNew && j.content ? j.content : j.message_to_teacher,
+          learning_log: j.learning_log,
+          submitted_at: j.submitted_at,
+          updated_at: j.updated_at,
+        };
+      }
     }
 
     // 가장 최근 발행된 피드백 (학생 본인 또는 자녀 중 누구든)
@@ -262,7 +283,10 @@ function StudentDashboard({
   school: string | null;
   grade: number | null;
   todaysJournal: {
-    content: string;
+    class_question: string | null;
+    test_question: string | null;
+    message_to_teacher: string | null;
+    learning_log: string | null;
     submitted_at: string;
     updated_at: string;
   } | null;

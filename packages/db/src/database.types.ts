@@ -378,7 +378,11 @@ export type Database = {
           id: string;
           student_id: string;
           journal_date: string;
-          content: string;
+          content: string | null;
+          class_question: string | null;
+          test_question: string | null;
+          message_to_teacher: string | null;
+          learning_log: string | null;
           submitted_at: string;
           updated_at: string;
         };
@@ -386,7 +390,11 @@ export type Database = {
           id?: string;
           student_id: string;
           journal_date: string;
-          content: string;
+          content?: string | null;
+          class_question?: string | null;
+          test_question?: string | null;
+          message_to_teacher?: string | null;
+          learning_log?: string | null;
           submitted_at?: string;
           updated_at?: string;
         };
@@ -394,7 +402,11 @@ export type Database = {
           id?: string;
           student_id?: string;
           journal_date?: string;
-          content?: string;
+          content?: string | null;
+          class_question?: string | null;
+          test_question?: string | null;
+          message_to_teacher?: string | null;
+          learning_log?: string | null;
           submitted_at?: string;
           updated_at?: string;
         };

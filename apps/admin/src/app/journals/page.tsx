@@ -13,7 +13,9 @@ export default async function JournalsPage() {
 
   const { data: journals } = await supabase
     .from("study_journals")
-    .select("id, student_id, journal_date, content, submitted_at, updated_at")
+    .select(
+      "id, student_id, journal_date, content, class_question, test_question, message_to_teacher, learning_log, submitted_at, updated_at",
+    )
     .gte("journal_date", sinceDate)
     .order("journal_date", { ascending: false })
     .order("submitted_at", { ascending: false });
