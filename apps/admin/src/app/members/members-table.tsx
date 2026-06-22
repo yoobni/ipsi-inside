@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import {
+  ArrowRight,
   Calendar,
   GraduationCap,
   Phone,
@@ -287,6 +289,20 @@ function MemberDrawer({
 
             <div className="flex-1 overflow-y-auto px-4 pb-4">
               <div className="grid auto-rows-min gap-6">
+                {member.role === "student" && (
+                  <Link
+                    href={`/members/${member.id}`}
+                    className="bg-primary/5 border-primary/30 inline-flex items-center justify-between gap-2 rounded-md border px-3 py-2.5 text-sm font-medium transition-colors hover:bg-primary/10"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <ArrowRight className="text-primary size-4" />
+                      종합 학습 리포트 보기
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      출결 / 시험 / 일지
+                    </span>
+                  </Link>
+                )}
                 <Section title="기본 정보">
                   <InfoList>
                     <InfoItem

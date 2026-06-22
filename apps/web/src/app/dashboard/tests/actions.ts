@@ -118,6 +118,10 @@ export async function submitAttemptAction(
   attemptId: string,
 ): Promise<Result> {
   const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "인증 필요" };
 
   // 채점 결과 계산
   const { data: rows } = await supabase.rpc("attempt_total_score", {
@@ -136,22 +140,64 @@ export async function submitAttemptAction(
     .eq("id", attemptId);
   if (uErr) return { ok: false, message: uErr.message };
 
-  // 시험지 id 찾아서 revalidate
+  // 시험지/학생 메타 + admin 알림 발송
   const { data: att } = await supabase
     .from("test_attempts")
-    .select("assignment_id")
+    .select("assignment_id, attempt_no")
     .eq("id", attemptId)
     .maybeSingle();
+
+  let testSheetId: string | null = null;
   if (att) {
     const { data: asg } = await supabase
       .from("test_assignments")
-      .select("test_sheet_id")
+      .select("test_sheet_id, student_id")
       .eq("id", att.assignment_id)
       .maybeSingle();
     if (asg) {
+      testSheetId = asg.test_sheet_id;
       revalidatePath(`/dashboard/tests/${asg.test_sheet_id}`);
+
+      // admin 들에게 알림
+      const [{ data: sheet }, { data: student }, { data: admins }] =
+        await Promise.all([
+          supabase
+            .from("test_sheets")
+            .select("title")
+            .eq("id", asg.test_sheet_id)
+            .maybeSingle(),
+          supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", asg.student_id)
+            .maybeSingle(),
+          supabase
+            .from("profiles")
+            .select("id")
+            .eq("role", "admin")
+            .eq("status", "approved"),
+        ]);
+
+      const scoreStr =
+        totals && totals.total_points > 0
+          ? ` ${totals.earned_points}/${totals.total_points}점`
+          : "";
+      const attemptStr = att.attempt_no > 1 ? ` (${att.attempt_no}회차)` : "";
+
+      const notifs = (admins ?? []).map((a) => ({
+        user_id: a.id,
+        type: "test_submitted",
+        title: `${student?.full_name ?? "학생"} 시험 제출${attemptStr}`,
+        body: `${sheet?.title ?? ""}${scoreStr}`,
+        link: `/tests/${asg.test_sheet_id}/attempts/${attemptId}`,
+      }));
+      if (notifs.length > 0) {
+        await supabase.from("notifications").insert(notifs);
+      }
     }
   }
+
   revalidatePath("/dashboard/tests");
+  if (testSheetId) revalidatePath(`/tests/${testSheetId}`);
   return { ok: true, attemptId };
 }

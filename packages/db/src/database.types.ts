@@ -412,6 +412,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      announcements: {
+        Row: {
+          id: string;
+          title: string;
+          body: string | null;
+          audience: "all" | "student" | "parent";
+          is_published: boolean;
+          published_at: string | null;
+          expires_at: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          body?: string | null;
+          audience?: "all" | "student" | "parent";
+          is_published?: boolean;
+          published_at?: string | null;
+          expires_at?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          body?: string | null;
+          audience?: "all" | "student" | "parent";
+          is_published?: boolean;
+          published_at?: string | null;
+          expires_at?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;

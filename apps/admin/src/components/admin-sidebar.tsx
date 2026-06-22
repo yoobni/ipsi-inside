@@ -6,6 +6,7 @@ import {
   BookOpen,
   CalendarCheck,
   FileText,
+  Megaphone,
   NotebookPen,
   UserCheck,
   Users,
@@ -56,6 +57,12 @@ const MENU: MenuItem[] = [
     label: "일일 마킹",
     icon: CalendarCheck,
     matchPrefix: "/daily",
+  },
+  {
+    href: "/announcements",
+    label: "공지사항",
+    icon: Megaphone,
+    matchPrefix: "/announcements",
   },
 ];
 

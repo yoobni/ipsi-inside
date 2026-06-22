@@ -7,8 +7,10 @@ import { LogoutButton } from "@/components/logout-button";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
+import { AnnouncementBanner } from "@/components/announcement-banner";
 import { WrongAccountNotice } from "@/components/wrong-account-notice";
 import { getMyNotifications } from "@/lib/notifications";
+import { getActiveAnnouncements } from "@/lib/announcements";
 import { JournalSubmit } from "./journal-submit";
 import { TodayReportCard } from "./today-report";
 import { WeeklySummary, type DailyRecord } from "./weekly-summary";
@@ -191,11 +193,13 @@ export default async function DashboardPage() {
     }
   }
 
-  // 알림
+  // 알림 + 공지
   const notif =
     state.kind === "ok"
       ? await getMyNotifications(supabase, state.userId)
       : { items: [], unreadCount: 0 };
+  const announcements =
+    state.kind === "ok" ? await getActiveAnnouncements(supabase) : [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -235,6 +239,11 @@ export default async function DashboardPage() {
 
         {state.kind === "ok" && (
           <div className="space-y-8">
+            {/* 공지사항 배너 */}
+            {announcements.length > 0 && (
+              <AnnouncementBanner items={announcements} />
+            )}
+
             {/* ★ 발행된 오늘의 리포트 — 최상단 */}
             {latestPublishedFeedback && (
               <TodayReportCard
