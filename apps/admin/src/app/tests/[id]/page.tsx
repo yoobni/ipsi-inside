@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Pencil } from "lucide-react";
+import { ChevronLeft, Download, Pencil } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import type { QuestionChoice } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
@@ -92,6 +92,51 @@ export default async function TestDetailPage({
       };
     })
     .filter((x): x is PreviewQuestion => x !== null);
+
+  // 문항별 정답률 집계 (제출된 attempt만)
+  const submittedAttemptIdsForSheet = await (async () => {
+    const { data: asgs } = await supabase
+      .from("test_assignments")
+      .select("id")
+      .eq("test_sheet_id", id);
+    const aIds = (asgs ?? []).map((a) => a.id);
+    if (aIds.length === 0) return [];
+    const { data: ats } = await supabase
+      .from("test_attempts")
+      .select("id")
+      .in("assignment_id", aIds)
+      .eq("status", "submitted");
+    return (ats ?? []).map((a) => a.id);
+  })();
+
+  const perQuestion = new Map<string, { correct: number; total: number }>();
+  if (submittedAttemptIdsForSheet.length > 0 && questionIds.length > 0) {
+    const { data: answers } = await supabase
+      .from("student_answers")
+      .select("question_id, is_correct")
+      .in("attempt_id", submittedAttemptIdsForSheet)
+      .in("question_id", questionIds);
+    (answers ?? []).forEach((a) => {
+      const cur = perQuestion.get(a.question_id) ?? { correct: 0, total: 0 };
+      cur.total += 1;
+      if (a.is_correct) cur.correct += 1;
+      perQuestion.set(a.question_id, cur);
+    });
+  }
+
+  const questionStats = orderedQuestions
+    .map(({ position, q }) => {
+      if (!q) return null;
+      const s = perQuestion.get(q.id);
+      return {
+        position,
+        question_id: q.id,
+        correct: s?.correct ?? 0,
+        total: s?.total ?? 0,
+        accuracy: s && s.total > 0 ? Math.round((s.correct / s.total) * 100) : null,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
   // 배정 학생
   const { data: assignments } = await supabase
@@ -217,7 +262,12 @@ export default async function TestDetailPage({
             </Badge>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <a href={`/tests/${id}/export`} download>
+              <Download className="size-4" /> CSV
+            </a>
+          </Button>
           <DuplicateButton testSheetId={id} />
           <Button asChild variant="outline" size="sm">
             <Link href={`/tests/${id}/edit`}>
@@ -295,6 +345,60 @@ export default async function TestDetailPage({
           )}
         </div>
       </section>
+
+      {/* 문항별 정답률 */}
+      {questionStats.some((s) => s.total > 0) && (
+        <section className="rounded-md border bg-card">
+          <div className="border-b px-4 py-3">
+            <h2 className="text-sm font-semibold">문항별 정답률</h2>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              제출된 응시만 집계 — 정답률 낮은 문항이 위로
+            </p>
+          </div>
+          <ul className="divide-y">
+            {questionStats
+              .slice()
+              .sort((a, b) => {
+                const A = a.accuracy ?? 101;
+                const B = b.accuracy ?? 101;
+                return A - B;
+              })
+              .map((s) => (
+                <li
+                  key={s.question_id}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm"
+                >
+                  <span className="bg-muted text-muted-foreground inline-flex size-7 shrink-0 items-center justify-center rounded text-xs font-bold tabular-nums">
+                    {s.position}
+                  </span>
+                  <div className="bg-muted relative h-2 flex-1 overflow-hidden rounded-full">
+                    <div
+                      className={
+                        "h-2 transition-all " +
+                        (s.accuracy == null
+                          ? ""
+                          : s.accuracy >= 70
+                            ? "bg-emerald-500"
+                            : s.accuracy >= 50
+                              ? "bg-amber-500"
+                              : "bg-red-500")
+                      }
+                      style={{
+                        width: s.accuracy != null ? `${s.accuracy}%` : "0%",
+                      }}
+                    />
+                  </div>
+                  <span className="w-28 text-right tabular-nums">
+                    {s.accuracy != null ? `${s.accuracy}%` : "—"}
+                    <span className="text-muted-foreground ml-1 text-xs">
+                      ({s.correct}/{s.total})
+                    </span>
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
 
       {/* 배정 */}
       <TestDetailClient

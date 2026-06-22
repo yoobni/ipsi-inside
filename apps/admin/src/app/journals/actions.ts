@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { journalFeedbackSchema } from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
@@ -62,7 +63,7 @@ export async function saveFeedbackDraftAction(
     { onConflict: "journal_id" },
   );
 
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/journals");
   return { ok: true };
 }
@@ -90,7 +91,7 @@ export async function publishFeedbackAction(
     .update({ publish_at: publishAt.toISOString() })
     .eq("journal_id", journalId);
 
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
 
   // 알림 — publish_at(다음날 06:00 KST) 시각으로 created_at을 설정해서
   // 학생/학부모 종 아이콘이 그 시각부터 노출되게.
@@ -146,7 +147,7 @@ export async function unpublishFeedbackAction(
     .from("journal_feedbacks")
     .update({ publish_at: null })
     .eq("journal_id", journalId);
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
 
   // 발행 취소: 관련 알림 정리 (저널의 학생/학부모, type='journal_feedback_published')
   const { data: journal } = await db

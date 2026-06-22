@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eraser, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { upsertDailyAction } from "./actions";
+import { bulkMarkDailyAction, upsertDailyAction } from "./actions";
 
 type Student = {
   id: string;
@@ -39,6 +39,9 @@ type Row = {
 
 export function DailyTable({ date, rows }: { date: string; rows: Row[] }) {
   const router = useRouter();
+  const [bulkPending, startBulkTransition] = useTransition();
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
   const goDate = (d: string) => {
     router.push(`/daily?date=${d}`);
   };
@@ -57,6 +60,29 @@ export function DailyTable({ date, rows }: { date: string; rows: Row[] }) {
     timeZone: "UTC",
   });
 
+  const studentIds = rows.map((r) => r.student.id);
+
+  const bulkApply = (
+    field: "attendance" | "homework_grade",
+    value: Attendance | HomeworkGrade,
+  ) => {
+    if (studentIds.length === 0) return;
+    setBulkError(null);
+    startBulkTransition(async () => {
+      const params: {
+        date: string;
+        studentIds: string[];
+        attendance?: Attendance;
+        homework_grade?: HomeworkGrade;
+      } = { date, studentIds };
+      if (field === "attendance") params.attendance = value as Attendance;
+      else params.homework_grade = value as HomeworkGrade;
+      const r = await bulkMarkDailyAction(params);
+      if (!r.ok) setBulkError(r.message);
+      else router.refresh();
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -74,6 +100,87 @@ export function DailyTable({ date, rows }: { date: string; rows: Row[] }) {
         </Button>
         <span className="text-muted-foreground ml-2 text-sm">{dateLabel}</span>
       </div>
+
+      {/* 일괄 마킹 */}
+      {rows.length > 0 && (
+        <div className="bg-card flex flex-wrap items-center gap-2 rounded-md border px-3 py-2.5">
+          <span className="text-muted-foreground text-xs font-semibold">
+            전원 ({rows.length}명) 일괄
+            {bulkPending && (
+              <Loader2 className="ml-1 inline size-3 animate-spin" />
+            )}
+          </span>
+          <span className="bg-border h-4 w-px" />
+          <BulkBtn
+            label="출석"
+            color="emerald"
+            disabled={bulkPending}
+            onClick={() => bulkApply("attendance", "present")}
+          />
+          <BulkBtn
+            label="지각"
+            color="amber"
+            disabled={bulkPending}
+            onClick={() => bulkApply("attendance", "late")}
+          />
+          <BulkBtn
+            label="결석"
+            color="red"
+            disabled={bulkPending}
+            onClick={() => bulkApply("attendance", "absent")}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={bulkPending}
+            onClick={() => bulkApply("attendance", null)}
+            className="h-7 text-xs"
+          >
+            <Eraser className="size-3" />출석 지움
+          </Button>
+          <span className="bg-border h-4 w-px" />
+          <BulkBtn
+            label="과제 S"
+            color="emerald"
+            disabled={bulkPending}
+            onClick={() => bulkApply("homework_grade", "S")}
+          />
+          <BulkBtn
+            label="A"
+            color="blue"
+            disabled={bulkPending}
+            onClick={() => bulkApply("homework_grade", "A")}
+          />
+          <BulkBtn
+            label="B"
+            color="amber"
+            disabled={bulkPending}
+            onClick={() => bulkApply("homework_grade", "B")}
+          />
+          <BulkBtn
+            label="F"
+            color="red"
+            disabled={bulkPending}
+            onClick={() => bulkApply("homework_grade", "F")}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={bulkPending}
+            onClick={() => bulkApply("homework_grade", null)}
+            className="h-7 text-xs"
+          >
+            <Eraser className="size-3" />과제 지움
+          </Button>
+          {bulkError && (
+            <span className="text-destructive ml-auto text-xs">
+              {bulkError}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="rounded-md border bg-card">
         <Table>
@@ -105,6 +212,40 @@ export function DailyTable({ date, rows }: { date: string; rows: Row[] }) {
         </Table>
       </div>
     </div>
+  );
+}
+
+function BulkBtn({
+  label,
+  color,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  color: "emerald" | "amber" | "red" | "blue";
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const cls = {
+    emerald:
+      "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300",
+    amber:
+      "border-amber-500/30 bg-amber-500/5 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300",
+    red: "border-red-500/30 bg-red-500/5 text-red-700 hover:bg-red-500/10 dark:text-red-300",
+    blue: "border-blue-500/30 bg-blue-500/5 text-blue-700 hover:bg-blue-500/10 dark:text-blue-300",
+  }[color];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "h-7 rounded-md border px-2.5 text-xs font-medium transition-colors disabled:opacity-50",
+        cls,
+      )}
+    >
+      {label}
+    </button>
   );
 }
 

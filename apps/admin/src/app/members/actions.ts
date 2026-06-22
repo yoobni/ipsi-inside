@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 
@@ -36,7 +37,7 @@ export async function suspendMemberAction(profileId: string): Promise<Result> {
     .eq("id", profileId)
     .neq("role", "admin");
 
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/members");
   return { ok: true };
 }
@@ -53,7 +54,7 @@ export async function unsuspendMemberAction(
     .update({ status: "approved" })
     .eq("id", profileId);
 
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/members");
   return { ok: true };
 }
@@ -87,7 +88,7 @@ export async function addParentStudentLinkAction(
     if (error.code === "23505") {
       return { ok: false, message: "이미 연결된 학생입니다" };
     }
-    return { ok: false, message: error.message };
+    return { ok: false, message: friendlyDbError(error) };
   }
 
   revalidatePath("/members");
@@ -108,7 +109,7 @@ export async function removeParentStudentLinkAction(
     .eq("parent_id", parentId)
     .eq("student_id", studentId);
 
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/members");
   return { ok: true };
 }

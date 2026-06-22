@@ -2,15 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TestsTableClient, type SheetRow } from "./tests-table-client";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +39,19 @@ export default async function TestsListPage() {
     );
   }
 
+  const rows: SheetRow[] = (sheets ?? []).map((s) => ({
+    id: s.id,
+    title: s.title,
+    target_school: s.target_school,
+    target_grade: s.target_grade,
+    open_at: s.open_at,
+    due_at: s.due_at,
+    allow_retake: s.allow_retake,
+    created_at: s.created_at,
+    question_count: qCount.get(s.id) ?? 0,
+    assigned_count: aCount.get(s.id) ?? 0,
+  }));
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -63,81 +68,7 @@ export default async function TestsListPage() {
         </Button>
       </div>
 
-      <div className="rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="pl-4">제목</TableHead>
-              <TableHead>대상</TableHead>
-              <TableHead>일정</TableHead>
-              <TableHead>문항</TableHead>
-              <TableHead>배정</TableHead>
-              <TableHead className="pr-4 text-right">생성일</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(sheets ?? []).length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="text-muted-foreground h-24 text-center"
-                >
-                  아직 시험지가 없습니다. 우측 상단 [새 시험지]로 만들어보세요.
-                </TableCell>
-              </TableRow>
-            ) : (
-              (sheets ?? []).map((s) => (
-                <TableRow key={s.id} className="cursor-pointer">
-                  <TableCell className="pl-4 font-medium">
-                    <Link href={`/tests/${s.id}`} className="hover:underline">
-                      {s.title}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {s.target_school
-                      ? `${s.target_school}${s.target_grade ? ` · ${s.target_grade}학년` : ""}`
-                      : "-"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    <ScheduleLabel openAt={s.open_at} dueAt={s.due_at} />
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{qCount.get(s.id) ?? 0}문항</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={(aCount.get(s.id) ?? 0) > 0 ? "primary" : "outline"}>
-                      {aCount.get(s.id) ?? 0}명
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground pr-4 text-right text-sm">
-                    {new Date(s.created_at).toLocaleDateString("ko-KR")}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <TestsTableClient sheets={rows} />
     </div>
   );
-}
-
-function ScheduleLabel({
-  openAt,
-  dueAt,
-}: {
-  openAt: string | null;
-  dueAt: string | null;
-}) {
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleString("ko-KR", {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  if (!openAt && !dueAt) return <span>제한 없음</span>;
-  if (openAt && dueAt) return <span>{fmt(openAt)} ~ {fmt(dueAt)}</span>;
-  if (openAt) return <span>{fmt(openAt)} 부터</span>;
-  return <span>~ {fmt(dueAt!)}</span>;
 }

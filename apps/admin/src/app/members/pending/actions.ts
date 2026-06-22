@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 
@@ -63,7 +64,7 @@ export async function approveProfileAction(
     })
     .eq("id", profileId);
 
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
 
   revalidatePath("/members/pending");
   return { ok: true };
@@ -79,7 +80,7 @@ export async function rejectProfileAction(profileId: string): Promise<Result> {
     .update({ status: "rejected" })
     .eq("id", profileId);
 
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/members/pending");
   return { ok: true };
 }

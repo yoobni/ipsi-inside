@@ -1,4 +1,6 @@
+import { Download } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { Button } from "@/components/ui/button";
 import { todayKst } from "@/lib/kst";
 import { DailyTable } from "./daily-table";
 
@@ -44,13 +46,29 @@ export default async function DailyPage({
     record: rowMap.get(s.id),
   }));
 
+  // 기본: 최근 30일
+  const exportTo = date;
+  const exportFromDate = new Date(`${date}T00:00:00Z`);
+  exportFromDate.setUTCDate(exportFromDate.getUTCDate() - 29);
+  const exportFrom = exportFromDate.toISOString().slice(0, 10);
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">일일 마킹</h1>
-        <p className="text-muted-foreground text-sm">
-          학생별 출석/과제/테스트 점수를 빠르게 기록해요. 변경하면 즉시 저장돼요.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">일일 마킹</h1>
+          <p className="text-muted-foreground text-sm">
+            학생별 출석/과제/테스트 점수를 빠르게 기록해요. 변경하면 즉시 저장돼요.
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <a
+            href={`/daily/export?from=${exportFrom}&to=${exportTo}`}
+            download
+          >
+            <Download className="size-4" /> CSV (최근 30일)
+          </a>
+        </Button>
       </div>
 
       <DailyTable date={date} rows={studentsWithData} />

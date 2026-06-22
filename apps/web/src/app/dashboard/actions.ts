@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { journalSubmitSchema } from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { todayKst } from "@/lib/kst";
@@ -63,7 +64,7 @@ export async function submitJournalAction(
       { onConflict: "student_id,journal_date" },
     );
 
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/journal");

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import {
   assignmentInputSchema,
@@ -116,7 +117,7 @@ export async function updateTestSheetAction(
       max_attempts: parsed.meta.max_attempts ?? null,
     })
     .eq("id", testSheetId);
-  if (uErr) return { ok: false, message: uErr.message };
+  if (uErr) return { ok: false, message: friendlyDbError(uErr) };
 
   // 매핑 전체 교체
   await supabase
@@ -204,7 +205,7 @@ export async function deleteTestSheetAction(testSheetId: string): Promise<Result
     .from("test_sheets")
     .delete()
     .eq("id", testSheetId);
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/tests");
   return { ok: true };
 }
@@ -274,7 +275,7 @@ export async function assignAction(
   const { error } = await supabase
     .from("test_assignments")
     .upsert(rows, { onConflict: "test_sheet_id,student_id", ignoreDuplicates: true });
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
 
   // 알림 — 학생 + 연결된 학부모
   const { data: sheet } = await supabase
@@ -350,7 +351,7 @@ export async function unassignAction(
     .delete()
     .eq("test_sheet_id", testSheetId)
     .eq("student_id", studentId);
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath(`/tests/${testSheetId}`);
   return { ok: true };
 }

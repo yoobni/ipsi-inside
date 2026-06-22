@@ -1,5 +1,6 @@
 "use server";
 
+import { friendlyDbError } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 
 type Result = { ok: true; url: string } | { ok: false; message: string };
@@ -39,7 +40,7 @@ export async function uploadImageAction(fd: FormData): Promise<Result> {
       upsert: false,
       contentType: file.type,
     });
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
 
   const { data: pub } = supabase.storage
     .from("question-assets")

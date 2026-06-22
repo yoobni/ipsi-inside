@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { passageWithQuestionsSchema } from "@ipsi/types";
 
@@ -186,7 +187,7 @@ export async function deletePassageAction(passageId: string): Promise<Result> {
   }
 
   const { error } = await supabase.from("passages").delete().eq("id", passageId);
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
 
   revalidatePath("/passages");
   return { ok: true, id: passageId };

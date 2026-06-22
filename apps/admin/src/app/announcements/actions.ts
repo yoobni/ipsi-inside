@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 
@@ -44,7 +45,7 @@ export async function upsertAnnouncementAction(
         expires_at: parsed.data.expires_at ?? null,
       })
       .eq("id", id);
-    if (error) return { ok: false, message: error.message };
+    if (error) return { ok: false, message: friendlyDbError(error) };
     revalidatePath("/announcements");
     return { ok: true, id };
   } else {
@@ -89,7 +90,7 @@ export async function togglePublishAction(
       published_at: publish ? new Date().toISOString() : null,
     })
     .eq("id", id);
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
 
   // 발행 시 알림 푸시 (audience에 맞춰)
   if (publish) {
@@ -125,7 +126,7 @@ export async function deleteAnnouncementAction(id: string): Promise<Result> {
     .from("announcements")
     .delete()
     .eq("id", id);
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/announcements");
   return { ok: true };
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { User as UserIcon } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
 import { todayKst } from "@/lib/kst";
@@ -215,6 +216,13 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <NotificationBell items={notif.items} unreadCount={notif.unreadCount} />
+          <Link
+            href="/dashboard/profile"
+            aria-label="내 정보"
+            className="hover:bg-muted inline-flex size-9 items-center justify-center rounded-md"
+          >
+            <UserIcon className="size-4" />
+          </Link>
           <ThemeToggle />
           <div className="hidden md:block">
             <LogoutButton />

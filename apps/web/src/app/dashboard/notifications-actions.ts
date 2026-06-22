@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 
 type Result = { ok: true } | { ok: false; message: string };
@@ -12,7 +13,7 @@ export async function markNotificationReadAction(id: string): Promise<Result> {
     .update({ read_at: new Date().toISOString() })
     .eq("id", id)
     .is("read_at", null);
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/tests");
   revalidatePath("/dashboard/journal");
@@ -31,7 +32,7 @@ export async function markAllNotificationsReadAction(): Promise<Result> {
     .update({ read_at: new Date().toISOString() })
     .eq("user_id", user.id)
     .is("read_at", null);
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/tests");
   revalidatePath("/dashboard/journal");

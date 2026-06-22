@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyDbError } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 
 type Result =
@@ -107,7 +108,7 @@ export async function saveAnswerAction(
       },
       { onConflict: "attempt_id,question_id" },
     );
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: friendlyDbError(error) };
   return { ok: true };
 }
 
@@ -138,7 +139,7 @@ export async function submitAttemptAction(
       total_points: totals?.total_points ?? 0,
     })
     .eq("id", attemptId);
-  if (uErr) return { ok: false, message: uErr.message };
+  if (uErr) return { ok: false, message: friendlyDbError(uErr) };
 
   // 시험지/학생 메타 + admin 알림 발송
   const { data: att } = await supabase

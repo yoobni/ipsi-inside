@@ -1,17 +1,12 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FileUp, Plus } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
-import { PASSAGE_SOURCE_LABEL, type PassageSource } from "@ipsi/types";
+import type { PassageSource } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  PassagesTableClient,
+  type PassageRow,
+} from "./passages-table-client";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +18,6 @@ export default async function PassagesListPage() {
     .select("id, title, source_type, unit_major, unit_minor, created_at")
     .order("created_at", { ascending: false });
 
-  // 지문별 문항 수
   const passageIds = (passages ?? []).map((p) => p.id);
   const counts = new Map<string, number>();
   if (passageIds.length > 0) {
@@ -36,6 +30,16 @@ export default async function PassagesListPage() {
     });
   }
 
+  const rows: PassageRow[] = (passages ?? []).map((p) => ({
+    id: p.id,
+    title: p.title,
+    source_type: p.source_type as PassageSource,
+    unit_major: p.unit_major,
+    unit_minor: p.unit_minor,
+    created_at: p.created_at,
+    question_count: counts.get(p.id) ?? 0,
+  }));
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -45,76 +49,21 @@ export default async function PassagesListPage() {
             수능 국어 지문과 문항을 등록해두면 시험지 만들 때 재사용할 수 있어요.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/passages/new">
-            <Plus className="size-4" />새 지문 등록
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/passages/import">
+              <FileUp className="size-4" />CSV 가져오기
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/passages/new">
+              <Plus className="size-4" />새 지문 등록
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="pl-4">제목</TableHead>
-              <TableHead>분류</TableHead>
-              <TableHead>단원</TableHead>
-              <TableHead>문항</TableHead>
-              <TableHead className="pr-4 text-right">등록일</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(passages ?? []).length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="text-muted-foreground h-24 text-center"
-                >
-                  아직 등록된 지문이 없습니다. 우측 상단 [새 지문 등록]을 눌러 시작하세요.
-                </TableCell>
-              </TableRow>
-            ) : (
-              (passages ?? []).map((p) => (
-                <TableRow key={p.id} className="cursor-pointer">
-                  <TableCell className="pl-4 font-medium">
-                    <Link
-                      href={`/passages/${p.id}`}
-                      className="hover:underline"
-                    >
-                      {p.title}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="primary">
-                      {PASSAGE_SOURCE_LABEL[p.source_type as PassageSource]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {p.unit_major}
-                    {p.unit_minor ? ` · ${p.unit_minor}` : ""}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {counts.get(p.id) ?? 0}문항
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground pr-4 text-right text-sm">
-                    {formatDate(p.created_at)}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <PassagesTableClient rows={rows} />
     </div>
   );
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
 }

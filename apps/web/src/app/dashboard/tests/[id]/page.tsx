@@ -6,6 +6,7 @@ import { readAuthState } from "@/lib/auth-state";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TestEntry } from "./test-entry";
+import { AttemptsTrend, type TrendPoint } from "./attempts-trend";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +110,27 @@ export default async function TestDetailPage({
             isClosed={isClosed}
           />
         </div>
+
+        {submitted.length >= 2 && (
+          <div className="mt-10">
+            <AttemptsTrend
+              points={
+                submitted
+                  .slice()
+                  .reverse()
+                  .map((a): TrendPoint => ({
+                    attempt_no: a.attempt_no,
+                    score: a.score ?? 0,
+                    total: a.total_points ?? 0,
+                    percent:
+                      a.total_points && a.total_points > 0
+                        ? Math.round(((a.score ?? 0) / a.total_points) * 100)
+                        : 0,
+                  }))
+              }
+            />
+          </div>
+        )}
 
         {submitted.length > 0 && (
           <section className="mt-10">
