@@ -484,6 +484,81 @@ export type Database = {
         };
         Relationships: [];
       };
+      materials: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          audience: "all" | "student" | "parent" | "targeted";
+          storage_path: string;
+          file_name: string;
+          file_size_bytes: number;
+          is_published: boolean;
+          published_at: string | null;
+          expires_at: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          audience?: "all" | "student" | "parent" | "targeted";
+          storage_path: string;
+          file_name: string;
+          file_size_bytes: number;
+          is_published?: boolean;
+          published_at?: string | null;
+          expires_at?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          audience?: "all" | "student" | "parent" | "targeted";
+          storage_path?: string;
+          file_name?: string;
+          file_size_bytes?: number;
+          is_published?: boolean;
+          published_at?: string | null;
+          expires_at?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      material_assignments: {
+        Row: {
+          id: string;
+          material_id: string;
+          student_id: string;
+          assigned_by: string;
+          assigned_by_school: string | null;
+          assigned_at: string;
+        };
+        Insert: {
+          id?: string;
+          material_id: string;
+          student_id: string;
+          assigned_by: string;
+          assigned_by_school?: string | null;
+          assigned_at?: string;
+        };
+        Update: {
+          id?: string;
+          material_id?: string;
+          student_id?: string;
+          assigned_by?: string;
+          assigned_by_school?: string | null;
+          assigned_at?: string;
+        };
+        Relationships: [];
+      };
       journal_feedbacks: {
         Row: {
           id: string;

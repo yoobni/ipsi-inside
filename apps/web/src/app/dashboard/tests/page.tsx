@@ -148,7 +148,7 @@ export default async function TestsPage() {
             <Link href="/dashboard" className="hover:text-foreground">홈</Link>
             <span className="font-bold text-foreground border-b-2 border-primary pb-1">시험</span>
             <Link href="/dashboard/journal" className="hover:text-foreground">일지</Link>
-            <span>강의</span>
+            <Link href="/dashboard/materials" className="hover:text-foreground">자료</Link>
           </nav>
         </div>
         <div className="flex items-center gap-2">

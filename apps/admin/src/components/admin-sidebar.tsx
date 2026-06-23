@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   CalendarCheck,
+  FileDown,
   FileText,
   Megaphone,
   NotebookPen,
@@ -45,6 +46,12 @@ const MENU: MenuItem[] = [
     label: "시험 관리",
     icon: FileText,
     matchPrefix: "/tests",
+  },
+  {
+    href: "/materials",
+    label: "자료 배부",
+    icon: FileDown,
+    matchPrefix: "/materials",
   },
   {
     href: "/journals",

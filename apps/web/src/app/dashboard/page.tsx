@@ -211,7 +211,7 @@ export default async function DashboardPage() {
             <span className="font-bold text-foreground border-b-2 border-primary pb-1">홈</span>
             <Link href="/dashboard/tests" className="hover:text-foreground">시험</Link>
             <Link href="/dashboard/journal" className="hover:text-foreground">일지</Link>
-            <span>강의</span>
+            <Link href="/dashboard/materials" className="hover:text-foreground">자료</Link>
           </nav>
         </div>
         <div className="flex items-center gap-2">
