@@ -8,6 +8,7 @@ import {
   parentSignupSchema,
   studentSignupSchema,
 } from "@ipsi/types";
+import { checkRateLimit, extractClientIp } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 
@@ -28,6 +29,21 @@ export async function loginAction(
       ok: false,
       message: "입력값을 확인해주세요",
       fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  // TODO: rate limit — 운영 전 실제 구현 연결 ([[packages/lib/src/rate-limit.ts]])
+  const h = await headers();
+  const rl = await checkRateLimit({
+    name: "login",
+    key: `${extractClientIp(h)}:${parsed.data.email}`,
+    limit: 5,
+    windowSec: 300,
+  });
+  if (!rl.ok) {
+    return {
+      ok: false,
+      message: `잠시 후 다시 시도해주세요 (${rl.retryAfterSec}초)`,
     };
   }
 
@@ -85,6 +101,21 @@ export async function studentSignupAction(
 
   const consent = readConsent(formData);
   if (consent.error) return consent.error;
+
+  // TODO: rate limit — 가입 폭주 방지
+  const h = await headers();
+  const rl = await checkRateLimit({
+    name: "signup",
+    key: extractClientIp(h),
+    limit: 3,
+    windowSec: 3600,
+  });
+  if (!rl.ok) {
+    return {
+      ok: false,
+      message: `잠시 후 다시 시도해주세요 (${rl.retryAfterSec}초)`,
+    };
+  }
 
   const admin = createAdminSupabaseClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -153,6 +184,21 @@ export async function parentSignupAction(
   const consent = readConsent(formData);
   if (consent.error) return consent.error;
 
+  // TODO: rate limit — 가입 폭주 방지
+  const h = await headers();
+  const rl = await checkRateLimit({
+    name: "signup",
+    key: extractClientIp(h),
+    limit: 3,
+    windowSec: 3600,
+  });
+  if (!rl.ok) {
+    return {
+      ok: false,
+      message: `잠시 후 다시 시도해주세요 (${rl.retryAfterSec}초)`,
+    };
+  }
+
   const admin = createAdminSupabaseClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: parsed.data.email,
@@ -218,8 +264,22 @@ export async function sendPasswordResetAction(
     return { ok: false, message: "이메일을 정확히 입력해주세요" };
   }
 
-  const supabase = await createServerSupabaseClient();
   const h = await headers();
+
+  // TODO: rate limit — 메일 폭주/사용자 열거 보조 방어
+  const rl = await checkRateLimit({
+    name: "password-reset",
+    key: email,
+    limit: 3,
+    windowSec: 3600,
+  });
+  if (!rl.ok) {
+    // 보안상 결과를 동일하게 보이려면 그냥 ok=true로 돌릴 수도 있지만,
+    // 실 운영에선 ratelimit 통과 못 한 시점에 메일 발송도 하지 않음.
+    return { ok: true };
+  }
+
+  const supabase = await createServerSupabaseClient();
   const host = h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin =
