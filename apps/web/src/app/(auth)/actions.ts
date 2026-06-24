@@ -82,6 +82,9 @@ export async function studentSignupAction(
     };
   }
 
+  const consent = readConsent(formData);
+  if (consent.error) return consent.error;
+
   const admin = createAdminSupabaseClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: parsed.data.email,
@@ -95,6 +98,7 @@ export async function studentSignupAction(
     return { ok: false, message };
   }
 
+  const nowIso = new Date().toISOString();
   const { error: profileErr } = await admin.from("profiles").insert({
     id: created.user.id,
     role: "student",
@@ -103,6 +107,9 @@ export async function studentSignupAction(
     phone: parsed.data.phone,
     school: parsed.data.school,
     grade: parsed.data.grade,
+    terms_agreed_at: nowIso,
+    privacy_agreed_at: nowIso,
+    marketing_agreed_at: consent.marketing ? nowIso : null,
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(created.user.id);
@@ -142,6 +149,9 @@ export async function parentSignupAction(
     };
   }
 
+  const consent = readConsent(formData);
+  if (consent.error) return consent.error;
+
   const admin = createAdminSupabaseClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: parsed.data.email,
@@ -155,12 +165,16 @@ export async function parentSignupAction(
     return { ok: false, message };
   }
 
+  const nowIso = new Date().toISOString();
   const { error: profileErr } = await admin.from("profiles").insert({
     id: created.user.id,
     role: "parent",
     status: "pending",
     full_name: parsed.data.fullName,
     phone: parsed.data.phone,
+    terms_agreed_at: nowIso,
+    privacy_agreed_at: nowIso,
+    marketing_agreed_at: consent.marketing ? nowIso : null,
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(created.user.id);
@@ -188,4 +202,41 @@ export async function logoutAction() {
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/login");
+}
+
+/**
+ * 가입 동의 체크박스 검증.
+ *  - termsAgreed/privacyAgreed (필수) 미체크 시 fieldErrors 반환
+ *  - marketingAgreed (선택) boolean으로 변환
+ */
+function readConsent(formData: FormData):
+  | { error: null; marketing: boolean }
+  | {
+      error: {
+        ok: false;
+        message: string;
+        fieldErrors: Record<string, string[]>;
+      };
+      marketing: false;
+    } {
+  const terms = formData.get("termsAgreed") === "on";
+  const privacy = formData.get("privacyAgreed") === "on";
+  const marketing = formData.get("marketingAgreed") === "on";
+
+  if (!terms || !privacy) {
+    const fieldErrors: Record<string, string[]> = {};
+    if (!terms) fieldErrors.termsAgreed = ["이용약관에 동의해주세요"];
+    if (!privacy)
+      fieldErrors.privacyAgreed = ["개인정보처리방침에 동의해주세요"];
+    return {
+      error: {
+        ok: false,
+        message: "필수 약관에 동의해주세요",
+        fieldErrors,
+      },
+      marketing: false,
+    };
+  }
+
+  return { error: null, marketing };
 }

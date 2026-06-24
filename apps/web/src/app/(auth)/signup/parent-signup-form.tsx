@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parentSignupAction } from "../actions";
+import { ConsentChecks } from "./consent-checks";
 
 type FieldName =
   | "email"
@@ -14,7 +15,9 @@ type FieldName =
   | "fullName"
   | "phone"
   | "studentFullName"
-  | "studentPhone";
+  | "studentPhone"
+  | "termsAgreed"
+  | "privacyAgreed";
 
 export function ParentSignupForm() {
   const [state, formAction, pending] = useActionState(parentSignupAction, null);
@@ -83,6 +86,13 @@ export function ParentSignupForm() {
           errors={fieldErrors?.studentPhone}
         />
       </div>
+
+      <ConsentChecks
+        errors={{
+          termsAgreed: fieldErrors?.termsAgreed,
+          privacyAgreed: fieldErrors?.privacyAgreed,
+        }}
+      />
 
       <Button type="submit" disabled={pending} size="lg" className="w-full">
         {pending ? "가입 중..." : "학부모로 가입 신청"}

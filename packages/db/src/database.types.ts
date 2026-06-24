@@ -39,6 +39,9 @@ export type Database = {
           created_at: string;
           approved_at: string | null;
           approved_by: string | null;
+          terms_agreed_at: string | null;
+          privacy_agreed_at: string | null;
+          marketing_agreed_at: string | null;
         };
         Insert: {
           id: string;
@@ -51,6 +54,9 @@ export type Database = {
           created_at?: string;
           approved_at?: string | null;
           approved_by?: string | null;
+          terms_agreed_at?: string | null;
+          privacy_agreed_at?: string | null;
+          marketing_agreed_at?: string | null;
         };
         Update: {
           id?: string;
@@ -63,6 +69,9 @@ export type Database = {
           created_at?: string;
           approved_at?: string | null;
           approved_by?: string | null;
+          terms_agreed_at?: string | null;
+          privacy_agreed_at?: string | null;
+          marketing_agreed_at?: string | null;
         };
         Relationships: [];
       };

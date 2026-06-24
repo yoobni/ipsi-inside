@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { studentSignupAction } from "../actions";
+import { ConsentChecks } from "./consent-checks";
 
 type FieldName =
   | "email"
@@ -21,7 +22,9 @@ type FieldName =
   | "fullName"
   | "phone"
   | "school"
-  | "grade";
+  | "grade"
+  | "termsAgreed"
+  | "privacyAgreed";
 
 export function StudentSignupForm() {
   const [grade, setGrade] = useState<string>("1");
@@ -94,6 +97,12 @@ export function StudentSignupForm() {
         autoComplete="new-password"
         required
         errors={fieldErrors?.passwordConfirm}
+      />
+      <ConsentChecks
+        errors={{
+          termsAgreed: fieldErrors?.termsAgreed,
+          privacyAgreed: fieldErrors?.privacyAgreed,
+        }}
       />
       <Button type="submit" disabled={pending} size="lg" className="w-full">
         {pending ? "가입 중..." : "학생으로 가입 신청"}
