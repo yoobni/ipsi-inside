@@ -1,9 +1,11 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -87,4 +89,68 @@ export async function updateMyProfileAction(
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   return { ok: true };
+}
+
+/**
+ * 회원 탈퇴 — 비밀번호 재확인 후 PII 마스킹 + status=suspended + signOut.
+ * 학습 이력은 student_id FK로 유지(익명 처리), 학부모-자녀 링크는 삭제.
+ * 동일 이메일 재가입은 운영자가 admin api로 풀어줘야 가능.
+ */
+export async function withdrawAction(
+  _prev: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const password = String(formData.get("password") ?? "");
+  if (!password) return { ok: false, message: "비밀번호를 입력해주세요" };
+
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !user.email)
+    return { ok: false, message: "로그인이 필요합니다" };
+
+  // 비밀번호 재확인 — signInWithPassword 결과로 검증 (성공 시 세션 갱신)
+  const { error: signinErr } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password,
+  });
+  if (signinErr) {
+    return { ok: false, message: "비밀번호가 일치하지 않습니다" };
+  }
+
+  // admin client로 마스킹 (RLS bypass — 사용자가 본인 status 변경 못 하는 정책 대비)
+  const admin = createAdminSupabaseClient();
+  const { error: updErr } = await admin
+    .from("profiles")
+    .update({
+      status: "suspended",
+      full_name: "(탈퇴회원)",
+      phone: "",
+      school: null,
+      grade: null,
+      terms_agreed_at: null,
+      privacy_agreed_at: null,
+      marketing_agreed_at: null,
+    })
+    .eq("id", user.id);
+  if (updErr) {
+    return { ok: false, message: "탈퇴 처리 중 오류가 발생했습니다" };
+  }
+
+  // 학부모-자녀 링크 정리
+  await admin
+    .from("parent_student_links")
+    .delete()
+    .or(`parent_id.eq.${user.id},student_id.eq.${user.id}`);
+
+  // 학부모일 경우 자녀 매칭 요청도 정리
+  await admin
+    .from("parent_signup_requests")
+    .delete()
+    .eq("parent_id", user.id);
+
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/login?withdrawn=1");
 }

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import {
   loginSchema,
   parentSignupSchema,
@@ -202,6 +203,86 @@ export async function logoutAction() {
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/login");
+}
+
+/**
+ * 비밀번호 재설정 이메일 발송.
+ * 보안상 가입 여부를 노출하지 않기 위해 결과는 항상 ok=true (Supabase 에러도 무시).
+ */
+export async function sendPasswordResetAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, message: "이메일을 정확히 입력해주세요" };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const h = await headers();
+  const host = h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (host ? `${proto}://${host}` : "http://localhost:3000");
+
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/reset-password`,
+  });
+
+  // 가입 여부와 무관하게 동일 응답 (사용자 열거 공격 방지)
+  return { ok: true };
+}
+
+/**
+ * 새 비밀번호 설정.
+ * /auth/callback에서 recovery code 교환 후 reset-password 페이지로 redirect된 상태.
+ * 세션이 있어야 updateUser 가능.
+ */
+export async function updatePasswordAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const password = String(formData.get("password") ?? "");
+  const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
+
+  const fieldErrors: Record<string, string[]> = {};
+  if (password.length < 8)
+    fieldErrors.password = ["비밀번호는 8자 이상이어야 합니다"];
+  else if (!/[A-Za-z]/.test(password))
+    fieldErrors.password = ["영문을 포함해야 합니다"];
+  else if (!/[0-9]/.test(password))
+    fieldErrors.password = ["숫자를 포함해야 합니다"];
+
+  if (password !== passwordConfirm)
+    fieldErrors.passwordConfirm = ["비밀번호가 일치하지 않습니다"];
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { ok: false, message: "입력값을 확인해주세요", fieldErrors };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      ok: false,
+      message: "재설정 세션이 만료됐어요. 다시 메일 링크를 받아주세요.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    return {
+      ok: false,
+      message: "비밀번호 변경 중 오류가 발생했습니다",
+    };
+  }
+
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/login?reset=success");
 }
 
 /**

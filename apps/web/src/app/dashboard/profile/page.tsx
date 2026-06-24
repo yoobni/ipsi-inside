@@ -6,6 +6,7 @@ import { readAuthState } from "@/lib/auth-state";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileForm, type ProfileInitial } from "./profile-form";
+import { WithdrawSection } from "./withdraw-section";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export default async function ProfilePage() {
           </p>
         </div>
         <ProfileForm initial={initial} />
+        <WithdrawSection />
       </main>
     </div>
   );

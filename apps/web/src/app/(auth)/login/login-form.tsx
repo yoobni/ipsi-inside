@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,15 @@ export function LoginForm() {
         )}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">비밀번호</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">비밀번호</Label>
+          <Link
+            href="/forgot-password"
+            className="text-muted-foreground text-xs hover:text-foreground hover:underline"
+          >
+            비밀번호 찾기
+          </Link>
+        </div>
         <Input
           id="password"
           name="password"
