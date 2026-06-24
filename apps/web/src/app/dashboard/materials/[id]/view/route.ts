@@ -4,9 +4,9 @@ import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 /**
- * 자료 다운로드 — RLS가 통과시킨 자료만 short-TTL signed URL로 302 redirect.
- * 권한 없는 사용자가 직접 URL을 호출하면 RLS상 row가 안 보여 maybeSingle=null → 403.
- * 성공 시 material_downloads 행을 source='download'로 insert.
+ * 인앱 뷰어용 — Content-Disposition을 attachment로 강제하지 않고 inline.
+ * iframe src에서 이 URL을 가리키면 다운로드 라우트와 달리 브라우저가 PDF를 그대로 표시.
+ * TTL 5분 (큰 PDF 로드 시간 + iframe 새로고침 여유).
  */
 export async function GET(
   _req: Request,
@@ -22,24 +22,24 @@ export async function GET(
 
   const { data: m } = await supabase
     .from("materials")
-    .select("id, storage_path, file_name")
+    .select("id, storage_path")
     .eq("id", id)
     .maybeSingle();
   if (!m) return new NextResponse("Forbidden or not found", { status: 403 });
 
   const { data: signed, error } = await supabase.storage
     .from("materials")
-    .createSignedUrl(m.storage_path, 60, { download: m.file_name });
+    .createSignedUrl(m.storage_path, 300);
 
   if (error || !signed?.signedUrl) {
     return new NextResponse("Signed URL failed", { status: 500 });
   }
 
-  // 로깅 — admin은 굳이 로그 남기지 않음
+  // 인앱 뷰어 진입도 로깅 (source='view')
   await supabase.from("material_downloads").insert({
     material_id: m.id,
     user_id: user.id,
-    source: "download",
+    source: "view",
   });
 
   return NextResponse.redirect(signed.signedUrl, 302);

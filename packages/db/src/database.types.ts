@@ -559,6 +559,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      material_downloads: {
+        Row: {
+          id: string;
+          material_id: string;
+          user_id: string;
+          source: "download" | "view";
+          downloaded_at: string;
+        };
+        Insert: {
+          id?: string;
+          material_id: string;
+          user_id: string;
+          source?: "download" | "view";
+          downloaded_at?: string;
+        };
+        Update: {
+          id?: string;
+          material_id?: string;
+          user_id?: string;
+          source?: "download" | "view";
+          downloaded_at?: string;
+        };
+        Relationships: [];
+      };
       journal_feedbacks: {
         Row: {
           id: string;

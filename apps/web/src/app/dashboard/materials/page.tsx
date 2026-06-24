@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Download, FileText } from "lucide-react";
+import { ArrowRight, Download, FileText } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { MATERIAL_AUDIENCE_LABEL } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
@@ -56,12 +56,19 @@ export default async function MaterialsPage() {
           {materials.map((m) => (
             <li
               key={m.id}
-              className="border-hairline bg-surface flex items-start gap-3 rounded-[14px] border p-4 sm:items-center"
+              className="border-hairline bg-surface flex items-start gap-3 rounded-[14px] border p-4 transition-colors hover:bg-muted/30 sm:items-center"
             >
-              <div className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-md">
+              <Link
+                href={`/dashboard/materials/${m.id}`}
+                className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-md"
+                aria-label="자료 열기"
+              >
                 <FileText className="size-5" />
-              </div>
-              <div className="min-w-0 flex-1">
+              </Link>
+              <Link
+                href={`/dashboard/materials/${m.id}`}
+                className="min-w-0 flex-1"
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-sm font-bold">{m.title}</h3>
                   <span className="border-hairline text-muted-foreground rounded-full border px-2 py-0.5 text-[10px]">
@@ -77,12 +84,22 @@ export default async function MaterialsPage() {
                   {m.file_name} · {(m.file_size_bytes / 1024 / 1024).toFixed(1)}MB
                   {m.published_at && ` · 발행 ${formatDt(m.published_at)}`}
                 </p>
+              </Link>
+              <div className="flex shrink-0 gap-1">
+                <Button asChild size="sm" variant="outline">
+                  <a
+                    href={`/dashboard/materials/${m.id}/download`}
+                    aria-label="다운로드"
+                  >
+                    <Download className="size-4" />
+                  </a>
+                </Button>
+                <Button asChild size="sm">
+                  <Link href={`/dashboard/materials/${m.id}`}>
+                    보기 <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
               </div>
-              <Button asChild size="sm" className="shrink-0">
-                <a href={`/dashboard/materials/${m.id}/download`}>
-                  <Download className="size-4" /> 다운로드
-                </a>
-              </Button>
             </li>
           ))}
         </ul>
