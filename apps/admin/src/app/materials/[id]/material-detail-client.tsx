@@ -44,6 +44,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SchedulePublishButton } from "@/components/schedule-publish-popover";
 import {
   assignMaterialAction,
   deleteMaterialAction,
@@ -124,6 +125,13 @@ export function MaterialDetailClient({
         </div>
         <div className="flex flex-wrap gap-2">
           <ToggleButton material={material} />
+          {!material.is_published && (
+            <SchedulePublishButton
+              onPublish={(iso) =>
+                togglePublishMaterialAction(material.id, true, iso)
+              }
+            />
+          )}
           <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
             <Pencil className="size-4" /> 편집
           </Button>

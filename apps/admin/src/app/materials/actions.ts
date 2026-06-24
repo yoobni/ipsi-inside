@@ -125,6 +125,7 @@ export async function deleteMaterialAction(id: string): Promise<Result> {
 export async function togglePublishMaterialAction(
   id: string,
   publish: boolean,
+  publishAtIso?: string | null,
 ): Promise<Result> {
   const supabase = await createServerSupabaseClient();
 
@@ -135,23 +136,31 @@ export async function togglePublishMaterialAction(
     .maybeSingle();
   if (!m) return { ok: false, message: "자료를 찾을 수 없어요." };
 
+  // 발행 시각 결정 — publish=true && publishAtIso 있으면 그 시점, 아니면 now
+  const effectivePublishedAt = publish
+    ? publishAtIso && publishAtIso.length > 0
+      ? new Date(publishAtIso).toISOString()
+      : new Date().toISOString()
+    : null;
+
   const { error } = await supabase
     .from("materials")
     .update({
       is_published: publish,
-      published_at: publish ? new Date().toISOString() : null,
+      published_at: effectivePublishedAt,
     })
     .eq("id", id);
   if (error) return { ok: false, message: friendlyDbError(error) };
 
-  // 발행 시 알림 fan-out
-  if (publish) {
+  // 발행 시 알림 fan-out — 알림 created_at도 publish 시각으로 (미래면 종에 바로 안 뜸)
+  if (publish && effectivePublishedAt) {
     await fanOutMaterialNotifications(
       supabase,
       id,
       m.audience as MaterialAudience,
       m.title,
       m.description,
+      effectivePublishedAt,
     );
   }
 
@@ -254,12 +263,15 @@ export async function assignMaterialAction(
 
   // 이미 발행된 자료라면 신규 배정 학생 + 학부모에게도 알림 발사
   if (material.is_published && newlyAssigned.length > 0) {
+    // 신규 배정 학생/학부모에게 즉시 알림 (이미 발행된 자료니까 created_at = now)
+    const nowIso = new Date().toISOString();
     const notifs: Array<{
       user_id: string;
       type: string;
       title: string;
       body: string | null;
       link: string;
+      created_at: string;
     }> = [];
     newlyAssigned.forEach((sid) => {
       notifs.push({
@@ -268,6 +280,7 @@ export async function assignMaterialAction(
         title: `자료: ${material.title}`,
         body: material.description,
         link: "/dashboard/materials",
+        created_at: nowIso,
       });
     });
     const { data: parentLinks } = await supabase
@@ -284,6 +297,7 @@ export async function assignMaterialAction(
         title: `자녀에게 자료 배부: ${material.title}`,
         body: material.description,
         link: "/dashboard/materials",
+        created_at: nowIso,
       });
     });
     if (notifs.length > 0) {
@@ -320,6 +334,7 @@ async function fanOutMaterialNotifications(
   audience: MaterialAudience,
   title: string,
   description: string | null,
+  createdAtIso: string,
 ) {
   const recipientIds = new Set<string>();
   const parentTitle = `자녀에게 자료 배부: ${title}`;
@@ -390,6 +405,7 @@ async function fanOutMaterialNotifications(
     title: string;
     body: string | null;
     link: string;
+    created_at: string;
   }> = [];
 
   recipientIds.forEach((uid) => {
@@ -399,6 +415,7 @@ async function fanOutMaterialNotifications(
       title: `자료: ${title}`,
       body: description,
       link: "/dashboard/materials",
+      created_at: createdAtIso,
     });
   });
   parentRecipients.forEach((pid) => {
@@ -409,6 +426,7 @@ async function fanOutMaterialNotifications(
       title: parentTitle,
       body: description,
       link: "/dashboard/materials",
+      created_at: createdAtIso,
     });
   });
 

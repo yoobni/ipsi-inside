@@ -69,6 +69,7 @@ export async function upsertAnnouncementAction(
 export async function togglePublishAction(
   id: string,
   publish: boolean,
+  publishAtIso?: string | null,
 ): Promise<Result> {
   const supabase = await createServerSupabaseClient();
   const {
@@ -83,17 +84,23 @@ export async function togglePublishAction(
     .maybeSingle();
   if (!ann) return { ok: false, message: "공지를 찾을 수 없어요." };
 
+  const effectivePublishedAt = publish
+    ? publishAtIso && publishAtIso.length > 0
+      ? new Date(publishAtIso).toISOString()
+      : new Date().toISOString()
+    : null;
+
   const { error } = await supabase
     .from("announcements")
     .update({
       is_published: publish,
-      published_at: publish ? new Date().toISOString() : null,
+      published_at: effectivePublishedAt,
     })
     .eq("id", id);
   if (error) return { ok: false, message: friendlyDbError(error) };
 
-  // 발행 시 알림 푸시 (audience에 맞춰)
-  if (publish) {
+  // 발행 시 알림 푸시 (audience에 맞춰) — created_at = publish 시각 (예약이면 미래)
+  if (publish && effectivePublishedAt) {
     let userQuery = supabase
       .from("profiles")
       .select("id")
@@ -110,6 +117,7 @@ export async function togglePublishAction(
       title: `공지: ${ann.title}`,
       body: ann.body,
       link: "/dashboard",
+      created_at: effectivePublishedAt,
     }));
     if (notifs.length > 0) {
       await supabase.from("notifications").insert(notifs);

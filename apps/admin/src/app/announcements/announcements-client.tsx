@@ -30,6 +30,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { SchedulePublishButton } from "@/components/schedule-publish-popover";
 import {
   deleteAnnouncementAction,
   togglePublishAction,
@@ -164,6 +165,12 @@ function RowItem({
             </>
           )}
         </Button>
+        {!row.is_published && (
+          <SchedulePublishButton
+            onPublish={(iso) => togglePublishAction(row.id, true, iso)}
+            label="예약"
+          />
+        )}
         <Button variant="outline" size="sm" onClick={onEdit}>
           <Pencil className="size-3.5" />
           편집
