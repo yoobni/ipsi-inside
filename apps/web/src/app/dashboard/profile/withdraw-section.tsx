@@ -19,9 +19,9 @@ export function WithdrawSection() {
         <div className="space-y-1">
           <h2 className="text-base font-bold">회원 탈퇴</h2>
           <p className="text-muted-foreground text-sm">
-            탈퇴하면 이름·연락처 등 개인정보는 즉시 익명 처리됩니다. 학습 이력은
-            통계 목적으로 익명 보관됩니다. 동일 이메일로의 재가입은 운영자
-            도움이 필요해요.
+            탈퇴하면 이름·연락처 등 개인정보는 즉시 익명 처리되고, 직접 작성한
+            학습 일지는 삭제돼요. 시험 결과·출결 등 학습 이력은 통계 목적으로
+            익명 보관됩니다. 동일 이메일로의 재가입은 운영자 도움이 필요해요.
           </p>
         </div>
       </div>

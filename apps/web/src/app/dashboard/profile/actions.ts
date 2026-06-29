@@ -138,6 +138,12 @@ export async function withdrawAction(
     return { ok: false, message: "탈퇴 처리 중 오류가 발생했습니다" };
   }
 
+  // 학생 본인이 작성한 자유서술(학습 일지)은 파기.
+  // 텍스트에 PII가 인라인으로 섞일 수 있고, 비워두면 빈 껍데기라 익명 보존 가치가 없음.
+  // journal_feedbacks는 journal_id on delete cascade로 함께 삭제됨.
+  // 시험 응시 결과·출결 등 정량 학습 이력은 프로필 마스킹으로 익명화되어 그대로 보존됨.
+  await admin.from("study_journals").delete().eq("student_id", user.id);
+
   // 학부모-자녀 링크 정리
   await admin
     .from("parent_student_links")
