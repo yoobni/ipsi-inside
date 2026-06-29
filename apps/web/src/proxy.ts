@@ -10,12 +10,33 @@ import { updateSession } from "@ipsi/lib/supabase/middleware";
  *   - 공개 경로(/, /login, /signup): 누구나 OK
  *   - 보호 경로: 로그인된 학생/학부모만 통과 (status 가드는 페이지에서 /pending으로)
  */
-const PUBLIC_PATHS = ["/", "/login", "/signup"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/maintenance"];
 const ALLOW_THROUGH_PREFIXES = ["/_next", "/favicon", "/api/signout", "/api/health"];
 
+// 점검 모드(MAINTENANCE_MODE=1)에서도 통과시킬 경로 — 정적 자산/헬스체크/점검 페이지 자체
+const MAINTENANCE_ALLOW_PREFIXES = [
+  "/_next",
+  "/favicon",
+  "/api/health",
+  "/maintenance",
+];
+
 export async function proxy(request: NextRequest) {
-  const { response, supabase, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
+
+  // 점검 모드: web(학생/학부모)만 차단. admin 앱은 별도라 그대로 열려 있음.
+  // 세션 조회(updateSession)보다 먼저 처리해서 점검 중 DB 부하도 피함.
+  if (
+    process.env.MAINTENANCE_MODE === "1" &&
+    !MAINTENANCE_ALLOW_PREFIXES.some((p) => pathname.startsWith(p))
+  ) {
+    return NextResponse.rewrite(new URL("/maintenance", request.url), {
+      status: 503,
+      headers: { "Retry-After": "3600" },
+    });
+  }
+
+  const { response, supabase, user } = await updateSession(request);
 
   if (ALLOW_THROUGH_PREFIXES.some((p) => pathname.startsWith(p))) {
     return response;
