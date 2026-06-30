@@ -4,40 +4,41 @@ import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 /**
- * 자료 다운로드 — RLS가 통과시킨 자료만 short-TTL signed URL로 302 redirect.
- * 권한 없는 사용자가 직접 URL을 호출하면 RLS상 row가 안 보여 maybeSingle=null → 403.
+ * 자료 파일 다운로드 — 묶음(material_files) 중 ?file=<fileId> 하나를 short-TTL signed URL로 302.
+ * RLS(material_files_read)가 부모 material 가시성으로 접근을 막음 → 권한 없으면 row=null → 403.
  * 성공 시 material_downloads 행을 source='download'로 insert.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
-  const supabase = await createServerSupabaseClient();
+  const fileId = new URL(req.url).searchParams.get("file");
+  if (!fileId) return new NextResponse("file 파라미터 필요", { status: 400 });
 
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
-  const { data: m } = await supabase
-    .from("materials")
-    .select("id, storage_path, file_name")
-    .eq("id", id)
+  const { data: f } = await supabase
+    .from("material_files")
+    .select("id, material_id, storage_path, file_name")
+    .eq("id", fileId)
+    .eq("material_id", id)
     .maybeSingle();
-  if (!m) return new NextResponse("Forbidden or not found", { status: 403 });
+  if (!f) return new NextResponse("Forbidden or not found", { status: 403 });
 
   const { data: signed, error } = await supabase.storage
     .from("materials")
-    .createSignedUrl(m.storage_path, 60, { download: m.file_name });
-
+    .createSignedUrl(f.storage_path, 60, { download: f.file_name });
   if (error || !signed?.signedUrl) {
     return new NextResponse("Signed URL failed", { status: 500 });
   }
 
-  // 로깅 — admin은 굳이 로그 남기지 않음
   await supabase.from("material_downloads").insert({
-    material_id: m.id,
+    material_id: f.material_id,
     user_id: user.id,
     source: "download",
   });

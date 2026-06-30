@@ -16,22 +16,35 @@ export default async function MaterialsListPage() {
   const { data: materials } = await supabase
     .from("materials")
     .select(
-      "id, title, audience, file_name, file_size_bytes, is_published, published_at, expires_at, created_at",
+      "id, title, audience, is_published, published_at, expires_at, created_at",
     )
     .order("created_at", { ascending: false });
 
   const materialIds = (materials ?? []).map((m) => m.id);
   const targetCounts = new Map<string, number>();
+  const fileAgg = new Map<string, { count: number; bytes: number }>();
   if (materialIds.length > 0) {
-    const { data: assigns } = await supabase
-      .from("material_assignments")
-      .select("material_id")
-      .in("material_id", materialIds);
+    const [{ data: assigns }, { data: files }] = await Promise.all([
+      supabase
+        .from("material_assignments")
+        .select("material_id")
+        .in("material_id", materialIds),
+      supabase
+        .from("material_files")
+        .select("material_id, file_size_bytes")
+        .in("material_id", materialIds),
+    ]);
     (assigns ?? []).forEach((a) => {
       targetCounts.set(
         a.material_id,
         (targetCounts.get(a.material_id) ?? 0) + 1,
       );
+    });
+    (files ?? []).forEach((f) => {
+      const cur = fileAgg.get(f.material_id) ?? { count: 0, bytes: 0 };
+      cur.count += 1;
+      cur.bytes += f.file_size_bytes;
+      fileAgg.set(f.material_id, cur);
     });
   }
 
@@ -39,8 +52,8 @@ export default async function MaterialsListPage() {
     id: m.id,
     title: m.title,
     audience: m.audience as MaterialAudience,
-    file_name: m.file_name,
-    file_size_bytes: m.file_size_bytes,
+    file_count: fileAgg.get(m.id)?.count ?? 0,
+    total_bytes: fileAgg.get(m.id)?.bytes ?? 0,
     is_published: m.is_published,
     published_at: m.published_at,
     expires_at: m.expires_at,

@@ -37,7 +37,7 @@ export type GroupOption = { id: string; name: string; member_count: number };
 
 export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
   const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [audience, setAudience] = useState<MaterialAudience>("targeted");
@@ -56,17 +56,19 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setError("PDF 파일을 선택해주세요.");
+    if (files.length === 0) {
+      setError("PDF 파일을 1개 이상 선택해주세요.");
       return;
     }
-    if (file.size > MAX_MATERIAL_BYTES) {
-      setError("30MB 이하의 PDF만 업로드 가능합니다.");
-      return;
-    }
-    if (file.type !== "application/pdf") {
-      setError("PDF 파일만 업로드 가능합니다.");
-      return;
+    for (const f of files) {
+      if (f.size > MAX_MATERIAL_BYTES) {
+        setError(`${f.name}: 30MB 이하의 PDF만 업로드 가능합니다.`);
+        return;
+      }
+      if (f.type !== "application/pdf") {
+        setError(`${f.name}: PDF 파일만 업로드 가능합니다.`);
+        return;
+      }
     }
     if (audience === "group" && groupIds.size === 0) {
       setError("대상 그룹을 최소 1개 선택해주세요.");
@@ -75,12 +77,25 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
     setError(null);
 
     startTransition(async () => {
-      const uploadFd = new FormData();
-      uploadFd.set("file", file);
-      const up = await uploadPdfAction(uploadFd);
-      if (!up.ok) {
-        setError(up.message);
-        return;
+      // 파일별 업로드 (순서 유지)
+      const uploaded: {
+        storage_path: string;
+        file_name: string;
+        file_size_bytes: number;
+      }[] = [];
+      for (const f of files) {
+        const uploadFd = new FormData();
+        uploadFd.set("file", f);
+        const up = await uploadPdfAction(uploadFd);
+        if (!up.ok) {
+          setError(`${f.name}: ${up.message}`);
+          return;
+        }
+        uploaded.push({
+          storage_path: up.storage_path,
+          file_name: up.file_name,
+          file_size_bytes: up.file_size_bytes,
+        });
       }
 
       const fd = new FormData();
@@ -88,9 +103,7 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
       fd.set("description", description.trim());
       fd.set("audience", audience);
       fd.set("expires_at", expiresAt ? localToIso(expiresAt) ?? "" : "");
-      fd.set("storage_path", up.storage_path);
-      fd.set("file_name", up.file_name);
-      fd.set("file_size_bytes", String(up.file_size_bytes));
+      fd.set("files", JSON.stringify(uploaded));
       if (audience === "group") {
         fd.set("group_ids", JSON.stringify(Array.from(groupIds)));
       }
@@ -103,6 +116,8 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
       router.push(`/materials/${r.id}`);
     });
   };
+
+  const totalMb = files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 rounded-md border bg-card p-5">
@@ -199,23 +214,42 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="file">PDF 파일 * (≤30MB)</Label>
+        <Label htmlFor="file">PDF 파일 * (여러 개 가능, 각 ≤30MB)</Label>
         <div className="border-input flex items-center gap-3 rounded-md border border-dashed bg-background p-4">
           <FileUp className="text-muted-foreground size-5" />
           <input
             id="file"
             type="file"
             accept="application/pdf"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            multiple
+            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             className="flex-1 text-sm"
             required
           />
         </div>
-        {file && (
-          <p className="text-muted-foreground text-xs">
-            {file.name} · {(file.size / 1024 / 1024).toFixed(1)}MB
-          </p>
+        {files.length > 0 && (
+          <ul className="space-y-1">
+            {files.map((f, i) => (
+              <li
+                key={`${f.name}-${i}`}
+                className="text-muted-foreground flex items-center justify-between gap-2 text-xs"
+              >
+                <span className="truncate">
+                  {i + 1}. {f.name}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {(f.size / 1024 / 1024).toFixed(1)}MB
+                </span>
+              </li>
+            ))}
+            <li className="text-muted-foreground text-xs font-medium">
+              총 {files.length}개 · {totalMb.toFixed(1)}MB
+            </li>
+          </ul>
         )}
+        <p className="text-muted-foreground text-xs">
+          여러 PDF를 한 번에 올리면 한 자료(세트)로 묶여서 배부돼요.
+        </p>
       </div>
 
       {error && (
@@ -233,7 +267,7 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
         >
           취소
         </Button>
-        <Button type="submit" disabled={pending || !file}>
+        <Button type="submit" disabled={pending || files.length === 0}>
           <Upload className="size-4" />
           {pending ? "업로드 중..." : "업로드 & 저장"}
         </Button>

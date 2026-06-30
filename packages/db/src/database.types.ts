@@ -555,9 +555,9 @@ export type Database = {
           title: string;
           description: string | null;
           audience: "all" | "student" | "parent" | "targeted" | "group";
-          storage_path: string;
-          file_name: string;
-          file_size_bytes: number;
+          storage_path: string | null;
+          file_name: string | null;
+          file_size_bytes: number | null;
           is_published: boolean;
           published_at: string | null;
           expires_at: string | null;
@@ -570,9 +570,9 @@ export type Database = {
           title: string;
           description?: string | null;
           audience?: "all" | "student" | "parent" | "targeted" | "group";
-          storage_path: string;
-          file_name: string;
-          file_size_bytes: number;
+          storage_path?: string | null;
+          file_name?: string | null;
+          file_size_bytes?: number | null;
           is_published?: boolean;
           published_at?: string | null;
           expires_at?: string | null;
@@ -585,9 +585,9 @@ export type Database = {
           title?: string;
           description?: string | null;
           audience?: "all" | "student" | "parent" | "targeted" | "group";
-          storage_path?: string;
-          file_name?: string;
-          file_size_bytes?: number;
+          storage_path?: string | null;
+          file_name?: string | null;
+          file_size_bytes?: number | null;
           is_published?: boolean;
           published_at?: string | null;
           expires_at?: string | null;
@@ -621,6 +621,36 @@ export type Database = {
           assigned_by?: string;
           assigned_by_school?: string | null;
           assigned_at?: string;
+        };
+        Relationships: [];
+      };
+      material_files: {
+        Row: {
+          id: string;
+          material_id: string;
+          storage_path: string;
+          file_name: string;
+          file_size_bytes: number;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          material_id: string;
+          storage_path: string;
+          file_name: string;
+          file_size_bytes: number;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          material_id?: string;
+          storage_path?: string;
+          file_name?: string;
+          file_size_bytes?: number;
+          position?: number;
+          created_at?: string;
         };
         Relationships: [];
       };

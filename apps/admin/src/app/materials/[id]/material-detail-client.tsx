@@ -54,13 +54,19 @@ import {
   updateMaterialAction,
 } from "../actions";
 
+export type MaterialFileRow = {
+  id: string;
+  file_name: string;
+  file_size_bytes: number;
+  position: number;
+};
+
 export type MaterialDetail = {
   id: string;
   title: string;
   description: string | null;
   audience: MaterialAudience;
-  file_name: string;
-  file_size_bytes: number;
+  files: MaterialFileRow[];
   is_published: boolean;
   published_at: string | null;
   expires_at: string | null;
@@ -107,7 +113,11 @@ export function MaterialDetailClient({
 
   const isExpired =
     material.expires_at != null && new Date(material.expires_at) < new Date();
-  const sizeMb = (material.file_size_bytes / 1024 / 1024).toFixed(1);
+  const totalMb = (
+    material.files.reduce((s, f) => s + f.file_size_bytes, 0) /
+    1024 /
+    1024
+  ).toFixed(1);
 
   return (
     <>
@@ -127,7 +137,7 @@ export function MaterialDetailClient({
             <p className="text-muted-foreground text-sm">{material.description}</p>
           )}
           <p className="text-muted-foreground text-xs">
-            {material.file_name} · {sizeMb}MB
+            파일 {material.files.length}개 · {totalMb}MB
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -165,6 +175,38 @@ export function MaterialDetailClient({
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-md border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">
+            파일 ({material.files.length})
+          </h2>
+        </div>
+        {material.files.length === 0 ? (
+          <p className="text-muted-foreground px-4 py-6 text-center text-sm">
+            파일이 없어요.
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {material.files.map((f) => (
+              <li
+                key={f.id}
+                className="flex items-center justify-between gap-2 px-4 py-2.5"
+              >
+                <span className="min-w-0 truncate text-sm">
+                  <span className="text-muted-foreground mr-1.5 tabular-nums">
+                    {f.position}.
+                  </span>
+                  {f.file_name}
+                </span>
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  {(f.file_size_bytes / 1024 / 1024).toFixed(1)}MB
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {material.audience === "targeted" && (

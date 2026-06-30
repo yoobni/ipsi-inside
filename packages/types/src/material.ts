@@ -23,18 +23,23 @@ export const MATERIAL_AUDIENCE_LABEL: Record<MaterialAudience, string> = {
 
 export const MAX_MATERIAL_BYTES = 30 * 1024 * 1024; // 30MB
 
-export const materialInputSchema = z.object({
-  title: z.string().trim().min(2, "제목을 입력해주세요").max(120),
-  description: z.string().trim().max(1000).nullable().optional(),
-  audience: z.enum(MATERIAL_AUDIENCE),
-  expires_at: z.string().nullable().optional(),
-  storage_path: z.string().min(1, "파일이 없습니다"),
+export const materialFileSchema = z.object({
+  storage_path: z.string().min(1),
   file_name: z.string().min(1).max(255),
   file_size_bytes: z.coerce
     .number()
     .int()
     .min(1)
     .max(MAX_MATERIAL_BYTES, "30MB 이하의 PDF만 업로드 가능합니다"),
+});
+
+export const materialInputSchema = z.object({
+  title: z.string().trim().min(2, "제목을 입력해주세요").max(120),
+  description: z.string().trim().max(1000).nullable().optional(),
+  audience: z.enum(MATERIAL_AUDIENCE),
+  expires_at: z.string().nullable().optional(),
+  // 묶음 배부: 1개 이상의 PDF
+  files: z.array(materialFileSchema).min(1, "PDF를 최소 1개 올려주세요"),
 });
 
 export const materialUpdateSchema = z.object({
@@ -56,5 +61,6 @@ export const materialAssignmentSchema = z
   );
 
 export type MaterialInput = z.infer<typeof materialInputSchema>;
+export type MaterialFileInput = z.infer<typeof materialFileSchema>;
 export type MaterialUpdate = z.infer<typeof materialUpdateSchema>;
 export type MaterialAssignmentInput = z.infer<typeof materialAssignmentSchema>;

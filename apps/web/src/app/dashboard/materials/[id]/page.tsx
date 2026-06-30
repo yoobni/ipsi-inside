@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, Download } from "lucide-react";
+import { ChevronLeft, Download, Eye, FileText } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { MATERIAL_AUDIENCE_LABEL, type MaterialAudience } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
@@ -30,12 +30,22 @@ export default async function MaterialDetailPage({
 
   const { data: m } = await supabase
     .from("materials")
-    .select(
-      "id, title, description, audience, file_name, file_size_bytes, published_at",
-    )
+    .select("id, title, description, audience, published_at")
     .eq("id", id)
     .maybeSingle();
   if (!m) notFound();
+
+  const { data: fileRows } = await supabase
+    .from("material_files")
+    .select("id, file_name, file_size_bytes, position")
+    .eq("material_id", id)
+    .order("position");
+  const files = fileRows ?? [];
+  const totalMb = (
+    files.reduce((s, f) => s + f.file_size_bytes, 0) /
+    1024 /
+    1024
+  ).toFixed(1);
 
   const notif =
     state.kind === "ok"
@@ -66,34 +76,65 @@ export default async function MaterialDetailPage({
           </p>
         )}
         <p className="text-muted-foreground text-xs">
-          {m.file_name} · {(m.file_size_bytes / 1024 / 1024).toFixed(1)}MB
+          파일 {files.length}개 · {totalMb}MB
           {m.published_at && ` · 발행 ${formatDt(m.published_at)}`}
         </p>
       </div>
 
-      <div className="flex justify-end">
-        <Button asChild>
-          <a href={`/dashboard/materials/${m.id}/download`}>
-            <Download className="size-4" /> 다운로드
-          </a>
-        </Button>
-      </div>
+      {files.length === 0 ? (
+        <p className="text-muted-foreground rounded-[14px] border border-hairline bg-surface p-8 text-center text-sm">
+          파일이 없어요.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {files.map((f) => (
+            <li
+              key={f.id}
+              className="border-hairline bg-surface flex items-center gap-3 rounded-[14px] border p-3"
+            >
+              <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-md">
+                <FileText className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{f.file_name}</p>
+                <p className="text-muted-foreground text-[10px]">
+                  {(f.file_size_bytes / 1024 / 1024).toFixed(1)}MB
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <Button asChild size="sm" variant="outline">
+                  <a
+                    href={`/dashboard/materials/${m.id}/view?file=${f.id}`}
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    <Eye className="size-4" /> 보기
+                  </a>
+                </Button>
+                <Button asChild size="sm">
+                  <a href={`/dashboard/materials/${m.id}/download?file=${f.id}`}>
+                    <Download className="size-4" /> 받기
+                  </a>
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {/*
-        iframe src = view route → 5분 TTL signed URL로 302 redirect.
-        브라우저가 PDF를 inline으로 표시. 모바일에서 일부 브라우저(iOS Safari 등)는
-        embed가 약해서 그 경우 다운로드 버튼이 fallback.
-      */}
-      <div className="border-hairline overflow-hidden rounded-[14px] border bg-muted">
-        <iframe
-          src={`/dashboard/materials/${m.id}/view`}
-          title={m.title}
-          className="h-[80vh] w-full bg-white"
-        />
-      </div>
+      {/* 파일이 하나면 인앱 뷰어를 바로 노출 (단일 자료 UX 유지) */}
+      {files.length === 1 && (
+        <div className="border-hairline overflow-hidden rounded-[14px] border bg-muted">
+          <iframe
+            src={`/dashboard/materials/${m.id}/view?file=${files[0].id}`}
+            title={m.title}
+            className="h-[80vh] w-full bg-white"
+          />
+        </div>
+      )}
 
       <p className="text-muted-foreground text-center text-[11px]">
-        PDF가 보이지 않으면 위의 [다운로드] 버튼으로 받아주세요.
+        PDF가 보이지 않으면 [받기]로 내려받아 주세요.
       </p>
     </Shell>
   );

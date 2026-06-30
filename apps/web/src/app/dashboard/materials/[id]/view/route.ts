@@ -4,40 +4,40 @@ import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 /**
- * 인앱 뷰어용 — Content-Disposition을 attachment로 강제하지 않고 inline.
- * iframe src에서 이 URL을 가리키면 다운로드 라우트와 달리 브라우저가 PDF를 그대로 표시.
- * TTL 5분 (큰 PDF 로드 시간 + iframe 새로고침 여유).
+ * 인앱 뷰어용 — ?file=<fileId>를 inline signed URL(5분 TTL)로 302.
+ * iframe src나 새 탭에서 가리키면 브라우저가 PDF를 그대로 표시.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
-  const supabase = await createServerSupabaseClient();
+  const fileId = new URL(req.url).searchParams.get("file");
+  if (!fileId) return new NextResponse("file 파라미터 필요", { status: 400 });
 
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
-  const { data: m } = await supabase
-    .from("materials")
-    .select("id, storage_path")
-    .eq("id", id)
+  const { data: f } = await supabase
+    .from("material_files")
+    .select("id, material_id, storage_path")
+    .eq("id", fileId)
+    .eq("material_id", id)
     .maybeSingle();
-  if (!m) return new NextResponse("Forbidden or not found", { status: 403 });
+  if (!f) return new NextResponse("Forbidden or not found", { status: 403 });
 
   const { data: signed, error } = await supabase.storage
     .from("materials")
-    .createSignedUrl(m.storage_path, 300);
-
+    .createSignedUrl(f.storage_path, 300);
   if (error || !signed?.signedUrl) {
     return new NextResponse("Signed URL failed", { status: 500 });
   }
 
-  // 인앱 뷰어 진입도 로깅 (source='view')
   await supabase.from("material_downloads").insert({
-    material_id: m.id,
+    material_id: f.material_id,
     user_id: user.id,
     source: "view",
   });

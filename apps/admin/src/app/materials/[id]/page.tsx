@@ -39,13 +39,23 @@ export default async function MaterialDetailPage({
     .maybeSingle();
   if (!m) notFound();
 
+  const { data: fileRows } = await supabase
+    .from("material_files")
+    .select("id, file_name, file_size_bytes, position")
+    .eq("material_id", id)
+    .order("position");
+
   const detail: MaterialDetail = {
     id: m.id,
     title: m.title,
     description: m.description,
     audience: m.audience as MaterialAudience,
-    file_name: m.file_name,
-    file_size_bytes: m.file_size_bytes,
+    files: (fileRows ?? []).map((f) => ({
+      id: f.id,
+      file_name: f.file_name,
+      file_size_bytes: f.file_size_bytes,
+      position: f.position,
+    })),
     is_published: m.is_published,
     published_at: m.published_at,
     expires_at: m.expires_at,

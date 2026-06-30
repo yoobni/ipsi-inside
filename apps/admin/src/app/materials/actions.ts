@@ -36,14 +36,19 @@ export async function createMaterialAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "인증 필요" };
 
+  let filesRaw: unknown = [];
+  try {
+    filesRaw = JSON.parse(String(fd.get("files") ?? "[]"));
+  } catch {
+    return { ok: false, message: "파일 정보 파싱 실패" };
+  }
+
   const parsed = materialInputSchema.safeParse({
     title: fd.get("title"),
     description: fd.get("description") || null,
     audience: fd.get("audience"),
     expires_at: fd.get("expires_at") || null,
-    storage_path: fd.get("storage_path"),
-    file_name: fd.get("file_name"),
-    file_size_bytes: fd.get("file_size_bytes"),
+    files: filesRaw,
   });
   if (!parsed.success) {
     return {
@@ -52,6 +57,10 @@ export async function createMaterialAction(
     };
   }
 
+  const allPaths = parsed.data.files.map((f) => f.storage_path);
+  const cleanupFiles = () =>
+    supabase.storage.from("materials").remove(allPaths);
+
   const { data, error } = await supabase
     .from("materials")
     .insert({
@@ -59,20 +68,31 @@ export async function createMaterialAction(
       description: parsed.data.description ?? null,
       audience: parsed.data.audience,
       expires_at: parsed.data.expires_at ?? null,
-      storage_path: parsed.data.storage_path,
-      file_name: parsed.data.file_name,
-      file_size_bytes: parsed.data.file_size_bytes,
       created_by: user.id,
     })
     .select("id")
     .single();
 
   if (error || !data) {
-    // 업로드는 됐는데 row 생성 실패 → orphan 파일 정리
-    await supabase.storage
-      .from("materials")
-      .remove([parsed.data.storage_path]);
+    await cleanupFiles(); // 업로드된 파일 orphan 정리
     return { ok: false, message: friendlyDbError(error) };
+  }
+
+  // 묶음 파일들 등록
+  const fileRows = parsed.data.files.map((f, idx) => ({
+    material_id: data.id,
+    storage_path: f.storage_path,
+    file_name: f.file_name,
+    file_size_bytes: f.file_size_bytes,
+    position: idx + 1,
+  }));
+  const { error: fErr } = await supabase
+    .from("material_files")
+    .insert(fileRows);
+  if (fErr) {
+    await supabase.from("materials").delete().eq("id", data.id);
+    await cleanupFiles();
+    return { ok: false, message: friendlyDbError(fErr) };
   }
 
   // 그룹 대상이면 타깃 그룹 연결
@@ -88,11 +108,9 @@ export async function createMaterialAction(
         .from("material_group_targets")
         .insert(rows);
       if (gErr) {
-        // 롤백: material row + 업로드 파일 정리
+        // 롤백: material row(+material_files cascade) + 업로드 파일 정리
         await supabase.from("materials").delete().eq("id", data.id);
-        await supabase.storage
-          .from("materials")
-          .remove([parsed.data.storage_path]);
+        await cleanupFiles();
         return { ok: false, message: friendlyDbError(gErr) };
       }
     }
@@ -162,17 +180,27 @@ export async function updateMaterialAction(
 export async function deleteMaterialAction(id: string): Promise<Result> {
   const supabase = await createServerSupabaseClient();
 
+  // 묶음 파일 경로 수집 (스토리지 정리용) — 단건 컬럼 잔재도 함께
+  const { data: files } = await supabase
+    .from("material_files")
+    .select("storage_path")
+    .eq("material_id", id);
   const { data: m } = await supabase
     .from("materials")
     .select("storage_path")
     .eq("id", id)
     .maybeSingle();
 
+  const paths = [
+    ...(files ?? []).map((f) => f.storage_path),
+    ...(m?.storage_path ? [m.storage_path] : []),
+  ];
+
   const { error } = await supabase.from("materials").delete().eq("id", id);
   if (error) return { ok: false, message: friendlyDbError(error) };
 
-  if (m?.storage_path) {
-    await supabase.storage.from("materials").remove([m.storage_path]);
+  if (paths.length > 0) {
+    await supabase.storage.from("materials").remove(paths);
   }
 
   revalidatePath("/materials");

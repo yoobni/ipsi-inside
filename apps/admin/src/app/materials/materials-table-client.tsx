@@ -33,8 +33,8 @@ export type MaterialRow = {
   id: string;
   title: string;
   audience: MaterialAudience;
-  file_name: string;
-  file_size_bytes: number;
+  file_count: number;
+  total_bytes: number;
   is_published: boolean;
   published_at: string | null;
   expires_at: string | null;
@@ -53,7 +53,7 @@ export function MaterialsTableClient({ rows }: { rows: MaterialRow[] }) {
   const filtered = useMemo(() => {
     const q = query.trim();
     return rows.filter((r) => {
-      if (q && !r.title.includes(q) && !r.file_name.includes(q)) return false;
+      if (q && !r.title.includes(q)) return false;
       if (audienceFilter !== "_any" && r.audience !== audienceFilter)
         return false;
       if (publishFilter === "published" && !r.is_published) return false;
@@ -154,7 +154,7 @@ function RowItem({ row }: { row: MaterialRow }) {
 
   const isExpired =
     row.expires_at != null && new Date(row.expires_at) < new Date();
-  const sizeMb = (row.file_size_bytes / 1024 / 1024).toFixed(1);
+  const totalMb = (row.total_bytes / 1024 / 1024).toFixed(1);
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -173,7 +173,7 @@ function RowItem({ row }: { row: MaterialRow }) {
           {isExpired && <Badge variant="warning">만료</Badge>}
         </div>
         <p className="text-muted-foreground mt-1 text-xs">
-          {row.file_name} · {sizeMb}MB
+          파일 {row.file_count}개 · {totalMb}MB
         </p>
         <p className="text-muted-foreground mt-0.5 text-[10px]">
           {row.published_at

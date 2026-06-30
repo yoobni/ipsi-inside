@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Download, FileText } from "lucide-react";
+import { ArrowRight, FileText } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { MATERIAL_AUDIENCE_LABEL } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
@@ -81,22 +81,14 @@ export default async function MaterialsPage() {
                   </p>
                 )}
                 <p className="text-muted-foreground mt-0.5 text-[10px]">
-                  {m.file_name} · {(m.file_size_bytes / 1024 / 1024).toFixed(1)}MB
+                  파일 {m.file_count}개 · {(m.total_bytes / 1024 / 1024).toFixed(1)}MB
                   {m.published_at && ` · 발행 ${formatDt(m.published_at)}`}
                 </p>
               </Link>
               <div className="flex shrink-0 gap-1">
-                <Button asChild size="sm" variant="outline">
-                  <a
-                    href={`/dashboard/materials/${m.id}/download`}
-                    aria-label="다운로드"
-                  >
-                    <Download className="size-4" />
-                  </a>
-                </Button>
                 <Button asChild size="sm">
                   <Link href={`/dashboard/materials/${m.id}`}>
-                    보기 <ArrowRight className="size-4" />
+                    열기 <ArrowRight className="size-4" />
                   </Link>
                 </Button>
               </div>
