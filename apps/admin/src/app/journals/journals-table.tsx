@@ -365,7 +365,7 @@ function FeedbackDrawer({
                   </Button>
                   <Button onClick={handlePublish} disabled={pending}>
                     <Send className="size-4" />
-                    {pending ? "처리 중..." : "발행 (내일 06:00 KST)"}
+                    {pending ? "처리 중..." : "발행 (즉시)"}
                   </Button>
                 </div>
               </div>

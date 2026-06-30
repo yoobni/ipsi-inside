@@ -66,7 +66,7 @@ export default async function JournalsPage() {
       <div className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">학습 일지</h1>
         <p className="text-muted-foreground text-sm">
-          학생이 제출한 일일 일지를 검수하고 4필드 피드백을 작성·발행해요. 발행하면 다음날 오전 6시에 학생/학부모에게 노출돼요.
+          학생이 제출한 일일 일지를 검수하고 4필드 피드백을 작성·발행해요. 발행하면 즉시 학생/학부모에게 노출돼요.
         </p>
       </div>
 

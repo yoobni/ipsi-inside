@@ -5,7 +5,6 @@ import { friendlyDbError } from "@ipsi/lib";
 import { journalFeedbackSchema } from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
-import { nextKstSixAm } from "@/lib/kst";
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -69,7 +68,7 @@ export async function saveFeedbackDraftAction(
 }
 
 /**
- * 발행 — 다음 KST 06:00에 학생/학부모에게 공개
+ * 발행 — 즉시 학생/학부모에게 공개 (소규모/과외의 빠른 질응답 강점 살리기)
  */
 export async function publishFeedbackAction(
   journalId: string,
@@ -84,7 +83,7 @@ export async function publishFeedbackAction(
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
-  const publishAt = nextKstSixAm();
+  const publishAt = new Date();
 
   const { error } = await db
     .from("journal_feedbacks")
@@ -93,8 +92,7 @@ export async function publishFeedbackAction(
 
   if (error) return { ok: false, message: friendlyDbError(error) };
 
-  // 알림 — publish_at(다음날 06:00 KST) 시각으로 created_at을 설정해서
-  // 학생/학부모 종 아이콘이 그 시각부터 노출되게.
+  // 알림 — 발행 즉시(created_at=now) 학생/학부모 종 아이콘에 노출.
   const { data: journal } = await db
     .from("study_journals")
     .select("student_id, journal_date")
