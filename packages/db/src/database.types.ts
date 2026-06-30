@@ -106,6 +106,62 @@ export type Database = {
         Relationships: [];
       };
 
+      // ─── 학생 그룹(반) ───────────────────────────────────────────────────────
+      student_groups: {
+        Row: {
+          id: string;
+          name: string;
+          color: string | null;
+          description: string | null;
+          archived: boolean;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          color?: string | null;
+          description?: string | null;
+          archived?: boolean;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          color?: string | null;
+          description?: string | null;
+          archived?: boolean;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      group_members: {
+        Row: {
+          group_id: string;
+          student_id: string;
+          added_by: string;
+          added_at: string;
+        };
+        Insert: {
+          group_id: string;
+          student_id: string;
+          added_by: string;
+          added_at?: string;
+        };
+        Update: {
+          group_id?: string;
+          student_id?: string;
+          added_by?: string;
+          added_at?: string;
+        };
+        Relationships: [];
+      };
+
       // ─── v2 시험 시스템 ──────────────────────────────────────────────────────
       passages: {
         Row: {

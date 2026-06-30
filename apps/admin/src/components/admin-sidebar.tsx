@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   FileDown,
   FileText,
+  Layers,
   Megaphone,
   NotebookPen,
   UserCheck,
@@ -34,6 +35,12 @@ const MENU: MenuItem[] = [
     label: "회원 관리",
     icon: Users,
     matchPrefix: undefined,
+  },
+  {
+    href: "/groups",
+    label: "그룹(반)",
+    icon: Layers,
+    matchPrefix: "/groups",
   },
   {
     href: "/passages",
