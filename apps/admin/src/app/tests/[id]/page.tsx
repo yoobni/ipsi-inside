@@ -227,6 +227,25 @@ export default async function TestDetailPage({
     ),
   ).sort();
 
+  // 그룹 목록(현재 멤버 수 포함) — 배정 드로어 "그룹" 탭용
+  const [{ data: groups }, { data: memberships }] = await Promise.all([
+    supabase
+      .from("student_groups")
+      .select("id, name")
+      .eq("archived", false)
+      .order("name"),
+    supabase.from("group_members").select("group_id"),
+  ]);
+  const countByGroup = new Map<string, number>();
+  (memberships ?? []).forEach((mm) =>
+    countByGroup.set(mm.group_id, (countByGroup.get(mm.group_id) ?? 0) + 1),
+  );
+  const groupOptions = (groups ?? []).map((g) => ({
+    id: g.id,
+    name: g.name,
+    member_count: countByGroup.get(g.id) ?? 0,
+  }));
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-center gap-2">
@@ -406,6 +425,7 @@ export default async function TestDetailPage({
         assigned={assignedRows}
         availableStudents={availableStudents}
         distinctSchools={distinctSchools}
+        groups={groupOptions}
       />
     </div>
   );

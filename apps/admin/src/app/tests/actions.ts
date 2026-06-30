@@ -249,6 +249,30 @@ export async function assignAction(
     );
   }
 
+  // 그룹 단위 → 그 그룹의 "현재" 멤버를 스냅샷으로 배정 (응시·채점이 학생별 행에 붙으므로 동적 불가)
+  if ((parsed.group_ids?.length ?? 0) > 0) {
+    const { data: members } = await supabase
+      .from("group_members")
+      .select("student_id")
+      .in("group_id", parsed.group_ids!);
+    const memberIds = Array.from(
+      new Set((members ?? []).map((m) => m.student_id)),
+    );
+    if (memberIds.length > 0) {
+      const { data: students } = await supabase
+        .from("profiles")
+        .select("id, school")
+        .eq("role", "student")
+        .eq("status", "approved")
+        .in("id", memberIds);
+      (students ?? []).forEach((s) => {
+        if (!targets.find((t) => t.student_id === s.id)) {
+          targets.push({ student_id: s.id, school: s.school });
+        }
+      });
+    }
+  }
+
   if ((parsed.student_ids?.length ?? 0) > 0) {
     const { data: students } = await supabase
       .from("profiles")

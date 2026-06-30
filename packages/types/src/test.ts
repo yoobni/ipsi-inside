@@ -147,10 +147,14 @@ export const assignmentInputSchema = z
     test_sheet_id: z.string().uuid(),
     schools: z.array(z.string().min(1)).optional().default([]),
     student_ids: z.array(z.string().uuid()).optional().default([]),
+    group_ids: z.array(z.string().uuid()).optional().default([]),
   })
   .refine(
-    (v) => (v.schools?.length ?? 0) > 0 || (v.student_ids?.length ?? 0) > 0,
-    { message: "학교 또는 학생을 최소 1명/1개 선택해주세요" },
+    (v) =>
+      (v.schools?.length ?? 0) > 0 ||
+      (v.student_ids?.length ?? 0) > 0 ||
+      (v.group_ids?.length ?? 0) > 0,
+    { message: "학교/그룹/학생 중 최소 하나를 선택해주세요" },
   );
 
 export type AssignmentInput = z.infer<typeof assignmentInputSchema>;
