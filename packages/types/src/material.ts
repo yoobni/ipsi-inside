@@ -9,6 +9,7 @@ export const MATERIAL_AUDIENCE = [
   "student",
   "parent",
   "targeted",
+  "group",
 ] as const;
 export type MaterialAudience = (typeof MATERIAL_AUDIENCE)[number];
 
@@ -17,6 +18,7 @@ export const MATERIAL_AUDIENCE_LABEL: Record<MaterialAudience, string> = {
   student: "학생 광역",
   parent: "학부모 광역",
   targeted: "핀포인트",
+  group: "그룹(반)",
 };
 
 export const MAX_MATERIAL_BYTES = 30 * 1024 * 1024; // 30MB

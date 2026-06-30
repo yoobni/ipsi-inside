@@ -14,6 +14,7 @@ import {
   MATERIAL_AUDIENCE_LABEL,
   type MaterialAudience,
 } from "@ipsi/types";
+import type { GroupOption } from "../new-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -89,14 +90,20 @@ export function MaterialDetailClient({
   assigned,
   availableStudents,
   distinctSchools,
+  groups,
+  targetGroupIds,
 }: {
   material: MaterialDetail;
   assigned: AssignedRow[];
   availableStudents: AvailableStudent[];
   distinctSchools: string[];
+  groups: GroupOption[];
+  targetGroupIds: string[];
 }) {
   const [editing, setEditing] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+
+  const targetGroups = groups.filter((g) => targetGroupIds.includes(g.id));
 
   const isExpired =
     material.expires_at != null && new Date(material.expires_at) < new Date();
@@ -201,7 +208,39 @@ export function MaterialDetailClient({
         </section>
       )}
 
-      {material.audience !== "targeted" && (
+      {material.audience === "group" && (
+        <section className="rounded-md border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold">대상 그룹</h2>
+              <Badge variant="primary">{targetGroups.length}개 그룹</Badge>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="size-4" /> 그룹 변경
+            </Button>
+          </div>
+          <div className="p-4">
+            {targetGroups.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                연결된 그룹이 없어요. [그룹 변경]에서 대상 그룹을 선택하세요.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {targetGroups.map((g) => (
+                  <Badge key={g.id} variant="default">
+                    {g.name} · {g.member_count}명
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <p className="text-muted-foreground mt-3 text-xs">
+              그룹 멤버가 바뀌면 노출 대상도 자동으로 따라가요. (동적)
+            </p>
+          </div>
+        </section>
+      )}
+
+      {material.audience !== "targeted" && material.audience !== "group" && (
         <section className="rounded-md border bg-card px-4 py-6">
           <p className="text-muted-foreground text-sm">
             <strong className="text-foreground">광역 배부</strong> 모드에선 별도 배정이
@@ -214,6 +253,8 @@ export function MaterialDetailClient({
         open={editing}
         onClose={() => setEditing(false)}
         material={material}
+        groups={groups}
+        initialGroupIds={targetGroupIds}
       />
       <AssignDrawer
         open={assignOpen}
@@ -373,26 +414,48 @@ function EditDrawer({
   open,
   onClose,
   material,
+  groups,
+  initialGroupIds,
 }: {
   open: boolean;
   onClose: () => void;
   material: MaterialDetail;
+  groups: GroupOption[];
+  initialGroupIds: string[];
 }) {
   const [title, setTitle] = useState(material.title);
   const [description, setDescription] = useState(material.description ?? "");
   const [audience, setAudience] = useState<MaterialAudience>(material.audience);
+  const [groupIds, setGroupIds] = useState<Set<string>>(
+    new Set(initialGroupIds),
+  );
   const [expiresAt, setExpiresAt] = useState(isoToLocal(material.expires_at));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const toggleGroup = (id: string) =>
+    setGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (audience === "group" && groupIds.size === 0) {
+      setError("대상 그룹을 최소 1개 선택해주세요.");
+      return;
+    }
     setError(null);
     const fd = new FormData();
     fd.set("title", title.trim());
     fd.set("description", description.trim());
     fd.set("audience", audience);
     fd.set("expires_at", expiresAt ? localToIso(expiresAt) ?? "" : "");
+    if (audience === "group") {
+      fd.set("group_ids", JSON.stringify(Array.from(groupIds)));
+    }
     startTransition(async () => {
       const r = await updateMaterialAction(material.id, null, fd);
       if (r.ok) onClose();
@@ -440,6 +503,9 @@ function EditDrawer({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="group">
+                    {MATERIAL_AUDIENCE_LABEL.group}
+                  </SelectItem>
                   <SelectItem value="targeted">
                     {MATERIAL_AUDIENCE_LABEL.targeted}
                   </SelectItem>
@@ -459,6 +525,38 @@ function EditDrawer({
                 </p>
               )}
             </div>
+
+            {audience === "group" && (
+              <div className="space-y-1.5">
+                <Label>대상 그룹</Label>
+                {groups.length === 0 ? (
+                  <p className="text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-xs">
+                    만든 그룹이 없어요. [그룹(반)] 메뉴에서 먼저 만들어주세요.
+                  </p>
+                ) : (
+                  <ul className="max-h-48 divide-y overflow-y-auto rounded-md border">
+                    {groups.map((g) => (
+                      <li key={g.id}>
+                        <label className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={groupIds.has(g.id)}
+                            onChange={() => toggleGroup(g.id)}
+                            className="size-4 accent-current"
+                          />
+                          <span className="flex-1 text-sm font-medium">
+                            {g.name}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            {g.member_count}명
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="expires">만료 일시 (선택)</Label>
               <Input

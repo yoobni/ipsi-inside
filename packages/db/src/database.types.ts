@@ -554,7 +554,7 @@ export type Database = {
           id: string;
           title: string;
           description: string | null;
-          audience: "all" | "student" | "parent" | "targeted";
+          audience: "all" | "student" | "parent" | "targeted" | "group";
           storage_path: string;
           file_name: string;
           file_size_bytes: number;
@@ -569,7 +569,7 @@ export type Database = {
           id?: string;
           title: string;
           description?: string | null;
-          audience?: "all" | "student" | "parent" | "targeted";
+          audience?: "all" | "student" | "parent" | "targeted" | "group";
           storage_path: string;
           file_name: string;
           file_size_bytes: number;
@@ -584,7 +584,7 @@ export type Database = {
           id?: string;
           title?: string;
           description?: string | null;
-          audience?: "all" | "student" | "parent" | "targeted";
+          audience?: "all" | "student" | "parent" | "targeted" | "group";
           storage_path?: string;
           file_name?: string;
           file_size_bytes?: number;
@@ -621,6 +621,27 @@ export type Database = {
           assigned_by?: string;
           assigned_by_school?: string | null;
           assigned_at?: string;
+        };
+        Relationships: [];
+      };
+      material_group_targets: {
+        Row: {
+          material_id: string;
+          group_id: string;
+          added_by: string;
+          added_at: string;
+        };
+        Insert: {
+          material_id: string;
+          group_id: string;
+          added_by: string;
+          added_at?: string;
+        };
+        Update: {
+          material_id?: string;
+          group_id?: string;
+          added_by?: string;
+          added_at?: string;
         };
         Relationships: [];
       };

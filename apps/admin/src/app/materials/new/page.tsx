@@ -1,9 +1,31 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { NewMaterialForm } from "../new-form";
+import { NewMaterialForm, type GroupOption } from "../new-form";
 
-export default function NewMaterialPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NewMaterialPage() {
+  const supabase = await createServerSupabaseClient();
+  const [{ data: groups }, { data: memberships }] = await Promise.all([
+    supabase
+      .from("student_groups")
+      .select("id, name")
+      .eq("archived", false)
+      .order("name"),
+    supabase.from("group_members").select("group_id"),
+  ]);
+  const countByGroup = new Map<string, number>();
+  (memberships ?? []).forEach((m) =>
+    countByGroup.set(m.group_id, (countByGroup.get(m.group_id) ?? 0) + 1),
+  );
+  const groupOptions: GroupOption[] = (groups ?? []).map((g) => ({
+    id: g.id,
+    name: g.name,
+    member_count: countByGroup.get(g.id) ?? 0,
+  }));
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-2">
@@ -22,7 +44,7 @@ export default function NewMaterialPage() {
         </p>
       </div>
 
-      <NewMaterialForm />
+      <NewMaterialForm groups={groupOptions} />
     </div>
   );
 }

@@ -14,6 +14,18 @@ type Result =
   | { ok: true; id?: string; count?: number }
   | { ok: false; message: string };
 
+function parseGroupIds(raw: FormDataEntryValue | null): string[] {
+  if (typeof raw !== "string" || raw.length === 0) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr)
+      ? arr.filter((x): x is string => typeof x === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function createMaterialAction(
   _prev: unknown,
   fd: FormData,
@@ -63,6 +75,29 @@ export async function createMaterialAction(
     return { ok: false, message: friendlyDbError(error) };
   }
 
+  // 그룹 대상이면 타깃 그룹 연결
+  if (parsed.data.audience === "group") {
+    const groupIds = parseGroupIds(fd.get("group_ids"));
+    if (groupIds.length > 0) {
+      const rows = groupIds.map((gid) => ({
+        material_id: data.id,
+        group_id: gid,
+        added_by: user.id,
+      }));
+      const { error: gErr } = await supabase
+        .from("material_group_targets")
+        .insert(rows);
+      if (gErr) {
+        // 롤백: material row + 업로드 파일 정리
+        await supabase.from("materials").delete().eq("id", data.id);
+        await supabase.storage
+          .from("materials")
+          .remove([parsed.data.storage_path]);
+        return { ok: false, message: friendlyDbError(gErr) };
+      }
+    }
+  }
+
   revalidatePath("/materials");
   return { ok: true, id: data.id };
 }
@@ -86,6 +121,11 @@ export async function updateMaterialAction(
   }
 
   const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "인증 필요" };
+
   const { error } = await supabase
     .from("materials")
     .update({
@@ -96,6 +136,23 @@ export async function updateMaterialAction(
     })
     .eq("id", id);
   if (error) return { ok: false, message: friendlyDbError(error) };
+
+  // 그룹 타깃 동기화: group이면 새 목록으로 교체, 아니면 모두 제거.
+  await supabase.from("material_group_targets").delete().eq("material_id", id);
+  if (parsed.data.audience === "group") {
+    const groupIds = parseGroupIds(fd.get("group_ids"));
+    if (groupIds.length > 0) {
+      const rows = groupIds.map((gid) => ({
+        material_id: id,
+        group_id: gid,
+        added_by: user.id,
+      }));
+      const { error: gErr } = await supabase
+        .from("material_group_targets")
+        .insert(rows);
+      if (gErr) return { ok: false, message: friendlyDbError(gErr) };
+    }
+  }
 
   revalidatePath("/materials");
   revalidatePath(`/materials/${id}`);
@@ -396,6 +453,32 @@ async function fanOutMaterialNotifications(
         .select("parent_id")
         .in("student_id", studentIds);
       (parentLinks ?? []).forEach((l) => parentRecipients.add(l.parent_id));
+    }
+  } else if (audience === "group") {
+    // 타깃 그룹의 현재 멤버(동적) + 그 학부모
+    const { data: targets } = await supabase
+      .from("material_group_targets")
+      .select("group_id")
+      .eq("material_id", materialId);
+    const groupIds = (targets ?? []).map((t) => t.group_id);
+
+    if (groupIds.length > 0) {
+      const { data: members } = await supabase
+        .from("group_members")
+        .select("student_id")
+        .in("group_id", groupIds);
+      const studentIds = Array.from(
+        new Set((members ?? []).map((m) => m.student_id)),
+      );
+      studentIds.forEach((sid) => recipientIds.add(sid));
+
+      if (studentIds.length > 0) {
+        const { data: parentLinks } = await supabase
+          .from("parent_student_links")
+          .select("parent_id")
+          .in("student_id", studentIds);
+        (parentLinks ?? []).forEach((l) => parentRecipients.add(l.parent_id));
+      }
     }
   }
 

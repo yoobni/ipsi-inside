@@ -110,6 +110,31 @@ export default async function MaterialDetailPage({
     ),
   ).sort();
 
+  // 그룹 목록(멤버 수 포함) + 이 자료의 타깃 그룹
+  const [{ data: groups }, { data: memberships }, { data: groupTargets }] =
+    await Promise.all([
+      supabase
+        .from("student_groups")
+        .select("id, name")
+        .eq("archived", false)
+        .order("name"),
+      supabase.from("group_members").select("group_id"),
+      supabase
+        .from("material_group_targets")
+        .select("group_id")
+        .eq("material_id", id),
+    ]);
+  const countByGroup = new Map<string, number>();
+  (memberships ?? []).forEach((mm) =>
+    countByGroup.set(mm.group_id, (countByGroup.get(mm.group_id) ?? 0) + 1),
+  );
+  const groupOptions = (groups ?? []).map((g) => ({
+    id: g.id,
+    name: g.name,
+    member_count: countByGroup.get(g.id) ?? 0,
+  }));
+  const targetGroupIds = (groupTargets ?? []).map((t) => t.group_id);
+
   // 다운로드/뷰 이력 — 최근 100건
   const { data: downloadRows } = await supabase
     .from("material_downloads")
@@ -160,6 +185,8 @@ export default async function MaterialDetailPage({
         assigned={assigned}
         availableStudents={availableStudents}
         distinctSchools={distinctSchools}
+        groups={groupOptions}
+        targetGroupIds={targetGroupIds}
       />
 
       {detail.audience === "targeted" && assigned.length > 0 && (

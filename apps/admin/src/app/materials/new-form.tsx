@@ -29,17 +29,30 @@ const AUDIENCE_HINT: Record<MaterialAudience, string> = {
   parent: "활성 학부모 전원만 받아요. (학생에겐 노출 안 됨)",
   targeted:
     "발행 후 상세 화면에서 학교/학생을 선택해 배정해요. 자녀의 학부모도 함께 노출돼요.",
+  group:
+    "선택한 그룹(반)의 학생과 그 학부모가 받아요. 그룹 멤버가 바뀌면 노출 대상도 자동으로 따라가요.",
 };
 
-export function NewMaterialForm() {
+export type GroupOption = { id: string; name: string; member_count: number };
+
+export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [audience, setAudience] = useState<MaterialAudience>("targeted");
+  const [groupIds, setGroupIds] = useState<Set<string>>(new Set());
   const [expiresAt, setExpiresAt] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const toggleGroup = (id: string) =>
+    setGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +66,10 @@ export function NewMaterialForm() {
     }
     if (file.type !== "application/pdf") {
       setError("PDF 파일만 업로드 가능합니다.");
+      return;
+    }
+    if (audience === "group" && groupIds.size === 0) {
+      setError("대상 그룹을 최소 1개 선택해주세요.");
       return;
     }
     setError(null);
@@ -74,6 +91,9 @@ export function NewMaterialForm() {
       fd.set("storage_path", up.storage_path);
       fd.set("file_name", up.file_name);
       fd.set("file_size_bytes", String(up.file_size_bytes));
+      if (audience === "group") {
+        fd.set("group_ids", JSON.stringify(Array.from(groupIds)));
+      }
 
       const r = await createMaterialAction(null, fd);
       if (!r.ok) {
@@ -118,6 +138,9 @@ export function NewMaterialForm() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="group">
+              {MATERIAL_AUDIENCE_LABEL.group}
+            </SelectItem>
             <SelectItem value="targeted">
               {MATERIAL_AUDIENCE_LABEL.targeted} (학교/학생 선택)
             </SelectItem>
@@ -131,6 +154,35 @@ export function NewMaterialForm() {
           </SelectContent>
         </Select>
         <p className="text-muted-foreground text-xs">{AUDIENCE_HINT[audience]}</p>
+
+        {audience === "group" && (
+          <div className="mt-2 space-y-1.5">
+            {groups.length === 0 ? (
+              <p className="text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-xs">
+                만든 그룹이 없어요. [그룹(반)] 메뉴에서 먼저 그룹을 만들어주세요.
+              </p>
+            ) : (
+              <ul className="max-h-48 divide-y overflow-y-auto rounded-md border">
+                {groups.map((g) => (
+                  <li key={g.id}>
+                    <label className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={groupIds.has(g.id)}
+                        onChange={() => toggleGroup(g.id)}
+                        className="size-4 accent-current"
+                      />
+                      <span className="flex-1 text-sm font-medium">{g.name}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {g.member_count}명
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
