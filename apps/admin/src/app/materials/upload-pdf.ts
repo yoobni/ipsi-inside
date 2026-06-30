@@ -38,9 +38,13 @@ export async function uploadPdfAction(fd: FormData): Promise<Result> {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "인증 필요" };
 
+  // Supabase Storage 객체 키는 ASCII만 허용 — 한글/특수문자가 들어가면 `Invalid key`.
+  // 원본 파일명은 file_name 컬럼에 보존하고, 저장 키는 UUID + 확장자(ASCII)로만 만든다.
   const id = crypto.randomUUID();
-  const safeName = file.name.replace(/[^\w가-힣.\-]/g, "_");
-  const path = `${id}/${safeName}`;
+  const ext =
+    (file.name.split(".").pop() ?? "pdf").toLowerCase().replace(/[^a-z0-9]+/g, "") ||
+    "pdf";
+  const path = `${id}/file.${ext}`;
 
   const { error } = await supabase.storage
     .from("materials")
