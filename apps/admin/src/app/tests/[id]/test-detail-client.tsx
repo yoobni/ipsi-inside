@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Loader2,
+  RotateCcw,
   Trash2,
   UserPlus,
 } from "lucide-react";
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { assignAction, unassignAction } from "../actions";
+import { assignAction, resetAttemptsAction, unassignAction } from "../actions";
 
 export type AssignedRow = {
   assignment_id: string;
@@ -163,6 +164,20 @@ function AssignedRowItem({
     });
   };
 
+  const handleReset = () => {
+    if (
+      !confirm(
+        `${row.full_name} 학생의 이 시험 응시를 초기화할까요? 답안·점수가 삭제되고 처음부터 다시 응시할 수 있어요.`,
+      )
+    )
+      return;
+    setError(null);
+    startTransition(async () => {
+      const r = await resetAttemptsAction(testSheetId, row.student_id);
+      if (!r.ok) setError(r.message);
+    });
+  };
+
   return (
     <>
       <TableRow>
@@ -205,6 +220,20 @@ function AssignedRowItem({
         <TableCell className="text-muted-foreground pr-4 text-right text-xs">
           <div className="inline-flex items-center gap-1">
             <span>{new Date(row.assigned_at).toLocaleDateString("ko-KR")}</span>
+            {row.latest_status && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                disabled={pending}
+                onClick={handleReset}
+                className="size-7"
+                aria-label="응시 초기화"
+                title="응시 초기화 (답안·점수 삭제 후 재응시 허용)"
+              >
+                <RotateCcw className="size-3.5" />
+              </Button>
+            )}
             <Button
               type="button"
               size="icon"
@@ -215,7 +244,7 @@ function AssignedRowItem({
               aria-label="배정 해제"
               title={
                 row.latest_status
-                  ? "응시 기록이 있어 해제 불가"
+                  ? "응시 기록이 있어 해제 불가 (초기화 후 해제 가능)"
                   : "배정 해제"
               }
             >

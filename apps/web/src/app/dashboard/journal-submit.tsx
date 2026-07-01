@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Pencil, Check } from "lucide-react";
 import { JOURNAL_FIELDS, type JournalFieldKey } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,16 @@ type Props = {
 export function JournalSubmit({ todayDate, existing }: Props) {
   const hasExisting = hasAnyContent(existing);
   const [editing, setEditing] = useState(!hasExisting);
+  const [justSubmitted, setJustSubmitted] = useState(false);
   const [state, formAction, pending] = useActionState(submitJournalAction, null);
+
+  // 제출 성공 시 완료 뷰로 전환 + 확인 배너
+  useEffect(() => {
+    if (state?.ok) {
+      setEditing(false);
+      setJustSubmitted(true);
+    }
+  }, [state]);
 
   const dateLabel = new Date(todayDate).toLocaleDateString("ko-KR", {
     month: "long",
@@ -40,6 +49,12 @@ export function JournalSubmit({ todayDate, existing }: Props) {
     );
     return (
       <section className="border-hairline rounded-[14px] border bg-surface p-6">
+        {justSubmitted && (
+          <div className="mb-4 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <Check className="size-4" />
+            제출 완료! 원장님이 확인 후 피드백을 드려요.
+          </div>
+        )}
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-muted-foreground text-xs font-medium">

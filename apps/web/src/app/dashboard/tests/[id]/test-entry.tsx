@@ -25,8 +25,9 @@ export function TestEntry({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
-  const handleStart = () => {
+  const doStart = () => {
     setError(null);
     startTransition(async () => {
       const r = await startOrResumeAttemptAction(testSheetId);
@@ -36,6 +37,15 @@ export function TestEntry({
         setError(r.message);
       }
     });
+  };
+
+  const handleStart = () => {
+    // 새 응시는 실수 방지용 확인 단계, 이어풀기는 바로 진행
+    if (!hasInProgress && !confirming) {
+      setConfirming(true);
+      return;
+    }
+    doStart();
   };
 
   if (isLocked) {
@@ -71,29 +81,70 @@ export function TestEntry({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <Button
-        size="lg"
-        onClick={handleStart}
-        disabled={pending}
-        className="w-full"
-      >
-        {pending ? (
-          <>
-            <Loader2 className="size-4 animate-spin" />
-            준비 중...
-          </>
-        ) : hasInProgress ? (
-          <>
-            <Play className="size-4" />
-            이어서 풀기
-          </>
-        ) : (
-          <>
-            <Play className="size-4" />
-            시험 시작
-          </>
-        )}
-      </Button>
+
+      {confirming && !hasInProgress && (
+        <Alert>
+          <AlertDescription>
+            <strong className="text-foreground">시작하면 바로 응시가 시작돼요.</strong>{" "}
+            중간에 나가도 답안은 저장돼서 이어 풀 수 있어요. 준비됐나요?
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {confirming && !hasInProgress ? (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setConfirming(false)}
+            disabled={pending}
+            className="flex-1"
+          >
+            취소
+          </Button>
+          <Button
+            size="lg"
+            onClick={doStart}
+            disabled={pending}
+            className="flex-1"
+          >
+            {pending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" /> 준비 중...
+              </>
+            ) : (
+              <>
+                <Play className="size-4" /> 네, 시작할게요
+              </>
+            )}
+          </Button>
+        </div>
+      ) : (
+        <Button
+          size="lg"
+          onClick={handleStart}
+          disabled={pending}
+          className="w-full"
+        >
+          {pending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              준비 중...
+            </>
+          ) : hasInProgress ? (
+            <>
+              <Play className="size-4" />
+              이어서 풀기
+            </>
+          ) : (
+            <>
+              <Play className="size-4" />
+              시험 시작
+            </>
+          )}
+        </Button>
+      )}
+
       {hasInProgress && (
         <p className="text-muted-foreground text-center text-xs">
           진행 중인 응시가 있어요. 이어서 풀거나, 완료까지 그대로 진행하세요.

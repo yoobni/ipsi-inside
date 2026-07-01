@@ -346,6 +346,35 @@ export async function assignAction(
   return { ok: true, count: rows.length };
 }
 
+/**
+ * 응시 초기화 — 학생의 이 시험 응시(attempt)를 모두 삭제해 처음 상태로 되돌림.
+ * student_answers는 attempt on delete cascade로 함께 삭제. attempt가 없어지면 다시 응시 가능.
+ * 실수로 시작/제출한 응시를 원장이 구제할 때 사용.
+ */
+export async function resetAttemptsAction(
+  testSheetId: string,
+  studentId: string,
+): Promise<Result> {
+  const supabase = await createServerSupabaseClient();
+
+  const { data: asg } = await supabase
+    .from("test_assignments")
+    .select("id")
+    .eq("test_sheet_id", testSheetId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (!asg) return { ok: false, message: "배정을 찾을 수 없어요." };
+
+  const { error } = await supabase
+    .from("test_attempts")
+    .delete()
+    .eq("assignment_id", asg.id);
+  if (error) return { ok: false, message: friendlyDbError(error) };
+
+  revalidatePath(`/tests/${testSheetId}`);
+  return { ok: true };
+}
+
 export async function unassignAction(
   testSheetId: string,
   studentId: string,
