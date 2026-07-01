@@ -8,6 +8,7 @@ import {
   MAX_MATERIAL_BYTES,
   type MaterialAudience,
 } from "@ipsi/types";
+import { formatBytes } from "@ipsi/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -117,7 +118,7 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
     });
   };
 
-  const totalMb = files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
+  const totalSize = formatBytes(files.reduce((sum, f) => sum + f.size, 0));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 rounded-md border bg-card p-5">
@@ -238,12 +239,12 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
                   {i + 1}. {f.name}
                 </span>
                 <span className="shrink-0 tabular-nums">
-                  {(f.size / 1024 / 1024).toFixed(1)}MB
+                  {formatBytes(f.size)}
                 </span>
               </li>
             ))}
             <li className="text-muted-foreground text-xs font-medium">
-              총 {files.length}개 · {totalMb.toFixed(1)}MB
+              총 {files.length}개 · {totalSize}
             </li>
           </ul>
         )}

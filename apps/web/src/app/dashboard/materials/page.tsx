@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, FileText } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { formatBytes } from "@ipsi/lib/format";
 import { MATERIAL_AUDIENCE_LABEL } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
 import {
@@ -81,7 +82,7 @@ export default async function MaterialsPage() {
                   </p>
                 )}
                 <p className="text-muted-foreground mt-0.5 text-[10px]">
-                  파일 {m.file_count}개 · {(m.total_bytes / 1024 / 1024).toFixed(1)}MB
+                  파일 {m.file_count}개 · {formatBytes(m.total_bytes)}
                   {m.published_at && ` · 발행 ${formatDt(m.published_at)}`}
                 </p>
               </Link>

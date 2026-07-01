@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 
 type Result =
   | { ok: true; attemptId?: string }
@@ -159,7 +160,9 @@ export async function submitAttemptAction(
       testSheetId = asg.test_sheet_id;
       revalidatePath(`/dashboard/tests/${asg.test_sheet_id}`);
 
-      // admin 들에게 알림
+      // admin 들에게 알림 — 학생 세션은 admin 프로필 조회/알림 insert가 RLS로 막히므로
+      // service_role(admin client)로 처리.
+      const db = createAdminSupabaseClient();
       const [{ data: sheet }, { data: student }, { data: admins }] =
         await Promise.all([
           supabase
@@ -172,7 +175,7 @@ export async function submitAttemptAction(
             .select("full_name")
             .eq("id", asg.student_id)
             .maybeSingle(),
-          supabase
+          db
             .from("profiles")
             .select("id")
             .eq("role", "admin")
@@ -193,7 +196,7 @@ export async function submitAttemptAction(
         link: `/tests/${asg.test_sheet_id}/attempts/${attemptId}`,
       }));
       if (notifs.length > 0) {
-        await supabase.from("notifications").insert(notifs);
+        await db.from("notifications").insert(notifs);
       }
     }
   }

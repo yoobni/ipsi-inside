@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, Download, Eye, FileText } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { formatBytes } from "@ipsi/lib/format";
 import { MATERIAL_AUDIENCE_LABEL, type MaterialAudience } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
 import {
@@ -41,11 +42,9 @@ export default async function MaterialDetailPage({
     .eq("material_id", id)
     .order("position");
   const files = fileRows ?? [];
-  const totalMb = (
-    files.reduce((s, f) => s + f.file_size_bytes, 0) /
-    1024 /
-    1024
-  ).toFixed(1);
+  const totalSize = formatBytes(
+    files.reduce((s, f) => s + f.file_size_bytes, 0),
+  );
 
   const notif =
     state.kind === "ok"
@@ -76,7 +75,7 @@ export default async function MaterialDetailPage({
           </p>
         )}
         <p className="text-muted-foreground text-xs">
-          파일 {files.length}개 · {totalMb}MB
+          파일 {files.length}개 · {totalSize}
           {m.published_at && ` · 발행 ${formatDt(m.published_at)}`}
         </p>
       </div>
@@ -98,7 +97,7 @@ export default async function MaterialDetailPage({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{f.file_name}</p>
                 <p className="text-muted-foreground text-[10px]">
-                  {(f.file_size_bytes / 1024 / 1024).toFixed(1)}MB
+                  {formatBytes(f.file_size_bytes)}
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">

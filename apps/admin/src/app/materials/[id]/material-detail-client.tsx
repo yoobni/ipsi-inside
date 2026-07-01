@@ -14,6 +14,7 @@ import {
   MATERIAL_AUDIENCE_LABEL,
   type MaterialAudience,
 } from "@ipsi/types";
+import { formatBytes } from "@ipsi/lib/format";
 import type { GroupOption } from "../new-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -113,11 +114,9 @@ export function MaterialDetailClient({
 
   const isExpired =
     material.expires_at != null && new Date(material.expires_at) < new Date();
-  const totalMb = (
-    material.files.reduce((s, f) => s + f.file_size_bytes, 0) /
-    1024 /
-    1024
-  ).toFixed(1);
+  const totalSize = formatBytes(
+    material.files.reduce((s, f) => s + f.file_size_bytes, 0),
+  );
 
   return (
     <>
@@ -137,7 +136,7 @@ export function MaterialDetailClient({
             <p className="text-muted-foreground text-sm">{material.description}</p>
           )}
           <p className="text-muted-foreground text-xs">
-            파일 {material.files.length}개 · {totalMb}MB
+            파일 {material.files.length}개 · {totalSize}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -201,7 +200,7 @@ export function MaterialDetailClient({
                   {f.file_name}
                 </span>
                 <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                  {(f.file_size_bytes / 1024 / 1024).toFixed(1)}MB
+                  {formatBytes(f.file_size_bytes)}
                 </span>
               </li>
             ))}

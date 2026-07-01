@@ -13,6 +13,7 @@ import {
   MATERIAL_AUDIENCE_LABEL,
   type MaterialAudience,
 } from "@ipsi/types";
+import { formatBytes } from "@ipsi/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -154,7 +155,7 @@ function RowItem({ row }: { row: MaterialRow }) {
 
   const isExpired =
     row.expires_at != null && new Date(row.expires_at) < new Date();
-  const totalMb = (row.total_bytes / 1024 / 1024).toFixed(1);
+  const totalSize = formatBytes(row.total_bytes);
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -173,7 +174,7 @@ function RowItem({ row }: { row: MaterialRow }) {
           {isExpired && <Badge variant="warning">만료</Badge>}
         </div>
         <p className="text-muted-foreground mt-1 text-xs">
-          파일 {row.file_count}개 · {totalMb}MB
+          파일 {row.file_count}개 · {totalSize}
         </p>
         <p className="text-muted-foreground mt-0.5 text-[10px]">
           {row.published_at
