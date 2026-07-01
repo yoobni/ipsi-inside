@@ -47,6 +47,10 @@ export async function loginAction(
     };
   }
 
+  // 로그인 화면에서 고른 역할 (학생/학부모) — 계정 역할과 다르면 막아 문을 구분
+  const intendedRole =
+    formData.get("role") === "parent" ? "parent" : "student";
+
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
@@ -68,6 +72,18 @@ export async function loginAction(
       return {
         ok: false,
         message: "관리자 계정은 어드민 페이지에서 로그인해주세요",
+      };
+    }
+    // 학생/학부모 문을 잘못 고른 경우 안내 후 차단
+    if (
+      (profile?.role === "student" || profile?.role === "parent") &&
+      profile.role !== intendedRole
+    ) {
+      await supabase.auth.signOut();
+      const label = profile.role === "student" ? "학생" : "학부모";
+      return {
+        ok: false,
+        message: `이 계정은 ${label} 계정이에요. ${label} 로그인으로 다시 시도해주세요.`,
       };
     }
   }

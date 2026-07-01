@@ -8,12 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loginAction } from "../actions";
 
-export function LoginForm() {
+export function LoginForm({ role = "student" }: { role?: "student" | "parent" }) {
   const [state, formAction, pending] = useActionState(loginAction, null);
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
 
   return (
     <form action={formAction} className="space-y-5">
+      <input type="hidden" name="role" value={role} />
       {state && !state.ok && (
         <Alert variant="destructive">
           <AlertDescription>{state.message}</AlertDescription>
@@ -57,7 +58,11 @@ export function LoginForm() {
         )}
       </div>
       <Button type="submit" disabled={pending} size="lg" className="w-full">
-        {pending ? "로그인 중..." : "로그인 하기"}
+        {pending
+          ? "로그인 중..."
+          : role === "parent"
+            ? "학부모로 로그인"
+            : "학생으로 로그인"}
       </Button>
     </form>
   );
