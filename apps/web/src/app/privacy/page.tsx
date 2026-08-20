@@ -26,8 +26,8 @@ export default function PrivacyPage() {
         </header>
 
         <p className="text-muted-foreground">
-          <strong>HYCO</strong>(이하 "회사")는{" "}
-          <strong>입시인사이드</strong>(이하 "서비스") 이용자의 개인정보를
+          <strong>HYCO</strong>(이하 &ldquo;회사&rdquo;)는{" "}
+          <strong>입시인사이드</strong>(이하 &ldquo;서비스&rdquo;) 이용자의 개인정보를
           중요시하며, 「개인정보 보호법」 등 관련 법령을 준수하기 위해 다음과
           같이 개인정보처리방침을 수립·공개합니다.
         </p>

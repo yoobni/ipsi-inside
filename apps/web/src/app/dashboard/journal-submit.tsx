@@ -28,13 +28,17 @@ export function JournalSubmit({ todayDate, existing }: Props) {
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [state, formAction, pending] = useActionState(submitJournalAction, null);
 
-  // 제출 성공 시 완료 뷰로 전환 + 확인 배너
+  // 제출 성공 시 완료 뷰로 전환 + 확인 배너.
+  // '수정' 버튼으로 다시 편집 모드로 돌아갈 수 있어야 해서 순수 파생으로는
+  // 표현이 어렵다(제출 성공과 편집 요청이 서로를 덮어써야 함).
+  /* eslint-disable react-hooks/set-state-in-effect -- action 결과를 뷰 상태로 반영 */
   useEffect(() => {
     if (state?.ok) {
       setEditing(false);
       setJustSubmitted(true);
     }
   }, [state]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const dateLabel = new Date(todayDate).toLocaleDateString("ko-KR", {
     month: "long",

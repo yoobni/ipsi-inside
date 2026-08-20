@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
@@ -368,7 +369,7 @@ export function PassageForm({
           )}
           <div className="flex gap-2">
             <Button asChild variant="outline" type="button">
-              <a href="/passages">취소</a>
+              <Link href="/passages">취소</Link>
             </Button>
             <Button type="submit" disabled={pending || deletePending}>
               {pending

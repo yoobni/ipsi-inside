@@ -47,7 +47,7 @@ export function TestsTableClient({ sheets }: { sheets: SheetRow[] }) {
 
   const filtered = useMemo(() => {
     const q = query.trim();
-    let arr = q
+    const arr = q
       ? sheets.filter((s) =>
           [s.title, s.target_school ?? ""].some((v) => v.includes(q)),
         )

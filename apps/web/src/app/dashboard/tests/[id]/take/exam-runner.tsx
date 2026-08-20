@@ -52,15 +52,15 @@ export function ExamRunner({
   const [submitPending, startSubmitTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // 남은 시간 (due_at 있을 때만)
-  const [remainingMs, setRemainingMs] = useState<number | null>(
-    dueAt ? new Date(dueAt).getTime() - Date.now() : null,
-  );
+  // 남은 시간 (due_at 있을 때만).
+  // 초기값을 렌더 중 Date.now()로 계산하면 순수하지 않아, null로 두고 아래
+  // 인터벌이 첫 tick을 즉시 채운다.
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
   useEffect(() => {
     if (!dueAt) return;
-    const t = setInterval(() => {
-      setRemainingMs(new Date(dueAt).getTime() - Date.now());
-    }, 1000);
+    const tick = () => setRemainingMs(new Date(dueAt).getTime() - Date.now());
+    tick();
+    const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, [dueAt]);
 
