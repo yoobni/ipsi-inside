@@ -22,6 +22,13 @@ export type PassageSource =
 
 export type AttemptStatus = "in_progress" | "submitted";
 
+/** 주간 플래너 — 발행 전 초안은 학생에게 보이지 않음 */
+export type PlannerWeekStatus = "draft" | "published";
+/** fixed=타 과목/고정 일정(색상 블록만), korean=국어 시간(세부 과제를 가짐) */
+export type PlannerBlockKind = "korean" | "fixed";
+/** O(제시간 완료) / △(당일 완료, 시간 미준수) / X(미수행) */
+export type PlannerCheckStatus = "done" | "late" | "missed";
+
 export type QuestionChoice = { no: number; text: string };
 
 export type Database = {
@@ -738,12 +745,218 @@ export type Database = {
         };
         Relationships: [];
       };
+      planner_weeks: {
+        Row: {
+          id: string;
+          student_id: string;
+          week_start: string;
+          status: PlannerWeekStatus;
+          published_at: string | null;
+          weekly_comment: string | null;
+          comment_written_by: string | null;
+          comment_written_at: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          week_start: string;
+          status?: PlannerWeekStatus;
+          published_at?: string | null;
+          weekly_comment?: string | null;
+          comment_written_by?: string | null;
+          comment_written_at?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          week_start?: string;
+          status?: PlannerWeekStatus;
+          published_at?: string | null;
+          weekly_comment?: string | null;
+          comment_written_by?: string | null;
+          comment_written_at?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      planner_blocks: {
+        Row: {
+          id: string;
+          week_id: string;
+          day_of_week: number;
+          start_min: number;
+          end_min: number;
+          kind: PlannerBlockKind;
+          label: string | null;
+          color: string | null;
+          memo: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          week_id: string;
+          day_of_week: number;
+          start_min: number;
+          end_min: number;
+          kind: PlannerBlockKind;
+          label?: string | null;
+          color?: string | null;
+          memo?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          week_id?: string;
+          day_of_week?: number;
+          start_min?: number;
+          end_min?: number;
+          kind?: PlannerBlockKind;
+          label?: string | null;
+          color?: string | null;
+          memo?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      planner_tags: {
+        Row: {
+          id: string;
+          name: string;
+          color: string | null;
+          position: number;
+          archived: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          color?: string | null;
+          position?: number;
+          archived?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          color?: string | null;
+          position?: number;
+          archived?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      planner_tasks: {
+        Row: {
+          id: string;
+          block_id: string;
+          tag_id: string | null;
+          title: string;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          block_id: string;
+          tag_id?: string | null;
+          title: string;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          block_id?: string;
+          tag_id?: string | null;
+          title?: string;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      planner_task_checks: {
+        Row: {
+          id: string;
+          task_id: string;
+          student_id: string;
+          task_date: string;
+          status: PlannerCheckStatus;
+          late_reason: string | null;
+          photo_path: string | null;
+          checked_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          task_id: string;
+          student_id: string;
+          task_date: string;
+          status: PlannerCheckStatus;
+          late_reason?: string | null;
+          photo_path?: string | null;
+          checked_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          task_id?: string;
+          student_id?: string;
+          task_date?: string;
+          status?: PlannerCheckStatus;
+          late_reason?: string | null;
+          photo_path?: string | null;
+          checked_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      planner_templates: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          payload: Json;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          payload: Json;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          payload?: Json;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       current_profile_role: { Args: Record<string, never>; Returns: string };
       current_profile_status: { Args: Record<string, never>; Returns: string };
       is_admin: { Args: Record<string, never>; Returns: boolean };
+      planner_task_date: { Args: { p_task_id: string }; Returns: string };
+      planner_task_student: { Args: { p_task_id: string }; Returns: string };
       attempt_total_score: {
         Args: { p_attempt_id: string };
         Returns: {

@@ -157,6 +157,9 @@ function Shell({
             <Link href="/dashboard" className="hover:text-foreground">
               홈
             </Link>
+            <Link href="/dashboard/planner" className="hover:text-foreground">
+              플래너
+            </Link>
             <Link href="/dashboard/tests" className="hover:text-foreground">
               시험
             </Link>

@@ -117,6 +117,7 @@ function Shell({
           <Wordmark size="md" />
           <nav className="hidden md:flex items-center gap-5 text-sm text-muted-foreground">
             <Link href="/dashboard" className="hover:text-foreground">홈</Link>
+            <Link href="/dashboard/planner" className="hover:text-foreground">플래너</Link>
             <Link href="/dashboard/tests" className="hover:text-foreground">시험</Link>
             <Link href="/dashboard/journal" className="hover:text-foreground">일지</Link>
             <span className="font-bold text-foreground border-b-2 border-primary pb-1">자료</span>

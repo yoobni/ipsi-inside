@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   CalendarCheck,
+  CalendarRange,
   FileDown,
   FileText,
   Layers,
@@ -59,6 +60,12 @@ const MENU: MenuItem[] = [
     label: "자료 배부",
     icon: FileDown,
     matchPrefix: "/materials",
+  },
+  {
+    href: "/planner",
+    label: "주간 플래너",
+    icon: CalendarRange,
+    matchPrefix: "/planner",
   },
   {
     href: "/journals",

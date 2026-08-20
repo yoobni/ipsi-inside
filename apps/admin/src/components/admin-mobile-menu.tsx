@@ -6,7 +6,10 @@ import { useState } from "react";
 import {
   BookOpen,
   CalendarCheck,
+  CalendarRange,
+  FileDown,
   FileText,
+  Layers,
   Megaphone,
   Menu,
   NotebookPen,
@@ -27,8 +30,11 @@ type MenuItem = {
 const MENU: MenuItem[] = [
   { href: "/members/pending", label: "가입 승인", icon: UserCheck, matchPrefix: "/members/pending" },
   { href: "/members", label: "회원 관리", icon: Users },
+  { href: "/groups", label: "그룹(반)", icon: Layers, matchPrefix: "/groups" },
   { href: "/passages", label: "지문/문항", icon: BookOpen, matchPrefix: "/passages" },
   { href: "/tests", label: "시험 관리", icon: FileText, matchPrefix: "/tests" },
+  { href: "/materials", label: "자료 배부", icon: FileDown, matchPrefix: "/materials" },
+  { href: "/planner", label: "주간 플래너", icon: CalendarRange, matchPrefix: "/planner" },
   { href: "/journals", label: "학습 일지", icon: NotebookPen, matchPrefix: "/journals" },
   { href: "/daily", label: "일일 마킹", icon: CalendarCheck, matchPrefix: "/daily" },
   { href: "/announcements", label: "공지사항", icon: Megaphone, matchPrefix: "/announcements" },

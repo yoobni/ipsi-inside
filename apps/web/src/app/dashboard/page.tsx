@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { User as UserIcon } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { weekStartOf } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
 import { todayKst } from "@/lib/kst";
 import { LogoutButton } from "@/components/logout-button";
@@ -144,9 +145,10 @@ export default async function DashboardPage() {
   // 최근 7일 일일 마킹 (학생/학부모 공통)
   let weeklyDays: { date: string; record: DailyRecord | null }[] = [];
   let weeklyStudentName: string | undefined;
+  // 플래너 카드에서도 같은 대상을 써야 해서 블록 밖에 둔다
+  let targetStudentId: string | null = null;
 
   if (state.kind === "ok") {
-    let targetStudentId: string | null = null;
     if (state.role === "student") {
       targetStudentId = state.userId;
     } else {
@@ -194,6 +196,49 @@ export default async function DashboardPage() {
     }
   }
 
+  // 오늘 국어 플래너 진행률 — 학생/학부모 모두 홈에서 한눈에
+  let plannerToday: { total: number; checked: number } | null = null;
+  if (state.kind === "ok" && targetStudentId) {
+    const weekStart = weekStartOf(today);
+    const dayOfWeek = Math.round(
+      (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${weekStart}T00:00:00Z`)) /
+        86400000,
+    );
+
+    const { data: week } = await supabase
+      .from("planner_weeks")
+      .select("id")
+      .eq("student_id", targetStudentId)
+      .eq("week_start", weekStart)
+      .maybeSingle();
+
+    if (week) {
+      const { data: blocks } = await supabase
+        .from("planner_blocks")
+        .select("id")
+        .eq("week_id", week.id)
+        .eq("kind", "korean")
+        .eq("day_of_week", dayOfWeek);
+      const blockIds = (blocks ?? []).map((b) => b.id);
+
+      if (blockIds.length > 0) {
+        const { data: tasks } = await supabase
+          .from("planner_tasks")
+          .select("id")
+          .in("block_id", blockIds);
+        const taskIds = (tasks ?? []).map((t) => t.id);
+
+        if (taskIds.length > 0) {
+          const { count } = await supabase
+            .from("planner_task_checks")
+            .select("task_id", { count: "exact", head: true })
+            .in("task_id", taskIds);
+          plannerToday = { total: taskIds.length, checked: count ?? 0 };
+        }
+      }
+    }
+  }
+
   // 알림 + 공지
   const notif =
     state.kind === "ok"
@@ -209,6 +254,7 @@ export default async function DashboardPage() {
           <Wordmark size="md" />
           <nav className="hidden md:flex items-center gap-5 text-sm text-muted-foreground">
             <span className="font-bold text-foreground border-b-2 border-primary pb-1">홈</span>
+            <Link href="/dashboard/planner" className="hover:text-foreground">플래너</Link>
             <Link href="/dashboard/tests" className="hover:text-foreground">시험</Link>
             <Link href="/dashboard/journal" className="hover:text-foreground">일지</Link>
             <Link href="/dashboard/materials" className="hover:text-foreground">자료</Link>
@@ -250,6 +296,39 @@ export default async function DashboardPage() {
             {/* 공지사항 배너 */}
             {announcements.length > 0 && (
               <AnnouncementBanner items={announcements} />
+            )}
+
+            {/* 오늘 국어 플래너 진행률 */}
+            {plannerToday && (
+              <Link
+                href="/dashboard/planner"
+                className="border-hairline bg-surface flex items-center gap-4 rounded-[14px] border p-4 transition-colors hover:bg-muted/30"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold">오늘 국어 과제</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    {plannerToday.checked === plannerToday.total
+                      ? "오늘 몫은 모두 체크했어요"
+                      : state.role === "student"
+                        ? "밤 12시까지 체크할 수 있어요"
+                        : "아직 체크하지 않은 과제가 있어요"}
+                  </p>
+                  <div className="bg-muted mt-2 h-1.5 overflow-hidden rounded-full">
+                    <div
+                      className="bg-primary h-full rounded-full"
+                      style={{
+                        width: `${Math.round((plannerToday.checked / plannerToday.total) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <span className="shrink-0 text-lg font-bold">
+                  {plannerToday.checked}
+                  <span className="text-muted-foreground text-sm">
+                    /{plannerToday.total}
+                  </span>
+                </span>
+              </Link>
             )}
 
             {/* ★ 발행된 오늘의 리포트 — 최상단 */}
