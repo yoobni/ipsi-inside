@@ -49,6 +49,7 @@ export type Database = {
           terms_agreed_at: string | null;
           privacy_agreed_at: string | null;
           marketing_agreed_at: string | null;
+          must_change_password: boolean;
         };
         Insert: {
           id: string;
@@ -64,6 +65,7 @@ export type Database = {
           terms_agreed_at?: string | null;
           privacy_agreed_at?: string | null;
           marketing_agreed_at?: string | null;
+          must_change_password?: boolean;
         };
         Update: {
           id?: string;
@@ -79,6 +81,7 @@ export type Database = {
           terms_agreed_at?: string | null;
           privacy_agreed_at?: string | null;
           marketing_agreed_at?: string | null;
+          must_change_password?: boolean;
         };
         Relationships: [];
       };

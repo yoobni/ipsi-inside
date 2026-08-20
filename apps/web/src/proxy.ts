@@ -65,7 +65,7 @@ export async function proxy(request: NextRequest) {
   // 로그인 사용자: role/status 정합성 확인
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, must_change_password")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -74,6 +74,16 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/api/signout";
     url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // 원장이 발급한 임시 비밀번호를 쓰는 중이면 새로 정할 때까지 여기 묶어둔다.
+  // 원장이 아는 비밀번호로 서비스를 계속 쓰게 두면 안 된다.
+  if (profile.must_change_password && pathname !== "/dashboard/profile") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard/profile";
+    url.search = "";
+    url.hash = "password";
     return NextResponse.redirect(url);
   }
 

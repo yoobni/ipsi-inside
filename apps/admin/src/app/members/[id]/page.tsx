@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatPhone } from "@ipsi/lib/format";
+import { ResetPasswordButton } from "./reset-password-button";
 import { notFound } from "next/navigation";
 import { ChevronLeft, FileText, NotebookPen, CalendarCheck } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
@@ -260,13 +261,17 @@ export default async function MemberDetailPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button asChild variant="ghost" size="sm">
           <Link href="/members">
             <ChevronLeft className="size-4" />
             회원 목록
           </Link>
         </Button>
+        <ResetPasswordButton
+          profileId={data.member.id}
+          memberName={data.member.full_name}
+        />
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
