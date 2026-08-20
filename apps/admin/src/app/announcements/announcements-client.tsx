@@ -59,7 +59,14 @@ export function AnnouncementsClient({ rows }: { rows: AnnouncementRow[] }) {
 
   return (
     <>
-      <div className="flex justify-end">
+      {/* 자료 배부·시험 관리와 같은 헤더 구성 — 제목 왼쪽, 주 액션 오른쪽 */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">공지사항</h1>
+          <p className="text-muted-foreground text-sm">
+            학생/학부모 홈 상단에 노출되는 안내. 발행하면 알림 종에도 들어가요.
+          </p>
+        </div>
         <Button onClick={() => setEditing("new")}>
           <Plus className="size-4" />새 공지
         </Button>

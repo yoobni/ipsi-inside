@@ -24,15 +24,11 @@ export default async function AnnouncementsPage() {
     created_at: a.created_at,
   }));
 
+  // 제목 블록은 AnnouncementsClient가 그린다 — '새 공지'가 Sheet를 여는
+  // 클라이언트 액션이라, 다른 목록 화면(자료/시험/지문)처럼 제목과 한 줄에
+  // 두려면 헤더가 클라이언트 쪽에 있어야 한다.
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">공지사항</h1>
-        <p className="text-muted-foreground text-sm">
-          학생/학부모 홈 상단에 노출되는 안내. 발행하면 알림 종에도 들어가요.
-        </p>
-      </div>
-
+    <div className="mx-auto max-w-6xl space-y-6">
       <AnnouncementsClient rows={rows} />
     </div>
   );
