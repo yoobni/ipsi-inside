@@ -76,6 +76,17 @@ export async function submitPlannerChecksAction(
     .in("id", weekIds);
   const weekById = new Map((weeks ?? []).map((w) => [w.id, w]));
 
+  // 이미 붙어 있는 사진 경로. 상태만 다시 누른 요청(photo_path 미포함)에서
+  // 사진이 조용히 날아가지 않게 이어받고, 교체·해제된 파일은 버킷에서 지운다.
+  const { data: prevChecks } = await supabase
+    .from("planner_task_checks")
+    .select("task_id, photo_path")
+    .in("task_id", taskIds);
+  const prevPhoto = new Map(
+    (prevChecks ?? []).map((c) => [c.task_id, c.photo_path]),
+  );
+  const orphanPhotos: string[] = [];
+
   const rows: Array<{
     task_id: string;
     student_id: string;
@@ -111,13 +122,26 @@ export async function submitPlannerChecksAction(
       };
     }
 
+    // 미수행(X)엔 사진을 붙이지 않는다(스키마 제약과 동일) → 있던 건 해제.
+    // 새 사진이 왔으면 교체, 아무것도 안 왔으면 기존 것을 유지.
+    const previous = prevPhoto.get(item.task_id) ?? null;
+    let photoPath: string | null;
+    if (item.status === "missed") {
+      photoPath = null;
+    } else if (item.photo_path) {
+      photoPath = item.photo_path;
+    } else {
+      photoPath = previous;
+    }
+    if (previous && previous !== photoPath) orphanPhotos.push(previous);
+
     rows.push({
       task_id: item.task_id,
       student_id: user.id,
       task_date: taskDate,
       status: item.status,
       late_reason: item.status === "late" ? (item.late_reason?.trim() || null) : null,
-      photo_path: item.status === "missed" ? null : (item.photo_path ?? null),
+      photo_path: photoPath,
     });
   }
 
@@ -126,6 +150,12 @@ export async function submitPlannerChecksAction(
     .from("planner_task_checks")
     .upsert(rows, { onConflict: "task_id" });
   if (error) return { ok: false, message: friendlyDbError(error) };
+
+  // 저장이 확정된 뒤에만 지운다. 실패해도 체크는 유효하므로 조용히 넘긴다
+  // (본인 폴더 delete 정책이 있어 학생 세션으로 삭제 가능).
+  if (orphanPhotos.length > 0) {
+    await supabase.storage.from("planner-proofs").remove(orphanPhotos);
+  }
 
   revalidatePath("/dashboard/planner");
   revalidatePath("/dashboard");

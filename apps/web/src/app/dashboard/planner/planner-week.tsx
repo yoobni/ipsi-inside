@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Clock, Lock } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Clock, Lock } from "lucide-react";
 import {
   DAY_LABELS,
   LATE_REASON_PRESETS,
@@ -16,8 +16,10 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { resizeImageToJpeg } from "@/lib/image-resize";
 import { cn } from "@/lib/utils";
 import { submitPlannerChecksAction } from "./actions";
+import { uploadPlannerProofAction } from "./upload-proof";
 
 type TaskView = {
   id: string;
@@ -84,6 +86,17 @@ export function PlannerWeek({
   const [reasonFor, setReasonFor] = useState<string | null>(null);
   const [reasonText, setReasonText] = useState("");
 
+  // 인증사진 — 파일 input은 하나만 두고 어느 과제에 붙일지 ref로 들고 있는다
+  const fileRef = useRef<HTMLInputElement>(null);
+  const photoForRef = useRef<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const taskById = new Map(
+    days.flatMap((d) =>
+      d.blocks.flatMap((b) => b.tasks.map((t) => [t.id, t] as const)),
+    ),
+  );
+
   const goWeek = (next: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("week", next);
@@ -111,6 +124,65 @@ export function PlannerWeek({
     });
   };
 
+  /** 사진 고르기 → 파일 input 열기. 어느 과제에 붙일지는 photoFor에 기억해둔다 */
+  const pickPhoto = (taskId: string) => {
+    setMessage(null);
+    photoForRef.current = taskId;
+    fileRef.current?.click();
+  };
+
+  const onPhotoPicked = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // 같은 파일을 다시 골라도 change가 뜨게 비워둔다
+    event.target.value = "";
+    const taskId = photoForRef.current;
+    photoForRef.current = null;
+    if (!file || !taskId) return;
+
+    const task = taskById.get(taskId);
+    if (!task) return;
+
+    setUploading(true);
+    startTransition(async () => {
+      try {
+        // 폰 원본은 5~10MB — 버킷 제한(5MiB)에 걸리므로 올리기 전에 줄인다
+        const blob = await resizeImageToJpeg(file);
+        const fd = new FormData();
+        fd.set("file", new File([blob], "proof.jpg", { type: "image/jpeg" }));
+
+        const up = await uploadPlannerProofAction(fd);
+        if (!up.ok) {
+          setMessage({ kind: "error", text: up.message });
+          return;
+        }
+
+        // 사진을 올렸다는 건 과제를 했다는 뜻 — 아직 안 눌렀으면 O로 함께 확정.
+        // 이미 △면 상태와 사유를 그대로 유지한다.
+        const res = await submitPlannerChecksAction([
+          {
+            task_id: taskId,
+            status: task.status ?? "done",
+            late_reason: task.status === "late" ? task.late_reason : null,
+            photo_path: up.photo_path,
+          },
+        ]);
+        if (!res.ok) {
+          setMessage({ kind: "error", text: res.message });
+          return;
+        }
+        setMessage({ kind: "ok", text: "사진을 첨부했어요" });
+        router.refresh();
+      } catch {
+        setMessage({
+          kind: "error",
+          text: "사진을 불러올 수 없어요. 다른 사진으로 시도해주세요.",
+        });
+      } finally {
+        setUploading(false);
+      }
+    });
+  };
+
   const onPick = (task: TaskView, status: PlannerCheckStatus) => {
     if (status === "late") {
       // 사유는 선택이지만, 고르는 순간 입력창을 띄워 남기도록 유도
@@ -129,6 +201,15 @@ export function PlannerWeek({
 
   return (
     <div className="space-y-4">
+      {/* 인증사진 선택용 — 과제마다 두지 않고 하나를 공유한다 */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onPhotoPicked}
+      />
+
       {/* 주 이동 */}
       <div className="border-hairline bg-surface flex items-center justify-between rounded-[14px] border px-3 py-2">
         <Button
@@ -170,7 +251,13 @@ export function PlannerWeek({
         </div>
       )}
 
-      {message && (
+      {uploading && (
+        <Alert>
+          <AlertDescription>사진을 올리고 있어요…</AlertDescription>
+        </Alert>
+      )}
+
+      {message && !uploading && (
         <Alert variant={message.kind === "error" ? "destructive" : "default"}>
           <AlertDescription>{message.text}</AlertDescription>
         </Alert>
@@ -307,6 +394,48 @@ export function PlannerWeek({
                               <p className="text-muted-foreground text-xs">
                                 사유: {task.late_reason}
                               </p>
+                            )}
+
+                            {/* 인증사진 — 붙은 게 있으면 썸네일, 오늘이면 첨부/교체 */}
+                            {(task.photo_path ||
+                              (day.editable &&
+                                !readOnly &&
+                                task.status !== "missed")) && (
+                              <div className="flex items-center gap-2">
+                                {task.photo_path && (
+                                  <a
+                                    href={`/dashboard/planner/proof?task=${task.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="border-hairline block size-14 shrink-0 overflow-hidden rounded-md border"
+                                    title="크게 보기"
+                                  >
+                                    {/* 라우트가 short-TTL signed URL로 302 — next/image 원격 설정이 필요 없다 */}
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={`/dashboard/planner/proof?task=${task.id}`}
+                                      alt="인증사진"
+                                      loading="lazy"
+                                      className="size-full object-cover"
+                                    />
+                                  </a>
+                                )}
+                                {day.editable &&
+                                  !readOnly &&
+                                  task.status !== "missed" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => pickPhoto(task.id)}
+                                      disabled={pending || uploading}
+                                    >
+                                      <Camera className="size-3.5" />
+                                      {task.photo_path
+                                        ? "사진 바꾸기"
+                                        : "사진 첨부"}
+                                    </Button>
+                                  )}
+                              </div>
                             )}
 
                             {reasonFor === task.id && (
