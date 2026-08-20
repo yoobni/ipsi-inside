@@ -41,25 +41,45 @@ export function PlannerStats({
     text: string;
   } | null>(null);
 
-  if (!weekId) return null;
+  // 블록을 아직 저장하지 않은 주차엔 planner_weeks 행이 없어 총평을 붙일 데가
+  // 없다. 섹션을 통째로 숨기면 원장은 왜 안 나오는지 알 수 없으므로 이유를 적는다.
+  if (!weekId) {
+    return (
+      <section className="rounded-lg border bg-card">
+        <div className="flex items-center gap-2 border-b px-4 py-3">
+          <MessageSquare className="text-muted-foreground size-4" />
+          <h2 className="text-sm font-semibold">주간 총평</h2>
+        </div>
+        <p className="text-muted-foreground p-4 text-sm">
+          이 주차는 아직 비어 있어요. 블록을 하나 추가해 저장하면 총평을 쓸 수
+          있어요.
+        </p>
+      </section>
+    );
+  }
 
   const dirty = comment.trim() !== (weeklyComment ?? "");
 
-  const save = () => {
+  /**
+   * 총평 저장. 값을 인자로 받는다 — '지우기'가 입력창만 비우고 저장은 안 해서
+   * 새로고침하면 총평이 살아 있던 문제가 있었다. 지우기도 여기로 커밋한다.
+   */
+  const commit = (value: string | null) => {
     setMessage(null);
     startTransition(async () => {
       const res = await savePlannerWeeklyCommentAction({
         week_id: weekId,
-        weekly_comment: comment.trim() || null,
+        weekly_comment: value,
       });
       if (!res.ok) {
         setMessage({ kind: "error", text: res.message });
         return;
       }
+      setComment(value ?? "");
       setMessage({
         kind: "ok",
         text:
-          comment.trim().length === 0
+          value === null
             ? "총평을 지웠어요"
             : weekStatus === "published"
               ? "총평을 저장하고 알렸어요"
@@ -67,6 +87,13 @@ export function PlannerStats({
       });
       router.refresh();
     });
+  };
+
+  const save = () => commit(comment.trim() || null);
+
+  const clear = () => {
+    if (!confirm("이 주차의 총평을 지울까요?")) return;
+    commit(null);
   };
 
   const doneRate = stats ? plannerRate(stats.done, stats.due) : null;
@@ -150,7 +177,10 @@ export function PlannerStats({
                 <ul className="space-y-2">
                   {stats.by_tag.map((t) => {
                     const kept = t.done + t.late;
-                    const rate = plannerRate(kept, t.total);
+                    // 분모는 도래분(due) — total로 나누면 아직 오지 않은 과제가
+                    // 섞여 배정 직후 이행률이 낮게 보인다
+                    const rate = plannerRate(kept, t.due);
+                    const upcoming = t.total - t.due;
                     return (
                       <li
                         key={t.tag_id ?? "none"}
@@ -174,8 +204,22 @@ export function PlannerStats({
                             style={{ width: `${rate ?? 0}%` }}
                           />
                         </div>
-                        <span className="w-24 text-right tabular-nums">
-                          {fmtRate(rate)} ({kept}/{t.total})
+                        <span className="w-28 text-right tabular-nums">
+                          {rate === null ? (
+                            <span className="text-muted-foreground">
+                              — (예정 {upcoming})
+                            </span>
+                          ) : (
+                            <>
+                              {fmtRate(rate)} ({kept}/{t.due})
+                              {upcoming > 0 && (
+                                <span className="text-muted-foreground">
+                                  {" "}
+                                  +{upcoming}
+                                </span>
+                              )}
+                            </>
+                          )}
                         </span>
                       </li>
                     );
@@ -192,27 +236,48 @@ export function PlannerStats({
                   {stats.by_day.map((d) => (
                     <div
                       key={d.date}
-                      className="min-w-[68px] rounded-md border bg-background p-2 text-center"
+                      className={cn(
+                        "min-w-[68px] rounded-md border p-2 text-center",
+                        // 아직 오지 않은 요일 — "토 0/1"이 '안 했다'로 읽히면 안 된다
+                        d.due
+                          ? "bg-background"
+                          : "border-dashed bg-muted/40 text-muted-foreground",
+                      )}
                     >
                       <p className="text-[10px] font-medium">
                         {DAY_LABELS[d.day_of_week]}
                       </p>
-                      <p className="mt-0.5 text-xs tabular-nums">
-                        {d.done + d.late}/{d.total}
-                      </p>
-                      <div className="mt-1 flex justify-center gap-0.5">
-                        {d.done > 0 && (
-                          <Pip className="bg-emerald-500" n={d.done} />
-                        )}
-                        {d.late > 0 && <Pip className="bg-amber-500" n={d.late} />}
-                        {d.missed > 0 && <Pip className="bg-red-500" n={d.missed} />}
-                        {d.unchecked > 0 && (
-                          <Pip
-                            className="bg-muted-foreground/30"
-                            n={d.unchecked}
-                          />
-                        )}
-                      </div>
+                      {d.due ? (
+                        <>
+                          <p className="mt-0.5 text-xs tabular-nums">
+                            {d.done + d.late}/{d.total}
+                          </p>
+                          <div className="mt-1 flex justify-center gap-0.5">
+                            {d.done > 0 && (
+                              <Pip className="bg-emerald-500" n={d.done} />
+                            )}
+                            {d.late > 0 && (
+                              <Pip className="bg-amber-500" n={d.late} />
+                            )}
+                            {d.missed > 0 && (
+                              <Pip className="bg-red-500" n={d.missed} />
+                            )}
+                            {d.unchecked > 0 && (
+                              <Pip
+                                className="bg-muted-foreground/30"
+                                n={d.unchecked}
+                              />
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="mt-0.5 text-[10px]">예정</p>
+                          <p className="text-[10px] tabular-nums">
+                            {d.total}개
+                          </p>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -271,7 +336,9 @@ export function PlannerStats({
           <div>
             <h2 className="text-sm font-semibold">주간 총평</h2>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              한 줄이면 충분해요. 저장하면 학생·학부모에게 알림이 갑니다.
+              {weekStatus === "published"
+                ? "한 줄이면 충분해요. 저장하면 학생·학부모에게 알림이 갑니다."
+                : "한 줄이면 충분해요. 지금은 초안이라 알림은 가지 않고, 발행하면 함께 보여요."}
             </p>
           </div>
         </div>
@@ -292,8 +359,8 @@ export function PlannerStats({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setComment("")}
-                  disabled={pending || comment.length === 0}
+                  onClick={clear}
+                  disabled={pending}
                 >
                   지우기
                 </Button>

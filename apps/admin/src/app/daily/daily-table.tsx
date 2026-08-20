@@ -186,11 +186,13 @@ export function DailyTable({ date, rows }: { date: string; rows: Row[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="pl-4">학생</TableHead>
+              {/* 학생 칸을 고정하지 않으면 이름·학교가 길어질 때 폭을 다 먹고
+                  메모 입력칸이 placeholder도 못 담을 만큼(56px) 짜부라진다 */}
+              <TableHead className="w-[200px] pl-4">학생</TableHead>
               <TableHead className="w-[180px]">출석</TableHead>
               <TableHead className="w-[200px]">과제 (S/A/B/F)</TableHead>
               <TableHead className="w-[120px]">테스트 점수</TableHead>
-              <TableHead>메모</TableHead>
+              <TableHead className="min-w-[220px]">메모</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -363,6 +365,7 @@ function StudentDailyRow({ date, row }: { date: string; row: Row }) {
             }
           }}
           placeholder="(선택)"
+          className="min-w-[180px]"
           disabled={pending}
         />
       </TableCell>

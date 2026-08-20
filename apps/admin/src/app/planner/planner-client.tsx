@@ -171,6 +171,9 @@ export function PlannerClient({
   // 편집 중인 블록의 인덱스. null이면 신규 추가, undefined면 시트 닫힘
   const [editIndex, setEditIndex] = useState<number | null | undefined>(undefined);
   const [draft, setDraft] = useState<BlockDraft>(emptyDraft);
+  // 블록 편집 오류는 시트 안에 띄운다 — 뒤 페이지에 띄우면 오버레이에 가려
+  // 원장이 못 보고 넘어간다
+  const [sheetError, setSheetError] = useState<string | null>(null);
 
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [tplName, setTplName] = useState("");
@@ -186,8 +189,21 @@ export function PlannerClient({
     router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
-  /** 블록 배열이 바뀔 때마다 곧바로 서버에 저장 — 저장 버튼을 따로 두면 작업이 유실된다 */
-  const persist = (next: PlannerBlockInput[]) => {
+  /**
+   * 블록 배열이 바뀔 때마다 곧바로 서버에 저장 — 저장 버튼을 따로 두면 작업이 유실된다.
+   *
+   * 화면을 먼저 바꿔놓고(낙관적) 저장하므로, 실패하면 **반드시 되돌려야** 한다.
+   * 안 되돌리면 서버에 없는 블록이 타임테이블과 요약("국어 4시간")에 남아
+   * 원장이 없는 일정을 있다고 믿은 채 발행한다.
+   */
+  const persist = (
+    next: PlannerBlockInput[],
+    opts?: {
+      rollbackTo?: PlannerBlockInput[];
+      onOk?: () => void;
+      onFail?: (message: string) => void;
+    },
+  ) => {
     if (!selectedStudentId) return;
     setMessage(null);
     startTransition(async () => {
@@ -197,12 +213,15 @@ export function PlannerClient({
         blocks: next,
       });
       if (!res.ok) {
-        setMessage({ kind: "error", text: res.message });
+        if (opts?.rollbackTo) setBlocks(opts.rollbackTo);
+        if (opts?.onFail) opts.onFail(res.message);
+        else setMessage({ kind: "error", text: res.message });
         return;
       }
       // 서버가 돌려준 확정 상태로 정렬 (신규 행의 id를 받아야 다음 저장이 중복되지 않음)
       setBlocks(res.blocks);
       setCurrentWeekId(res.week_id);
+      opts?.onOk?.();
       setMessage({ kind: "ok", text: "저장했어요" });
       router.refresh();
     });
@@ -210,33 +229,38 @@ export function PlannerClient({
 
   const openNew = () => {
     setDraft(emptyDraft());
+    setSheetError(null);
     setEditIndex(null);
   };
 
   const openEdit = (index: number) => {
     setDraft(draftFromBlock(blocks[index]));
+    setSheetError(null);
     setEditIndex(index);
   };
 
-  const closeSheet = () => setEditIndex(undefined);
+  const closeSheet = () => {
+    setSheetError(null);
+    setEditIndex(undefined);
+  };
 
   const submitDraft = () => {
     const startMin = hhmmToMin(draft.start);
     const endMin = hhmmToMin(draft.end);
     if (startMin === null || endMin === null) {
-      setMessage({ kind: "error", text: "시각 형식이 올바르지 않아요" });
+      setSheetError("시각 형식이 올바르지 않아요");
       return;
     }
     if (endMin <= startMin) {
-      setMessage({ kind: "error", text: "종료 시각이 시작보다 늦어야 해요" });
+      setSheetError("종료 시각이 시작보다 늦어야 해요");
       return;
     }
     if (draft.kind === "fixed" && !draft.label.trim()) {
-      setMessage({ kind: "error", text: "고정 일정 이름을 입력해주세요" });
+      setSheetError("고정 일정 이름을 입력해주세요");
       return;
     }
     if (draft.days.length === 0) {
-      setMessage({ kind: "error", text: "요일을 선택해주세요" });
+      setSheetError("요일을 선택해주세요");
       return;
     }
 
@@ -252,7 +276,7 @@ export function PlannerClient({
         : [];
 
     if (draft.kind === "korean" && tasks.length === 0) {
-      setMessage({ kind: "error", text: "국어 블록에는 과제를 1개 이상 넣어주세요" });
+      setSheetError("국어 블록에는 과제를 1개 이상 넣어주세요");
       return;
     }
 
@@ -281,17 +305,29 @@ export function PlannerClient({
       return;
     }
 
+    // 시트는 저장이 확정된 뒤에 닫는다. 실패하면 열린 채로 오류를 보여주고
+    // 화면 상태도 저장 전으로 되돌린다
+    const previous = blocks;
+    setSheetError(null);
     setBlocks(next);
-    closeSheet();
-    persist(next);
+    persist(next, {
+      rollbackTo: previous,
+      onOk: closeSheet,
+      onFail: setSheetError,
+    });
   };
 
   const removeBlock = () => {
     if (typeof editIndex !== "number") return;
+    const previous = blocks;
     const next = blocks.filter((_, i) => i !== editIndex);
+    setSheetError(null);
     setBlocks(next);
-    closeSheet();
-    persist(next);
+    persist(next, {
+      rollbackTo: previous,
+      onOk: closeSheet,
+      onFail: setSheetError,
+    });
   };
 
   const saveAsTemplate = () => {
@@ -385,68 +421,72 @@ export function PlannerClient({
   return (
     <div className="space-y-4">
       {/* 툴바 */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
-        <Select
-          value={selectedGroupId ?? ALL_GROUPS}
-          onValueChange={(v) => setParam("group", v === ALL_GROUPS ? null : v)}
-        >
-          <SelectTrigger className="w-[150px]" aria-label="그룹 필터">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_GROUPS}>전체 학생</SelectItem>
-            {groups.map((g) => (
-              <SelectItem key={g.id} value={g.id}>
-                {g.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={selectedStudentId ?? ""}
-          onValueChange={(v) => setParam("student", v)}
-        >
-          <SelectTrigger className="w-[190px]" aria-label="학생 선택">
-            <SelectValue placeholder="학생 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            {students.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.full_name}
-                {s.school ? ` · ${s.school}` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="이전 주"
-            onClick={() => setParam("week", addDaysIso(weekStart, -7))}
+      {/* 두 그룹으로 나눈다. 한 줄에 다 넣고 액션만 ml-auto로 밀면,
+          폭이 좁아져 액션이 둘째 줄로 내려갈 때 그 줄 왼쪽이 통째로 빈다 */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={selectedGroupId ?? ALL_GROUPS}
+            onValueChange={(v) => setParam("group", v === ALL_GROUPS ? null : v)}
           >
-            <ChevronLeft />
-          </Button>
-          <span className="min-w-[150px] text-center text-sm font-medium">
-            {shortDayLabel(weekStart)} ~ {shortDayLabel(dateOfDay(weekStart, 6))}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="다음 주"
-            onClick={() => setParam("week", addDaysIso(weekStart, 7))}
+            <SelectTrigger className="w-[150px]" aria-label="그룹 필터">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_GROUPS}>전체 학생</SelectItem>
+              {groups.map((g) => (
+                <SelectItem key={g.id} value={g.id}>
+                  {g.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={selectedStudentId ?? ""}
+            onValueChange={(v) => setParam("student", v)}
           >
-            <ChevronRight />
-          </Button>
+            <SelectTrigger className="w-[190px]" aria-label="학생 선택">
+              <SelectValue placeholder="학생 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              {students.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.full_name}
+                  {s.school ? ` · ${s.school}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="이전 주"
+              onClick={() => setParam("week", addDaysIso(weekStart, -7))}
+            >
+              <ChevronLeft />
+            </Button>
+            <span className="min-w-[150px] text-center text-sm font-medium">
+              {shortDayLabel(weekStart)} ~ {shortDayLabel(dateOfDay(weekStart, 6))}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="다음 주"
+              onClick={() => setParam("week", addDaysIso(weekStart, 7))}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+
+          <Badge variant={weekStatus === "published" ? "success" : "warning"}>
+            {weekStatus === "published" ? "발행됨" : "초안"}
+          </Badge>
         </div>
 
-        <Badge variant={weekStatus === "published" ? "success" : "warning"}>
-          {weekStatus === "published" ? "발행됨" : "초안"}
-        </Badge>
-
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Button
             variant="outline"
             onClick={openNew}
@@ -679,6 +719,12 @@ export function PlannerClient({
           </SheetHeader>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-4">
+            {sheetError && (
+              <Alert variant="destructive">
+                <AlertDescription>{sheetError}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label>종류</Label>
               <div className="flex gap-2">

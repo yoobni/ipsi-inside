@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { formatPhone } from "@ipsi/lib/format";
 import { Calendar, GraduationCap, Phone, School, UserCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -136,7 +137,7 @@ export function PendingTable({
                   </TableCell>
                   <TableCell className="font-medium">{p.full_name}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {p.phone}
+                    {formatPhone(p.phone)}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {p.role === "student"
@@ -333,7 +334,7 @@ function PendingDrawer({
                                   </SelectLabel>
                                   {candidates.map((s) => (
                                     <SelectItem key={s.id} value={s.id}>
-                                      {s.full_name} · {s.phone}
+                                      {s.full_name} · {formatPhone(s.phone)}
                                       {s.school ? ` · ${s.school}` : ""}
                                       {s.grade ? ` ${s.grade}학년` : ""}
                                     </SelectItem>
@@ -349,7 +350,7 @@ function PendingDrawer({
                                 ) : (
                                   others.map((s) => (
                                     <SelectItem key={s.id} value={s.id}>
-                                      {s.full_name} · {s.phone}
+                                      {s.full_name} · {formatPhone(s.phone)}
                                       {s.school ? ` · ${s.school}` : ""}
                                       {s.grade ? ` ${s.grade}학년` : ""}
                                     </SelectItem>

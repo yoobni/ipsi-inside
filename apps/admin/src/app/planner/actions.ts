@@ -8,6 +8,7 @@ import {
   plannerWeekSaveSchema,
   plannerWeeklyCommentSchema,
   plannerTemplateSaveSchema,
+  plannerTemplateRenameSchema,
   plannerTemplateApplySchema,
   plannerTemplatePayloadSchema,
   stripBlockIds,
@@ -497,6 +498,40 @@ export async function savePlannerTemplateAction(input: {
   return { ok: true };
 }
 
+/**
+ * 템플릿 이름·설명 수정.
+ *
+ * payload는 손대지 않는다. 이름을 잘못 저장했을 때 삭제 후 재생성하는 것이
+ * 유일한 방법이면, 주차를 다시 구성해 템플릿으로 저장해야 한다.
+ */
+export async function renamePlannerTemplateAction(input: {
+  template_id: string;
+  name: string;
+  description?: string | null;
+}): Promise<Result> {
+  const check = await ensureAdmin();
+  if ("error" in check) return check.error;
+
+  const parsed = plannerTemplateRenameSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0].message };
+  }
+
+  const db = createAdminSupabaseClient();
+  const { error } = await db
+    .from("planner_templates")
+    .update({
+      name: parsed.data.name,
+      description: parsed.data.description?.trim() || null,
+    })
+    .eq("id", parsed.data.template_id);
+  if (error) return { ok: false, message: friendlyDbError(error) };
+
+  revalidatePath("/planner");
+  revalidatePath("/planner/templates");
+  return { ok: true };
+}
+
 export async function deletePlannerTemplateAction(
   templateId: string,
 ): Promise<Result> {
@@ -650,12 +685,21 @@ export async function applyPlannerTemplateAction(input: {
       .in("week_id", overwriteWeekIds);
     if (error) return { ok: false, message: friendlyDbError(error) };
 
-    if (publish) {
-      const { error: pubError } = await db
-        .from("planner_weeks")
-        .update({ status: "published", published_at: nowIso })
-        .in("id", overwriteWeekIds);
-      if (pubError) return { ok: false, message: friendlyDbError(pubError) };
+    // 발행 여부를 항상 명시적으로 덮어쓴다.
+    // publish=false일 때 손대지 않으면 이미 발행됐던 주차가 계속 발행 상태로
+    // 남아, '끄면 초안으로 들어간다'는 안내와 어긋난다. 게다가 덮어쓰기는
+    // 기존 블록·체크를 지우므로, 학생이 알림도 없이 완전히 다른 플래너를
+    // 보게 된다 — 새 내용은 원장이 발행할 때 나가야 한다.
+    const { error: statusError } = await db
+      .from("planner_weeks")
+      .update(
+        publish
+          ? { status: "published", published_at: nowIso }
+          : { status: "draft", published_at: null },
+      )
+      .in("id", overwriteWeekIds);
+    if (statusError) {
+      return { ok: false, message: friendlyDbError(statusError) };
     }
   }
 

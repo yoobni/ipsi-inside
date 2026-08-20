@@ -2,13 +2,14 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Trash2, Users } from "lucide-react";
+import { AlertTriangle, Pencil, Trash2, Users } from "lucide-react";
 import { addDaysIso, dateOfDay, shortDayLabel, weekStartOf } from "@ipsi/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
   SheetContent,
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   applyPlannerTemplateAction,
   deletePlannerTemplateAction,
+  renamePlannerTemplateAction,
 } from "../actions";
 
 export type TemplateRow = {
@@ -67,6 +69,10 @@ export function TemplatesClient({
   } | null>(null);
 
   const [assignTarget, setAssignTarget] = useState<TemplateRow | null>(null);
+  // 이름·설명만 고치는 시트 (블록 구성은 건드리지 않는다)
+  const [editTarget, setEditTarget] = useState<TemplateRow | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
   const [weekStart, setWeekStart] = useState(defaultWeekStart);
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [groupIds, setGroupIds] = useState<string[]>([]);
@@ -123,6 +129,35 @@ export function TemplatesClient({
         text: `${res.applied}명에게 배정했어요${skipNote}`,
       });
       setAssignTarget(null);
+      router.refresh();
+    });
+  };
+
+  const openEdit = (t: TemplateRow) => {
+    setEditTarget(t);
+    setEditName(t.name);
+    setEditDesc(t.description ?? "");
+    setMessage(null);
+  };
+
+  const submitEdit = () => {
+    if (!editTarget) return;
+    if (!editName.trim()) {
+      setMessage({ kind: "error", text: "템플릿 이름을 입력해주세요" });
+      return;
+    }
+    startTransition(async () => {
+      const res = await renamePlannerTemplateAction({
+        template_id: editTarget.id,
+        name: editName.trim(),
+        description: editDesc.trim() || null,
+      });
+      if (!res.ok) {
+        setMessage({ kind: "error", text: res.message });
+        return;
+      }
+      setMessage({ kind: "ok", text: "템플릿 정보를 수정했어요" });
+      setEditTarget(null);
       router.refresh();
     });
   };
@@ -185,6 +220,15 @@ export function TemplatesClient({
                   disabled={pending || t.damaged}
                 >
                   <Users /> 일괄 배정
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="이름·설명 수정"
+                  onClick={() => openEdit(t)}
+                  disabled={pending}
+                >
+                  <Pencil />
                 </Button>
                 <Button
                   variant="outline"
@@ -398,6 +442,69 @@ export function TemplatesClient({
                 disabled={pending}
               >
                 {pending ? "배정 중…" : "배정"}
+              </Button>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* 이름·설명 수정 */}
+      <Sheet
+        open={editTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+      >
+        <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>템플릿 정보 수정</SheetTitle>
+            <SheetDescription>
+              이름과 설명만 바꿔요. 저장된 블록 구성은 그대로예요.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 space-y-4 px-4">
+            <div className="space-y-2">
+              <Label htmlFor="tpl-edit-name">템플릿 이름</Label>
+              <Input
+                id="tpl-edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                maxLength={60}
+                placeholder="예) 고3 표준 주간 루틴"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tpl-edit-desc">설명 (선택)</Label>
+              <Textarea
+                id="tpl-edit-desc"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                rows={3}
+                maxLength={300}
+                placeholder="어떤 학생에게 쓰는 루틴인지 적어두면 찾기 쉬워요"
+              />
+            </div>
+          </div>
+
+          <SheetFooter>
+            <div className="flex w-full gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditTarget(null)}
+                className="flex-1"
+                disabled={pending}
+              >
+                취소
+              </Button>
+              <Button
+                type="button"
+                onClick={submitEdit}
+                className="flex-1"
+                disabled={pending}
+              >
+                {pending ? "저장 중…" : "저장"}
               </Button>
             </div>
           </SheetFooter>

@@ -14,7 +14,7 @@ import {
   MATERIAL_AUDIENCE_LABEL,
   type MaterialAudience,
 } from "@ipsi/types";
-import { formatBytes } from "@ipsi/lib/format";
+import { formatBytes, formatPhone } from "@ipsi/lib/format";
 import type { GroupOption } from "../new-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -802,7 +802,7 @@ function AssignDrawer({
                               {s.full_name}
                             </p>
                             <p className="text-muted-foreground truncate text-xs">
-                              {s.phone}
+                              {formatPhone(s.phone)}
                               {s.school ? ` · ${s.school}` : ""}
                               {s.grade ? ` ${s.grade}학년` : ""}
                             </p>

@@ -81,13 +81,15 @@ export default async function DailyPage({
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">일일 마킹</h1>
-          <p className="text-muted-foreground text-sm">
+          {/* break-keep: 한국어 어절 중간에서 끊기는 것 방지("변경하면 즉/시") */}
+          <p className="text-muted-foreground max-w-md text-sm break-keep">
             학생별 출석/과제/테스트 점수를 빠르게 기록해요. 변경하면 즉시 저장돼요.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        {/* shrink-0: 컨트롤 3개가 설명 텍스트에 밀려 2줄로 흩어지지 않게 */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <GroupFilter groups={groups ?? []} value={groupId} />
           <Button asChild variant="outline" size="sm">
             <Link

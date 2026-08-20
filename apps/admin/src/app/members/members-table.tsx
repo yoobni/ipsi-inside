@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatPhone } from "@ipsi/lib/format";
 import { useMemo, useState, useTransition } from "react";
 import {
   ArrowRight,
@@ -169,7 +170,7 @@ export function MembersTable({
                   </TableCell>
                   <TableCell className="font-medium">{m.full_name}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {m.phone}
+                    {formatPhone(m.phone)}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {m.role === "student"
@@ -359,7 +360,7 @@ function MemberDrawer({
                                   {s.full_name}
                                 </p>
                                 <p className="text-muted-foreground truncate text-xs">
-                                  {s.phone}
+                                  {formatPhone(s.phone)}
                                   {s.school ? ` · ${s.school}` : ""}
                                   {s.grade ? ` · ${s.grade}학년` : ""}
                                 </p>
@@ -406,7 +407,7 @@ function MemberDrawer({
                             <SelectContent>
                               {availableStudents.map((s) => (
                                 <SelectItem key={s.id} value={s.id}>
-                                  {s.full_name} · {s.phone}
+                                  {s.full_name} · {formatPhone(s.phone)}
                                   {s.school ? ` · ${s.school}` : ""}
                                   {s.grade ? ` ${s.grade}학년` : ""}
                                 </SelectItem>
@@ -513,7 +514,7 @@ function StudentParentList({
       {parents.map((p) => (
         <li key={p.id} className="px-3 py-2.5 text-sm">
           <p className="font-medium">{p.full_name}</p>
-          <p className="text-muted-foreground text-xs">{p.phone}</p>
+          <p className="text-muted-foreground text-xs">{formatPhone(p.phone)}</p>
         </li>
       ))}
     </ul>

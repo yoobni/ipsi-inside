@@ -199,6 +199,18 @@ export const plannerTemplateSaveSchema = z.object({
 });
 
 /**
+ * 템플릿 이름·설명만 수정. payload(블록 구성)는 건드리지 않는다 —
+ * 이름 오타를 고치려고 삭제·재생성하면 배정 내용까지 다시 짜야 한다.
+ */
+export const plannerTemplateRenameSchema = z.object({
+  template_id: z.string().uuid(),
+  name: z.string().trim().min(1, "템플릿 이름을 입력해주세요").max(60),
+  description: z.string().trim().max(300).nullable().optional(),
+});
+
+export type PlannerTemplateRename = z.infer<typeof plannerTemplateRenameSchema>;
+
+/**
  * 템플릿 → 여러 학생/그룹에 한 번에 배정.
  * 단건 배정만 만들면 HWP 대비 효율이 안 나온다 — 벌크가 기본.
  */
@@ -255,6 +267,8 @@ const statsTagSchema = z.object({
   name: z.string(),
   color: z.string().nullable(),
   total: z.number(),
+  /** 오늘까지 도래한 과제 수 — 이행률 분모. total로 나누면 미도래분이 섞인다 */
+  due: z.number(),
   done: z.number(),
   late: z.number(),
   missed: z.number(),
@@ -264,6 +278,8 @@ const statsTagSchema = z.object({
 const statsDaySchema = z.object({
   day_of_week: z.number().min(0).max(6),
   date: z.string(),
+  /** 이 요일이 이미 지났는지. 미도래 요일은 '안 한 것'으로 읽히면 안 된다 */
+  due: z.boolean(),
   total: z.number(),
   done: z.number(),
   late: z.number(),

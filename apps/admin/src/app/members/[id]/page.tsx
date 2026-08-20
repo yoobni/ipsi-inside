@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatPhone } from "@ipsi/lib/format";
 import { notFound } from "next/navigation";
 import { ChevronLeft, FileText, NotebookPen, CalendarCheck } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
@@ -42,7 +43,7 @@ export default async function MemberDetailPage({
             {member.role === "parent" ? "학부모" : "관리자"} 계정 — 종합 리포트는 학생 전용입니다.
           </p>
           <p className="text-muted-foreground mt-3 text-sm">
-            {member.phone}
+            {formatPhone(member.phone)}
           </p>
         </div>
       </div>
@@ -286,7 +287,7 @@ export default async function MemberDetailPage({
             {data.member.school ?? "-"}
             {data.member.grade ? ` · ${data.member.grade}학년` : ""}
             <span className="mx-2">·</span>
-            {data.member.phone}
+            {formatPhone(data.member.phone)}
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center sm:flex sm:flex-row">

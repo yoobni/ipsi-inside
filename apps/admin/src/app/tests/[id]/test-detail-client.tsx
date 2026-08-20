@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatPhone } from "@ipsi/lib/format";
 import { useMemo, useState, useTransition } from "react";
 import {
   ArrowRight,
@@ -509,7 +510,7 @@ function AssignDrawer({
                               {s.full_name}
                             </p>
                             <p className="text-muted-foreground truncate text-xs">
-                              {s.phone}
+                              {formatPhone(s.phone)}
                               {s.school ? ` · ${s.school}` : ""}
                               {s.grade ? ` ${s.grade}학년` : ""}
                             </p>

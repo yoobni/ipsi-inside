@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatPhone } from "@ipsi/lib/format";
 import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -298,7 +299,7 @@ export function MemberReport({ data }: { data: ReportData }) {
                 {parents.map((p) => (
                   <li key={p.id} className="py-2 first:pt-0 last:pb-0 text-sm">
                     <p className="font-medium">{p.full_name}</p>
-                    <p className="text-muted-foreground text-xs">{p.phone}</p>
+                    <p className="text-muted-foreground text-xs">{formatPhone(p.phone)}</p>
                   </li>
                 ))}
               </ul>
