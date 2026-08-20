@@ -141,7 +141,6 @@ export function PlannerClient({
   weekStart,
   weekId,
   weekStatus,
-  weeklyComment,
   initialBlocks,
   tags,
   templates,
@@ -153,7 +152,6 @@ export function PlannerClient({
   weekStart: string;
   weekId: string | null;
   weekStatus: "draft" | "published";
-  weeklyComment: string | null;
   initialBlocks: PlannerBlockInput[];
   tags: PlannerTagChoice[];
   templates: PlannerTemplateChoice[];
@@ -659,15 +657,6 @@ export function PlannerClient({
               ))}
             </div>
           </div>
-        </div>
-      )}
-
-      {weeklyComment && (
-        <div className="rounded-lg border bg-card p-4">
-          <div className="text-muted-foreground mb-1 text-xs font-medium">
-            주간 총평
-          </div>
-          <p className="text-sm whitespace-pre-wrap">{weeklyComment}</p>
         </div>
       )}
 

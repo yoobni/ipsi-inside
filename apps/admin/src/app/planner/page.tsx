@@ -1,8 +1,10 @@
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import {
   plannerTemplatePayloadSchema,
+  plannerWeekStatsSchema,
   weekStartOf,
   type PlannerBlockInput,
+  type PlannerWeekStats,
 } from "@ipsi/types";
 import { todayKst } from "@/lib/kst";
 import {
@@ -11,6 +13,7 @@ import {
   type PlannerTagChoice,
   type PlannerTemplateChoice,
 } from "./planner-client";
+import { PlannerStats } from "./planner-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +88,7 @@ export default async function PlannerPage({
   let weekStatus: "draft" | "published" = "draft";
   let weeklyComment: string | null = null;
   let blocks: PlannerBlockInput[] = [];
+  let stats: PlannerWeekStats | null = null;
 
   if (selectedStudentId) {
     const { data: week } = await supabase
@@ -128,6 +132,13 @@ export default async function PlannerPage({
           .filter((t) => t.block_id === b.id)
           .map((t) => ({ id: t.id, title: t.title, tag_id: t.tag_id })),
       }));
+
+      // 이행 통계는 SQL 함수가 한 번에 집계한다 (분자/분모만, 비율은 화면에서)
+      const { data: statsJson } = await supabase.rpc("planner_week_stats", {
+        p_week_id: week.id,
+      });
+      const parsedStats = plannerWeekStatsSchema.safeParse(statsJson);
+      stats = parsedStats.success ? parsedStats.data : null;
     }
   }
 
@@ -164,10 +175,16 @@ export default async function PlannerPage({
         weekStart={weekStart}
         weekId={weekId}
         weekStatus={weekStatus}
-        weeklyComment={weeklyComment}
         initialBlocks={blocks}
         tags={tagChoices}
         templates={templateChoices}
+      />
+
+      <PlannerStats
+        stats={stats}
+        weekId={weekId}
+        weeklyComment={weeklyComment}
+        weekStatus={weekStatus}
       />
     </div>
   );

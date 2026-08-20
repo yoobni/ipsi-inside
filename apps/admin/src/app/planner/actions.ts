@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 import {
   plannerWeekSaveSchema,
+  plannerWeeklyCommentSchema,
   plannerTemplateSaveSchema,
   plannerTemplateApplySchema,
   plannerTemplatePayloadSchema,
@@ -339,6 +340,113 @@ async function notifyPlannerPublished(
   ];
 
   // 중복 수신자 제거 (학부모 계정이 학생과 같을 일은 없지만 방어)
+  const seen = new Set<string>();
+  const unique = notifs.filter((n) => {
+    if (seen.has(n.user_id)) return false;
+    seen.add(n.user_id);
+    return true;
+  });
+
+  if (unique.length > 0) {
+    await db.from("notifications").insert(unique);
+  }
+}
+
+/* ── 주간 총평 ────────────────────────────────────────────────────────────── */
+
+/**
+ * 주간 한 줄 총평 저장.
+ *
+ * 발행된 주차에 총평이 새로 달리거나 내용이 바뀌면 학생·학부모에게 알린다.
+ * (draft 주차는 학생에게 아예 안 보이므로 알리지 않는다 — 발행 시점에
+ *  planner_published 알림이 따로 나간다)
+ */
+export async function savePlannerWeeklyCommentAction(input: {
+  week_id: string;
+  weekly_comment: string | null;
+}): Promise<Result> {
+  const check = await ensureAdmin();
+  if ("error" in check) return check.error;
+
+  const parsed = plannerWeeklyCommentSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0].message };
+  }
+
+  const db = createAdminSupabaseClient();
+
+  const { data: week } = await db
+    .from("planner_weeks")
+    .select("id, student_id, week_start, status, weekly_comment")
+    .eq("id", parsed.data.week_id)
+    .maybeSingle();
+  if (!week) return { ok: false, message: "플래너를 찾을 수 없습니다" };
+
+  // trim 후 빈 문자열도 '지우기'로 본다 (공백만 저장되면 학생 화면에 빈 카드가 뜬다)
+  const comment = parsed.data.weekly_comment?.length
+    ? parsed.data.weekly_comment
+    : null;
+  const previous = week.weekly_comment;
+
+  const { error } = await db
+    .from("planner_weeks")
+    .update({
+      weekly_comment: comment,
+      comment_written_by: comment ? check.adminId : null,
+      comment_written_at: comment ? new Date().toISOString() : null,
+    })
+    .eq("id", week.id);
+  if (error) return { ok: false, message: friendlyDbError(error) };
+
+  if (comment && comment !== previous && week.status === "published") {
+    await notifyWeeklyComment(week.student_id, week.week_start);
+  }
+
+  revalidatePath("/planner");
+  return { ok: true };
+}
+
+/** 총평 알림 fan-out — 학생 본인 + 연결된 학부모 */
+async function notifyWeeklyComment(
+  studentId: string,
+  weekStart: string,
+): Promise<void> {
+  const db = createAdminSupabaseClient();
+
+  const { data: student } = await db
+    .from("profiles")
+    .select("full_name")
+    .eq("id", studentId)
+    .maybeSingle();
+
+  const { data: links } = await db
+    .from("parent_student_links")
+    .select("parent_id")
+    .eq("student_id", studentId);
+
+  const range = `${shortDayLabel(weekStart)} ~ ${shortDayLabel(dateOfDay(weekStart, 6))}`;
+  const nowIso = new Date().toISOString();
+  const link = `/dashboard/planner?week=${weekStart}`;
+
+  const notifs = [
+    {
+      user_id: studentId,
+      type: "planner_comment",
+      title: "선생님이 주간 총평을 남겼어요",
+      body: range,
+      link,
+      created_at: nowIso,
+    },
+    ...(links ?? []).map((l) => ({
+      user_id: l.parent_id,
+      type: "planner_comment",
+      title: `${student?.full_name ?? "자녀"} 학생의 주간 총평이 등록됐어요`,
+      body: range,
+      link,
+      created_at: nowIso,
+    })),
+  ];
+
   const seen = new Set<string>();
   const unique = notifs.filter((n) => {
     if (seen.has(n.user_id)) return false;

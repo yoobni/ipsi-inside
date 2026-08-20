@@ -957,6 +957,9 @@ export type Database = {
       is_admin: { Args: Record<string, never>; Returns: boolean };
       planner_task_date: { Args: { p_task_id: string }; Returns: string };
       planner_task_student: { Args: { p_task_id: string }; Returns: string };
+      // 주간 이행 통계 — jsonb 한 덩어리. 형태는 @ipsi/types의
+      // plannerWeekStatsSchema로 파싱해서 쓴다 (보이지 않는 주차는 null).
+      planner_week_stats: { Args: { p_week_id: string }; Returns: Json };
       attempt_total_score: {
         Args: { p_attempt_id: string };
         Returns: {

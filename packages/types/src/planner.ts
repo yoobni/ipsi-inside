@@ -161,8 +161,11 @@ export const plannerWeekPublishSchema = z.object({
 
 export const plannerWeeklyCommentSchema = z.object({
   week_id: z.string().uuid(),
+  // null = 총평 지우기
   weekly_comment: z.string().trim().max(1000).nullable(),
 });
+
+export type PlannerWeeklyComment = z.infer<typeof plannerWeeklyCommentSchema>;
 
 /**
  * 템플릿 payload — 블록 구조 스냅샷 (학생/주차 정보와 행 id는 담지 않는다).
@@ -244,3 +247,66 @@ export type PlannerTemplateSave = z.infer<typeof plannerTemplateSaveSchema>;
 export type PlannerTemplateApply = z.infer<typeof plannerTemplateApplySchema>;
 export type PlannerCheckItem = z.infer<typeof plannerCheckItemSchema>;
 export type PlannerCheckSubmit = z.infer<typeof plannerCheckSubmitSchema>;
+
+/* ── 주간 이행 통계 (planner_week_stats RPC) ────────────────────────────── */
+
+const statsTagSchema = z.object({
+  tag_id: z.string().uuid().nullable(),
+  name: z.string(),
+  color: z.string().nullable(),
+  total: z.number(),
+  done: z.number(),
+  late: z.number(),
+  missed: z.number(),
+  unchecked_due: z.number(),
+});
+
+const statsDaySchema = z.object({
+  day_of_week: z.number().min(0).max(6),
+  date: z.string(),
+  total: z.number(),
+  done: z.number(),
+  late: z.number(),
+  missed: z.number(),
+  unchecked: z.number(),
+});
+
+/**
+ * SQL 함수는 비율을 만들지 않고 분자/분모만 준다 — 반올림 지점은 화면이 정한다.
+ * (jsonb에 float를 넣지 않으려는 의도. plannerRate로 % 변환)
+ */
+export const plannerWeekStatsSchema = z.object({
+  week_id: z.string().uuid(),
+  student_id: z.string().uuid(),
+  week_start: z.string(),
+  status: z.enum(["draft", "published"]),
+
+  total: z.number(),
+  due: z.number(),
+  checked: z.number(),
+  done: z.number(),
+  late: z.number(),
+  missed: z.number(),
+  unchecked_due: z.number(),
+
+  on_time: z.number(),
+  on_time_base: z.number(),
+  photo_count: z.number(),
+
+  by_tag: z.array(statsTagSchema),
+  by_day: z.array(statsDaySchema),
+  late_reasons: z.array(
+    z.object({ date: z.string(), title: z.string(), reason: z.string() }),
+  ),
+  missed_items: z.array(z.object({ date: z.string(), title: z.string() })),
+});
+
+export type PlannerWeekStats = z.infer<typeof plannerWeekStatsSchema>;
+export type PlannerWeekStatsTag = z.infer<typeof statsTagSchema>;
+export type PlannerWeekStatsDay = z.infer<typeof statsDaySchema>;
+
+/** 분자/분모 → 정수 %. 분모 0이면 null(0%와 "해당 없음"을 구분해야 함) */
+export function plannerRate(numer: number, denom: number): number | null {
+  if (denom <= 0) return null;
+  return Math.round((numer / denom) * 100);
+}
