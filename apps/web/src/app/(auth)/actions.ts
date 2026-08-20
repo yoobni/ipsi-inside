@@ -300,7 +300,7 @@ export async function sendPasswordResetAction(
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL ??
-    (host ? `${proto}://${host}` : "http://localhost:3000");
+    (host ? `${proto}://${host}` : "http://localhost:1234");
 
   await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/callback?next=/reset-password`,
