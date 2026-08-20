@@ -58,10 +58,21 @@ function proofSrc(task: TaskView): string {
 }
 
 const STATUS_STYLE: Record<PlannerCheckStatus, string> = {
-  done: "bg-emerald-500 text-white border-emerald-500",
-  late: "bg-amber-500 text-white border-amber-500",
-  missed: "bg-rose-500 text-white border-rose-500",
+  done: "bg-emerald-500 text-white",
+  late: "bg-amber-500 text-white",
+  missed: "bg-rose-500 text-white",
 };
+
+const TAG_DOT: Record<string, string> = {
+  "비문학 독해": "bg-sky-400",
+  "문학 분석": "bg-violet-400",
+  "화법과 작문": "bg-emerald-400",
+  "언어와 매체": "bg-amber-400",
+  "EBS 연계": "bg-rose-400",
+  "기출 오답": "bg-slate-400",
+};
+
+const CHECK_ORDER: PlannerCheckStatus[] = ["done", "late", "missed"];
 
 const FIXED_DOT: Record<string, string> = {
   slate: "bg-slate-400",
@@ -286,7 +297,7 @@ export function PlannerWeek({
               key={day.date}
               className={cn(
                 "border-hairline bg-surface rounded-[14px] border p-4",
-                isToday && "border-primary ring-primary/20 ring-2",
+                isToday && "border-primary/50",
               )}
             >
               <div className="mb-3 flex items-center gap-2">
@@ -315,201 +326,243 @@ export function PlannerWeek({
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {day.blocks.map((block) => (
                   <div
                     key={block.id}
                     className={cn(
-                      "rounded-[10px] border p-3",
+                      "rounded-[12px] border",
                       block.kind === "korean"
-                        ? "border-orange-300 bg-orange-50 dark:border-orange-700 dark:bg-orange-950/40"
-                        : "border-hairline bg-muted/30",
+                        ? "border-orange-200 bg-orange-50/70 dark:border-orange-900 dark:bg-orange-950/30"
+                        : "border-hairline bg-muted/25",
                     )}
                   >
-                    <div className="flex items-center gap-2 text-xs">
+                    {/* 블록 머리 — 무슨 시간이고 몇 시부터인지 */}
+                    <div className="flex items-baseline gap-2 px-3 pt-2.5 pb-1.5 text-xs">
                       {block.kind === "fixed" && (
                         <span
                           className={cn(
-                            "size-2 rounded-full",
-                            FIXED_DOT[block.color ?? "slate"] ??
-                              FIXED_DOT.slate,
+                            "size-2 shrink-0 translate-y-[-1px] rounded-full",
+                            FIXED_DOT[block.color ?? "slate"] ?? FIXED_DOT.slate,
                           )}
                         />
                       )}
                       <span className="font-bold">
                         {block.kind === "korean" ? "국어" : block.label}
                       </span>
-                      <span className="text-muted-foreground inline-flex items-center gap-1">
-                        <Clock className="size-3" />
+                      <span className="text-muted-foreground tabular-nums">
                         {minToHHMM(block.start_min)}~{minToHHMM(block.end_min)}
                       </span>
                     </div>
 
                     {block.memo && (
-                      <p className="text-muted-foreground mt-1 text-xs">
+                      <p className="text-muted-foreground px-3 pb-1.5 text-xs">
                         {block.memo}
                       </p>
                     )}
 
-                    {block.kind === "korean" && (
-                      <ul className="mt-2 space-y-2">
-                        {block.tasks.map((task) => (
-                          <li key={task.id} className="space-y-1.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {task.tag_name && (
-                                <span className="border-hairline rounded-full border bg-background px-2 py-0.5 text-[10px]">
-                                  {task.tag_name}
-                                </span>
-                              )}
-                              <span className="text-sm">{task.title}</span>
-                            </div>
+                    {block.kind === "korean" && block.tasks.length > 0 && (
+                      <>
+                        {/* O/△/X가 무슨 뜻인지 툴팁에만 있으면 학생은 알 수 없다.
+                            블록마다 한 번 어휘를 알려준다 */}
+                        <p className="text-muted-foreground/70 px-3 pb-2 text-[10px]">
+                          O 제시간 · △ 늦게 완료 · X 미수행
+                        </p>
 
-                            <div className="flex items-center gap-1.5">
-                              {(
-                                ["done", "late", "missed"] as PlannerCheckStatus[]
-                              ).map((s) => {
-                                const active = task.status === s;
-                                return (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    disabled={
-                                      readOnly || !day.editable || pending
-                                    }
-                                    onClick={() => onPick(task, s)}
-                                    aria-label={PLANNER_CHECK_LABEL[s]}
-                                    title={PLANNER_CHECK_LABEL[s]}
-                                    className={cn(
-                                      "size-9 rounded-md border text-sm font-bold transition-colors",
-                                      active
-                                        ? STATUS_STYLE[s]
-                                        : "bg-background hover:bg-muted",
-                                      (readOnly || !day.editable) &&
-                                        "cursor-not-allowed opacity-60",
-                                    )}
-                                  >
-                                    {PLANNER_CHECK_MARK[s]}
-                                  </button>
-                                );
-                              })}
-
-                              {task.checked_at && (
-                                <span className="text-muted-foreground text-[10px]">
-                                  {new Date(task.checked_at).toLocaleTimeString(
-                                    "ko-KR",
-                                    {
-                                      timeZone: "Asia/Seoul",
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    },
-                                  )}{" "}
-                                  체크
-                                </span>
-                              )}
-                            </div>
-
-                            {task.status === "late" && task.late_reason && (
-                              <p className="text-muted-foreground text-xs">
-                                사유: {task.late_reason}
-                              </p>
-                            )}
-
-                            {/* 인증사진 — 붙은 게 있으면 썸네일, 오늘이면 첨부/교체 */}
-                            {(task.photo_path ||
-                              (day.editable &&
-                                !readOnly &&
-                                task.status !== "missed")) && (
-                              <div className="flex items-center gap-2">
-                                {task.photo_path && (
-                                  <a
-                                    href={proofSrc(task)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="border-hairline block size-14 shrink-0 overflow-hidden rounded-md border"
-                                    title="크게 보기"
-                                  >
-                                    {/* 라우트가 short-TTL signed URL로 302 — next/image 원격 설정이 필요 없다 */}
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={proofSrc(task)}
-                                      alt="인증사진"
-                                      loading="lazy"
-                                      className="size-full object-cover"
-                                    />
-                                  </a>
-                                )}
-                                {day.editable &&
-                                  !readOnly &&
-                                  task.status !== "missed" && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => pickPhoto(task.id)}
-                                      disabled={pending || uploading}
-                                    >
-                                      <Camera className="size-3.5" />
-                                      {task.photo_path
-                                        ? "사진 바꾸기"
-                                        : "사진 첨부"}
-                                    </Button>
-                                  )}
-                              </div>
-                            )}
-
-                            {reasonFor === task.id && (
-                              <div className="border-hairline space-y-2 rounded-[10px] border bg-background p-2.5">
-                                <p className="text-xs font-medium">
-                                  제시간에 못한 이유 (선택)
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {LATE_REASON_PRESETS.map((preset) => (
-                                    <button
-                                      key={preset}
-                                      type="button"
-                                      onClick={() => setReasonText(preset)}
+                        <ul className="divide-hairline/70 divide-y border-t border-hairline/70">
+                          {block.tasks.map((task) => {
+                            const locked = readOnly || !day.editable;
+                            const canAttach =
+                              day.editable &&
+                              !readOnly &&
+                              task.status !== "missed";
+                            return (
+                              <li key={task.id} className="space-y-2 px-3 py-2.5">
+                                {/* 태그는 점 + 작은 글씨로 후퇴시켜 과제명과 경쟁하지 않게 */}
+                                {task.tag_name && (
+                                  <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+                                    <span
                                       className={cn(
-                                        "rounded-full border px-2.5 py-1 text-xs transition-colors",
-                                        reasonText === preset
-                                          ? "bg-primary text-primary-foreground border-primary"
-                                          : "hover:bg-muted",
+                                        "size-1.5 rounded-full",
+                                        TAG_DOT[task.tag_name] ?? "bg-slate-400",
                                       )}
-                                    >
-                                      {preset}
-                                    </button>
-                                  ))}
-                                </div>
-                                <Input
-                                  value={reasonText}
-                                  onChange={(e) => setReasonText(e.target.value)}
-                                  placeholder="직접 입력해도 돼요"
-                                  maxLength={200}
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="flex-1"
-                                    onClick={() => setReasonFor(null)}
-                                    disabled={pending}
+                                    />
+                                    {task.tag_name}
+                                  </div>
+                                )}
+
+                                <p className="text-[15px] leading-snug font-semibold">
+                                  {task.title}
+                                </p>
+
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                  {/* 3개 타일이 아니라 하나의 컨트롤로 읽히게 붙인다 */}
+                                  <div
+                                    role="group"
+                                    aria-label="수행 상태"
+                                    className="border-hairline bg-surface inline-flex overflow-hidden rounded-[9px] border"
                                   >
-                                    취소
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="flex-1"
-                                    onClick={() =>
-                                      check(task.id, "late", reasonText)
-                                    }
-                                    disabled={pending}
-                                  >
-                                    {pending ? "저장 중…" : "△로 체크"}
-                                  </Button>
+                                    {CHECK_ORDER.map((st, i) => {
+                                      const active = task.status === st;
+                                      return (
+                                        <button
+                                          key={st}
+                                          type="button"
+                                          disabled={locked || pending}
+                                          onClick={() => onPick(task, st)}
+                                          aria-pressed={active}
+                                          aria-label={PLANNER_CHECK_LABEL[st]}
+                                          title={PLANNER_CHECK_LABEL[st]}
+                                          className={cn(
+                                            "h-8 w-11 text-[13px] font-bold transition-colors",
+                                            i > 0 && "border-hairline border-l",
+                                            active
+                                              ? STATUS_STYLE[st]
+                                              : "text-muted-foreground",
+                                            !active && !locked && "hover:bg-muted",
+                                            locked && "cursor-not-allowed",
+                                          )}
+                                        >
+                                          {PLANNER_CHECK_MARK[st]}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {task.checked_at && (
+                                    <span className="text-muted-foreground text-[11px] tabular-nums">
+                                      {new Date(
+                                        task.checked_at,
+                                      ).toLocaleTimeString("ko-KR", {
+                                        timeZone: "Asia/Seoul",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}{" "}
+                                      체크
+                                    </span>
+                                  )}
                                 </div>
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+
+                                {/* 사유·사진은 과제에 딸린 것이라 왼쪽 인셋으로 묶는다 */}
+                                {((task.status === "late" && task.late_reason) ||
+                                  task.photo_path ||
+                                  canAttach) && (
+                                  <div className="border-hairline/70 ml-0.5 space-y-2 border-l pl-2.5">
+                                    {task.status === "late" &&
+                                      task.late_reason && (
+                                        <p className="text-muted-foreground text-xs">
+                                          사유: {task.late_reason}
+                                        </p>
+                                      )}
+
+                                    {(task.photo_path || canAttach) && (
+                                      <div className="flex items-center gap-2">
+                                        {task.photo_path && (
+                                          <a
+                                            href={proofSrc(task)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="border-hairline block size-11 shrink-0 overflow-hidden rounded-md border"
+                                            title="크게 보기"
+                                          >
+                                            {/* 라우트가 short-TTL signed URL로 302 — next/image 원격 설정이 필요 없다 */}
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={proofSrc(task)}
+                                              alt="인증사진"
+                                              loading="lazy"
+                                              className="size-full object-cover"
+                                            />
+                                          </a>
+                                        )}
+                                        {canAttach ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => pickPhoto(task.id)}
+                                            disabled={pending || uploading}
+                                          >
+                                            <Camera className="size-3.5" />
+                                            {task.photo_path
+                                              ? "사진 바꾸기"
+                                              : "사진 첨부"}
+                                          </Button>
+                                        ) : (
+                                          task.photo_path && (
+                                            <span className="text-muted-foreground text-[11px]">
+                                              인증사진
+                                            </span>
+                                          )
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {reasonFor === task.id && (
+                                  <div className="border-hairline bg-surface space-y-2 rounded-[10px] border p-2.5">
+                                    <p className="text-xs font-medium">
+                                      제시간에 못한 이유 (선택)
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {LATE_REASON_PRESETS.map((preset) => (
+                                        <button
+                                          key={preset}
+                                          type="button"
+                                          onClick={() => setReasonText(preset)}
+                                          className={cn(
+                                            "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                                            reasonText === preset
+                                              ? "bg-primary text-primary-foreground border-primary"
+                                              : "hover:bg-muted",
+                                          )}
+                                        >
+                                          {preset}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <Input
+                                      value={reasonText}
+                                      onChange={(e) =>
+                                        setReasonText(e.target.value)
+                                      }
+                                      placeholder="직접 입력해도 돼요"
+                                      maxLength={200}
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1"
+                                        onClick={() => setReasonFor(null)}
+                                        disabled={pending}
+                                      >
+                                        취소
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        className="flex-1"
+                                        onClick={() =>
+                                          check(task.id, "late", reasonText)
+                                        }
+                                        disabled={pending}
+                                      >
+                                        {pending ? "저장 중…" : "△로 체크"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </>
+                    )}
+
+                    {block.kind === "korean" && block.tasks.length === 0 && (
+                      <p className="text-muted-foreground px-3 pb-2.5 text-xs">
+                        배정된 과제가 없어요.
+                      </p>
                     )}
                   </div>
                 ))}
