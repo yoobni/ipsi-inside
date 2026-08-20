@@ -102,6 +102,18 @@ export function PlannerStats({
 
   return (
     <div className="space-y-4">
+      {(!stats || stats.total === 0) && (
+        <section className="rounded-lg border bg-card">
+          <div className="flex items-center gap-2 border-b px-4 py-3">
+            <CalendarCheck className="text-muted-foreground size-4" />
+            <h2 className="text-sm font-semibold">이번 주 이행 통계</h2>
+          </div>
+          <p className="text-muted-foreground p-4 text-sm">
+            국어 블록에 과제를 넣고 저장하면 이행률이 집계돼요.
+          </p>
+        </section>
+      )}
+
       {stats && stats.total > 0 && (
         <section className="rounded-lg border bg-card">
           <div className="flex items-center gap-2 border-b px-4 py-3">
@@ -350,6 +362,12 @@ export function PlannerStats({
             maxLength={1000}
             placeholder="예) 비문학은 안정적이에요. 문학 분석에서 △가 반복되니 다음 주는 분량을 줄여 매일 1편으로 가요."
           />
+          {message && (
+            <Alert variant={message.kind === "error" ? "destructive" : "default"}>
+              <AlertDescription>{message.text}</AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground text-xs tabular-nums">
               {comment.length}/1000
@@ -370,11 +388,6 @@ export function PlannerStats({
               </Button>
             </div>
           </div>
-          {message && (
-            <Alert variant={message.kind === "error" ? "destructive" : "default"}>
-              <AlertDescription>{message.text}</AlertDescription>
-            </Alert>
-          )}
         </div>
       </section>
     </div>

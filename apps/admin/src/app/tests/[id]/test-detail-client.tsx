@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatPhone } from "@ipsi/lib/format";
+import { formatPhone, phoneDigits } from "@ipsi/lib/format";
 import { useMemo, useState, useTransition } from "react";
 import {
   ArrowRight,
@@ -326,9 +326,12 @@ function AssignDrawer({
 
   const filteredStudents = useMemo(() => {
     const q = query.trim();
+    const qDigits = q.replace(/\D/g, "");
     if (!q) return availableStudents;
     return availableStudents.filter(
-      (s) => s.full_name.includes(q) || s.phone.includes(q),
+      (s) =>
+        s.full_name.includes(q) ||
+        (qDigits.length > 0 && phoneDigits(s.phone).includes(qDigits)),
     );
   }, [availableStudents, query]);
 

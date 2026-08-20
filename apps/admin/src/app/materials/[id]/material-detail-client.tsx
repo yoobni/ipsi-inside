@@ -14,7 +14,7 @@ import {
   MATERIAL_AUDIENCE_LABEL,
   type MaterialAudience,
 } from "@ipsi/types";
-import { formatBytes, formatPhone } from "@ipsi/lib/format";
+import { formatBytes, formatPhone, phoneDigits } from "@ipsi/lib/format";
 import type { GroupOption } from "../new-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -660,9 +660,12 @@ function AssignDrawer({
 
   const filteredStudents = useMemo(() => {
     const q = query.trim();
+    const qDigits = q.replace(/\D/g, "");
     if (!q) return availableStudents;
     return availableStudents.filter(
-      (s) => s.full_name.includes(q) || s.phone.includes(q),
+      (s) =>
+        s.full_name.includes(q) ||
+        (qDigits.length > 0 && phoneDigits(s.phone).includes(qDigits)),
     );
   }, [availableStudents, query]);
 

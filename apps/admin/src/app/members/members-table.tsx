@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatPhone } from "@ipsi/lib/format";
+import { formatPhone, phoneDigits } from "@ipsi/lib/format";
 import { useMemo, useState, useTransition } from "react";
 import {
   ArrowRight,
@@ -101,10 +101,15 @@ export function MembersTable({
 
   const filtered = useMemo(() => {
     const q = query.trim();
+    const qDigits = q.replace(/\D/g, "");
     return members.filter((m) => {
       if (tab !== "all" && m.role !== tab) return false;
       if (!q) return true;
-      return m.full_name.includes(q) || m.phone.includes(q);
+      // 하이픈이 섞여 저장돼 있어 숫자만 비교한다
+      return (
+        m.full_name.includes(q) ||
+        (qDigits.length > 0 && phoneDigits(m.phone).includes(qDigits))
+      );
     });
   }, [members, tab, query]);
 

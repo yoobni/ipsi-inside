@@ -30,3 +30,13 @@ export function formatPhone(raw: string | null | undefined): string {
   }
   return raw;
 }
+
+/**
+ * 전화번호 검색·비교용 숫자만 추출.
+ *
+ * 저장된 값에 하이픈이 섞여 있어서(수기 입력분) 원문끼리 비교하면
+ * "010-5668-3359"로 검색할 때 "01056683359" 행이 안 걸린다.
+ */
+export function phoneDigits(raw: string | null | undefined): string {
+  return (raw ?? '').replace(/\D/g, '');
+}
