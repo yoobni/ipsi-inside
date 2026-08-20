@@ -11,7 +11,14 @@ import { updateSession } from "@ipsi/lib/supabase/middleware";
  *   - 보호 경로: 로그인된 학생/학부모만 통과 (status 가드는 페이지에서 /pending으로)
  */
 const PUBLIC_PATHS = ["/", "/login", "/signup", "/maintenance"];
-const ALLOW_THROUGH_PREFIXES = ["/_next", "/favicon", "/api/signout", "/api/health"];
+// /api/cron 은 세션 없는 Vercel Cron 호출 — 라우트가 CRON_SECRET을 직접 검증한다
+const ALLOW_THROUGH_PREFIXES = [
+  "/_next",
+  "/favicon",
+  "/api/signout",
+  "/api/health",
+  "/api/cron",
+];
 
 // 점검 모드(MAINTENANCE_MODE=1)에서도 통과시킬 경로 — 정적 자산/헬스체크/점검 페이지 자체
 const MAINTENANCE_ALLOW_PREFIXES = [
