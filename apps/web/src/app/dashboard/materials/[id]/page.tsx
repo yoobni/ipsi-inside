@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { DashboardNav } from "@/components/dashboard-nav";
 import { Wordmark } from "@/components/wordmark";
 
 export const dynamic = "force-dynamic";
@@ -153,26 +154,7 @@ function Shell({
       <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
         <div className="flex items-center gap-6">
           <Wordmark size="md" />
-          <nav className="hidden md:flex items-center gap-5 text-sm text-muted-foreground">
-            <Link href="/dashboard" className="hover:text-foreground">
-              홈
-            </Link>
-            <Link href="/dashboard/planner" className="hover:text-foreground">
-              플래너
-            </Link>
-            <Link href="/dashboard/tests" className="hover:text-foreground">
-              시험
-            </Link>
-            <Link href="/dashboard/journal" className="hover:text-foreground">
-              일지
-            </Link>
-            <Link
-              href="/dashboard/materials"
-              className="font-bold text-foreground border-b-2 border-primary pb-1"
-            >
-              자료
-            </Link>
-          </nav>
+          <DashboardNav active="materials" />
         </div>
         <div className="flex items-center gap-2">
           <NotificationBell items={notifItems} unreadCount={unreadCount} />

@@ -6,6 +6,7 @@ import { weekStartOf } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
 import { todayKst } from "@/lib/kst";
 import { LogoutButton } from "@/components/logout-button";
+import { DashboardNav } from "@/components/dashboard-nav";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
@@ -252,13 +253,7 @@ export default async function DashboardPage() {
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-6 py-4 backdrop-blur">
         <div className="flex items-center gap-6">
           <Wordmark size="md" />
-          <nav className="hidden md:flex items-center gap-5 text-sm text-muted-foreground">
-            <span className="font-bold text-foreground border-b-2 border-primary pb-1">홈</span>
-            <Link href="/dashboard/planner" className="hover:text-foreground">플래너</Link>
-            <Link href="/dashboard/tests" className="hover:text-foreground">시험</Link>
-            <Link href="/dashboard/journal" className="hover:text-foreground">일지</Link>
-            <Link href="/dashboard/materials" className="hover:text-foreground">자료</Link>
-          </nav>
+          <DashboardNav active="home" />
         </div>
         <div className="flex items-center gap-2">
           <NotificationBell items={notif.items} unreadCount={notif.unreadCount} />

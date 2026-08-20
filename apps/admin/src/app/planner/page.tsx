@@ -167,7 +167,11 @@ export default async function PlannerPage({
         </p>
       </div>
 
+      {/* key로 remount — blocks를 useState로 들고 있어서, 학생/주차를 바꿔도
+          그리드에 이전 학생 블록이 남고 배지·총평만 새 값으로 바뀌어
+          서로 모순된 화면이 나왔다 */}
       <PlannerClient
+        key={`${selectedStudentId ?? "none"}-${weekStart}`}
         students={studentRows}
         groups={(groups ?? []).map((g) => ({ id: g.id, name: g.name }))}
         selectedGroupId={groupId}

@@ -37,5 +37,10 @@ export async function GET(req: Request) {
     return new NextResponse("Signed URL failed", { status: 500 });
   }
 
-  return NextResponse.redirect(signed.signedUrl, 302);
+  // 리다이렉트 자체는 캐시하지 않는다. signed URL은 5분이면 만료되므로
+  // 302가 캐시되면 만료된 주소를 물고 이미지가 깨진다.
+  return NextResponse.redirect(signed.signedUrl, {
+    status: 302,
+    headers: { "Cache-Control": "no-store" },
+  });
 }

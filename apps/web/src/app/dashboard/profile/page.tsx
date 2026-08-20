@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
+import { DashboardNav } from "@/components/dashboard-nav";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileForm, type ProfileInitial } from "./profile-form";
@@ -34,7 +35,10 @@ export default async function ProfilePage() {
   return (
     <div className="bg-background flex min-h-screen flex-col">
       <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
-        <Wordmark size="md" />
+        <div className="flex items-center gap-6">
+          <Wordmark size="md" />
+          <DashboardNav />
+        </div>
         <ThemeToggle />
       </header>
       <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10 space-y-6">

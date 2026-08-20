@@ -47,6 +47,16 @@ export type PlannerDay = {
   blocks: BlockView[];
 };
 
+/**
+ * 인증사진 URL. photo_path의 uuid를 v로 달아 캐시를 깬다 —
+ * ?task=<id>만 쓰면 사진을 바꿔도 브라우저가 옛 이미지를 그대로 보여준다.
+ */
+function proofSrc(task: TaskView): string {
+  const file = (task.photo_path ?? "").split("/").pop() ?? "";
+  const version = file.split(".")[0];
+  return `/dashboard/planner/proof?task=${task.id}&v=${version}`;
+}
+
 const STATUS_STYLE: Record<PlannerCheckStatus, string> = {
   done: "bg-emerald-500 text-white border-emerald-500",
   late: "bg-amber-500 text-white border-amber-500",
@@ -268,6 +278,7 @@ export function PlannerWeek({
         {days.map((day) => {
           const isToday = day.date === today;
           const isPast = day.date < today;
+          const isFuture = day.date > today;
           if (day.blocks.length === 0) return null;
 
           return (
@@ -293,6 +304,13 @@ export function PlannerWeek({
                 {isPast && !readOnly && (
                   <span className="text-muted-foreground ml-auto inline-flex items-center gap-1 text-[10px]">
                     <Lock className="size-3" /> 입력 마감
+                  </span>
+                )}
+                {/* 미래 요일도 버튼이 잠기므로 이유를 적어준다 — 라벨이 없으면
+                    학생은 왜 안 눌리는지 알 수 없다 */}
+                {isFuture && !readOnly && (
+                  <span className="text-muted-foreground ml-auto inline-flex items-center gap-1 text-[10px]">
+                    <Clock className="size-3" /> 그날 체크할 수 있어요
                   </span>
                 )}
               </div>
@@ -404,7 +422,7 @@ export function PlannerWeek({
                               <div className="flex items-center gap-2">
                                 {task.photo_path && (
                                   <a
-                                    href={`/dashboard/planner/proof?task=${task.id}`}
+                                    href={proofSrc(task)}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="border-hairline block size-14 shrink-0 overflow-hidden rounded-md border"
@@ -413,7 +431,7 @@ export function PlannerWeek({
                                     {/* 라우트가 short-TTL signed URL로 302 — next/image 원격 설정이 필요 없다 */}
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
-                                      src={`/dashboard/planner/proof?task=${task.id}`}
+                                      src={proofSrc(task)}
                                       alt="인증사진"
                                       loading="lazy"
                                       className="size-full object-cover"

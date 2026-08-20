@@ -296,8 +296,36 @@ export async function publishPlannerWeekAction(
     await notifyPlannerPublished(week.student_id, week.week_start);
   }
 
+  // 발행을 내리면 이미 나간 알림도 거둔다. 안 그러면 학생 알림함엔 "플래너가
+  // 도착했어요"가 남아 있는데 눌러 들어가면 "배정된 플래너가 없어요" 빈 화면이 뜬다.
+  if (!publish && wasPublished) {
+    await clearPlannerNotifications(week.student_id, week.week_start);
+  }
+
   revalidatePath("/planner");
   return { ok: true };
+}
+
+/** 그 주차로 향하는 플래너 알림 회수 — 학생 본인 + 연결된 학부모 */
+async function clearPlannerNotifications(
+  studentId: string,
+  weekStart: string,
+): Promise<void> {
+  const db = createAdminSupabaseClient();
+
+  const { data: links } = await db
+    .from("parent_student_links")
+    .select("parent_id")
+    .eq("student_id", studentId);
+
+  const userIds = [studentId, ...(links ?? []).map((l) => l.parent_id)];
+
+  await db
+    .from("notifications")
+    .delete()
+    .in("user_id", userIds)
+    .in("type", ["planner_published", "planner_comment", "planner_reminder"])
+    .eq("link", `/dashboard/planner?week=${weekStart}`);
 }
 
 /** 발행 알림 fan-out — 학생 본인 + 연결된 학부모 */
@@ -325,7 +353,8 @@ async function notifyPlannerPublished(
     {
       user_id: studentId,
       type: "planner_published",
-      title: "이번 주 국어 플래너가 도착했어요",
+      // 미래 주차도 배정할 수 있으니 "이번 주"로 못 박지 않는다 (본문에 기간 표시)
+      title: "국어 플래너가 도착했어요",
       body: range,
       link: `/dashboard/planner?week=${weekStart}`,
       created_at: nowIso,

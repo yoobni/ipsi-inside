@@ -5,6 +5,8 @@ import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
 import { todayKst } from "@/lib/kst";
 import { Button } from "@/components/ui/button";
+import { DashboardNav } from "@/components/dashboard-nav";
+import { LogoutButton } from "@/components/logout-button";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
@@ -164,13 +166,19 @@ function Shell({
   return (
     <div className="bg-background flex min-h-screen flex-col">
       <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
-        <Wordmark size="md" />
+        <div className="flex items-center gap-6">
+          <Wordmark size="md" />
+          <DashboardNav active="journal" />
+        </div>
         <div className="flex items-center gap-2">
           <NotificationBell items={notif.items} unreadCount={notif.unreadCount} />
           <ThemeToggle />
+          <div className="hidden md:block">
+            <LogoutButton />
+          </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8 space-y-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 space-y-6">
         {children}
       </main>
     </div>
