@@ -297,7 +297,11 @@ export async function sendPasswordResetAction(
 
   const supabase = await createServerSupabaseClient();
   const host = h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "https";
+  // 로컬 dev는 프록시가 없어 x-forwarded-proto가 안 온다. https로 기본값을 두면
+  // 메일 링크가 https://localhost:1234 로 만들어져 열리지 않는다.
+  const forwarded = h.get("x-forwarded-proto");
+  const isLocal = !!host && /^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host);
+  const proto = forwarded ?? (isLocal ? "http" : "https");
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL ??
     (host ? `${proto}://${host}` : "http://localhost:1234");

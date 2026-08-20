@@ -306,26 +306,50 @@ export async function publishPlannerWeekAction(
   return { ok: true };
 }
 
-/** 그 주차로 향하는 플래너 알림 회수 — 학생 본인 + 연결된 학부모 */
+/** 플래너 알림 링크. 학부모용은 어느 자녀인지까지 담는다 */
+function plannerLink(weekStart: string, childId?: string): string {
+  const base = `/dashboard/planner?week=${weekStart}`;
+  return childId ? `${base}&child=${childId}` : base;
+}
+
+/**
+ * 그 주차로 향하는 플래너 알림 회수 — 학생 본인 + 연결된 학부모.
+ *
+ * planner_reminder는 지우지 않는다. 크론이 "오늘 이미 보냈는지"를 그 행의
+ * 존재로 판단하므로(api/cron/planner-reminder), 지우면 같은 날 리마인더가
+ * 두 번 갈 수 있다.
+ */
 async function clearPlannerNotifications(
   studentId: string,
   weekStart: string,
 ): Promise<void> {
   const db = createAdminSupabaseClient();
+  const types = ["planner_published", "planner_comment"];
 
+  // 학생 본인 — 자녀 파라미터가 없는 링크
+  await db
+    .from("notifications")
+    .delete()
+    .eq("user_id", studentId)
+    .in("type", types)
+    .eq("link", plannerLink(weekStart));
+
+  // 학부모 — 이 자녀를 가리키는 링크만. 다자녀에서 다른 자녀 알림이
+  // 함께 지워지지 않게 자녀 id로 좁힌다
   const { data: links } = await db
     .from("parent_student_links")
     .select("parent_id")
     .eq("student_id", studentId);
+  const parentIds = (links ?? []).map((l) => l.parent_id);
 
-  const userIds = [studentId, ...(links ?? []).map((l) => l.parent_id)];
-
-  await db
-    .from("notifications")
-    .delete()
-    .in("user_id", userIds)
-    .in("type", ["planner_published", "planner_comment", "planner_reminder"])
-    .eq("link", `/dashboard/planner?week=${weekStart}`);
+  if (parentIds.length > 0) {
+    await db
+      .from("notifications")
+      .delete()
+      .in("user_id", parentIds)
+      .in("type", types)
+      .eq("link", plannerLink(weekStart, studentId));
+  }
 }
 
 /** 발행 알림 fan-out — 학생 본인 + 연결된 학부모 */
@@ -356,7 +380,7 @@ async function notifyPlannerPublished(
       // 미래 주차도 배정할 수 있으니 "이번 주"로 못 박지 않는다 (본문에 기간 표시)
       title: "국어 플래너가 도착했어요",
       body: range,
-      link: `/dashboard/planner?week=${weekStart}`,
+      link: plannerLink(weekStart),
       created_at: nowIso,
     },
     ...(links ?? []).map((l) => ({
@@ -364,7 +388,10 @@ async function notifyPlannerPublished(
       type: "planner_published",
       title: `${student?.full_name ?? "자녀"} 학생의 주간 플래너가 배정됐어요`,
       body: range,
-      link: `/dashboard/planner?week=${weekStart}`,
+      // 학부모 알림엔 자녀를 명시한다. 주차만 담으면 다자녀 학부모에서
+      // 자녀별 알림이 구분되지 않아, 한 자녀의 발행을 내릴 때 다른 자녀
+      // 알림까지 함께 지워진다 (링크가 바이트 단위로 같아서)
+      link: plannerLink(weekStart, studentId),
       created_at: nowIso,
     })),
   ];
@@ -456,7 +483,6 @@ async function notifyWeeklyComment(
 
   const range = `${shortDayLabel(weekStart)} ~ ${shortDayLabel(dateOfDay(weekStart, 6))}`;
   const nowIso = new Date().toISOString();
-  const link = `/dashboard/planner?week=${weekStart}`;
 
   const notifs = [
     {
@@ -464,7 +490,7 @@ async function notifyWeeklyComment(
       type: "planner_comment",
       title: "선생님이 주간 총평을 남겼어요",
       body: range,
-      link,
+      link: plannerLink(weekStart),
       created_at: nowIso,
     },
     ...(links ?? []).map((l) => ({
@@ -472,7 +498,7 @@ async function notifyWeeklyComment(
       type: "planner_comment",
       title: `${student?.full_name ?? "자녀"} 학생의 주간 총평이 등록됐어요`,
       body: range,
-      link,
+      link: plannerLink(weekStart, studentId),
       created_at: nowIso,
     })),
   ];

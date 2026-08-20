@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarRange } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";

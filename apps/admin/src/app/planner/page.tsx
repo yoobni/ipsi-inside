@@ -157,6 +157,8 @@ export default async function PlannerPage({
     },
   );
 
+  const plannerKey = `${selectedStudentId ?? "none"}-${weekStart}`;
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="space-y-1">
@@ -167,11 +169,13 @@ export default async function PlannerPage({
         </p>
       </div>
 
-      {/* key로 remount — blocks를 useState로 들고 있어서, 학생/주차를 바꿔도
-          그리드에 이전 학생 블록이 남고 배지·총평만 새 값으로 바뀌어
-          서로 모순된 화면이 나왔다 */}
+      {/* 학생/주차가 바뀌면 두 컴포넌트 모두 remount 한다.
+          blocks(PlannerClient)와 총평 입력값(PlannerStats)을 useState로 들고
+          있어서, 소프트 내비게이션으로 학생을 바꿔도 상태가 그대로 남는다.
+          총평은 특히 위험 — A 학생 텍스트가 입력창에 남은 채 저장을 누르면
+          B 학생 주차에 A의 총평이 기록되고 알림까지 나간다. */}
       <PlannerClient
-        key={`${selectedStudentId ?? "none"}-${weekStart}`}
+        key={plannerKey}
         students={studentRows}
         groups={(groups ?? []).map((g) => ({ id: g.id, name: g.name }))}
         selectedGroupId={groupId}
@@ -185,6 +189,7 @@ export default async function PlannerPage({
       />
 
       <PlannerStats
+        key={plannerKey}
         stats={stats}
         weekId={weekId}
         weeklyComment={weeklyComment}
