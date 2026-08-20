@@ -1,10 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
 import { todayKst } from "@/lib/kst";
-import { Button } from "@/components/ui/button";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { LogoutButton } from "@/components/logout-button";
 import { Wordmark } from "@/components/wordmark";
@@ -128,15 +125,6 @@ export default async function JournalArchivePage({
 
   return (
     <Shell notif={notif}>
-      <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/dashboard">
-            <ChevronLeft className="size-4" />
-            홈
-          </Link>
-        </Button>
-      </div>
-
       <div className="space-y-1">
         <h1 className="font-display text-[34px] leading-tight">학습 일지 기록</h1>
         <p className="text-muted-foreground text-sm">

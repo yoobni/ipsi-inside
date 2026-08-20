@@ -44,6 +44,8 @@ export default async function StudentPlannerPage({
       ? weekStartOf(sp.week)
       : weekStartOf(today);
 
+  const isCurrentWeek = weekStart === weekStartOf(today);
+
   // 학생은 본인, 학부모는 자녀의 플래너
   let targetStudentId = state.userId;
   let childName: string | null = null;
@@ -79,7 +81,12 @@ export default async function StudentPlannerPage({
     .eq("week_start", weekStart)
     .maybeSingle();
 
-  let days: PlannerDay[] = [];
+  let days: PlannerDay[] = Array.from({ length: 7 }, (_, dow) => ({
+    day_of_week: dow,
+    date: addDays(weekStart, dow),
+    editable: false,
+    blocks: [],
+  }));
   if (week) {
     const { data: blockRows } = await supabase
       .from("planner_blocks")
@@ -154,22 +161,22 @@ export default async function StudentPlannerPage({
         <h1 className="font-display text-[34px] leading-tight">주간 플래너</h1>
         <p className="text-muted-foreground text-sm">
           {state.role === "parent"
-            ? `${childName ?? "자녀"} 학생의 이번 주 국어 학습 계획과 이행 상황이에요.`
-            : "오늘 과제를 끝내면 바로 체크해요. 체크는 그날 밤 12시까지만 가능해요."}
+            ? isCurrentWeek
+              ? `${childName ?? "자녀"} 학생의 이번 주 국어 학습 계획과 이행 상황이에요.`
+              : `${childName ?? "자녀"} 학생의 국어 학습 계획과 이행 상황이에요.`
+            : isCurrentWeek
+              ? "오늘 과제를 끝내면 바로 체크해요. 체크는 그날 밤 12시까지만 가능해요."
+              : "지난 주와 다음 주는 보기만 할 수 있어요. 체크는 그날에만 가능해요."}
         </p>
       </div>
 
-      {!week ? (
-        <EmptyState message="이 주에 배정된 플래너가 없어요." />
-      ) : (
-        <PlannerWeek
-          weekStart={weekStart}
-          today={today}
-          days={days}
-          weeklyComment={week.weekly_comment}
-          readOnly={state.role === "parent"}
-        />
-      )}
+      <PlannerWeek
+        weekStart={weekStart}
+        today={today}
+        days={days}
+        weeklyComment={week?.weekly_comment ?? null}
+        readOnly={state.role === "parent"}
+      />
     </Shell>
   );
 }

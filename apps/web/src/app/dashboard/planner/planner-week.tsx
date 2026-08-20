@@ -2,7 +2,14 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Camera, ChevronLeft, ChevronRight, Clock, Lock } from "lucide-react";
+import {
+  CalendarRange,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Lock,
+} from "lucide-react";
 import {
   DAY_LABELS,
   LATE_REASON_PRESETS,
@@ -214,6 +221,10 @@ export function PlannerWeek({
     check(task.id, status);
   };
 
+  // 블록이 하나도 없는 주차 — 페이지가 다른 화면으로 갈아치우면 주 이동 바까지
+  // 사라져 되돌아갈 방법이 없어진다(알림 타고 들어오면 특히). 여기서 처리한다.
+  const isEmptyWeek = days.every((d) => d.blocks.length === 0);
+
   const todayDay = days.find((d) => d.date === today);
   const todayTasks = (todayDay?.blocks ?? []).flatMap((b) =>
     b.kind === "korean" ? b.tasks : [],
@@ -282,6 +293,18 @@ export function PlannerWeek({
         <Alert variant={message.kind === "error" ? "destructive" : "default"}>
           <AlertDescription>{message.text}</AlertDescription>
         </Alert>
+      )}
+
+      {isEmptyWeek && (
+        <div className="border-hairline bg-surface rounded-[14px] border p-8 text-center">
+          <CalendarRange className="text-muted-foreground mx-auto size-8" />
+          <p className="text-muted-foreground mt-3 text-sm">
+            이 주에 배정된 플래너가 없어요.
+          </p>
+          <p className="text-faint mt-1 text-xs">
+            위 화살표로 다른 주를 볼 수 있어요.
+          </p>
+        </div>
       )}
 
       {/* 요일별 카드 — 모바일 우선 */}
@@ -487,13 +510,7 @@ export function PlannerWeek({
                                               ? "사진 바꾸기"
                                               : "사진 첨부"}
                                           </Button>
-                                        ) : (
-                                          task.photo_path && (
-                                            <span className="text-muted-foreground text-[11px]">
-                                              인증사진
-                                            </span>
-                                          )
-                                        )}
+                                        ) : null}
                                       </div>
                                     )}
                                   </div>

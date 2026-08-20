@@ -300,10 +300,16 @@ export default async function DashboardPage() {
                 className="border-hairline bg-surface flex items-center gap-4 rounded-[14px] border p-4 transition-colors hover:bg-muted/30"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold">오늘 국어 과제</p>
+                  <p className="text-sm font-bold">
+                    {state.role === "student"
+                      ? "오늘 국어 과제"
+                      : "자녀의 오늘 국어 과제"}
+                  </p>
                   <p className="text-muted-foreground mt-0.5 text-xs">
                     {plannerToday.checked === plannerToday.total
-                      ? "오늘 몫은 모두 체크했어요"
+                      ? state.role === "student"
+                        ? "오늘 몫은 모두 체크했어요"
+                        : "오늘 몫을 모두 체크했어요"
                       : state.role === "student"
                         ? "밤 12시까지 체크할 수 있어요"
                         : "아직 체크하지 않은 과제가 있어요"}
