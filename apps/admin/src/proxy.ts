@@ -7,7 +7,16 @@ import { updateSession } from "@ipsi/lib/supabase/middleware";
  *   - 그 외 세션(학생/학부모/pending/profile 없음)은 즉시 /api/signout
  *   - /login, /api/signout, 정적 자산만 비로그인 허용
  */
-const ALLOW_THROUGH_PREFIXES = ["/_next", "/favicon", "/api/signout", "/api/health"];
+// robots.txt는 세션 없는 크롤러가 부른다 — 리다이렉트되면 "전부 차단" 규칙이 전달되지 않는다
+const ALLOW_THROUGH_PREFIXES = [
+  "/_next",
+  "/favicon",
+  "/icon",
+  "/apple-icon",
+  "/robots.txt",
+  "/api/signout",
+  "/api/health",
+];
 
 export async function proxy(request: NextRequest) {
   const { response, supabase, user } = await updateSession(request);

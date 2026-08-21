@@ -10,11 +10,29 @@ import { updateSession } from "@ipsi/lib/supabase/middleware";
  *   - 공개 경로(/, /login, /signup): 누구나 OK
  *   - 보호 경로: 로그인된 학생/학부모만 통과 (status 가드는 페이지에서 /pending으로)
  */
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/maintenance"];
+// 약관·개인정보처리방침은 가입 화면에서 링크하니 비로그인으로도 열려야 한다
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/signup",
+  "/maintenance",
+  "/privacy",
+  "/terms",
+];
 // /api/cron 은 세션 없는 Vercel Cron 호출 — 라우트가 CRON_SECRET을 직접 검증한다
+//
+// robots.txt/sitemap.xml은 세션이 없는 크롤러가 부르는 경로다. matcher의
+// 확장자 예외에 .txt/.xml이 없어서 여기서 빼주지 않으면 /login으로 리다이렉트되고
+// SEO 설정이 통째로 죽는다. 아이콘/OG 이미지는 matcher에서 이미 빠지지만
+// 목록으로 한 번 더 남겨둔다.
 const ALLOW_THROUGH_PREFIXES = [
   "/_next",
   "/favicon",
+  "/icon",
+  "/apple-icon",
+  "/opengraph-image",
+  "/robots.txt",
+  "/sitemap.xml",
   "/api/signout",
   "/api/health",
   "/api/cron",
@@ -26,6 +44,8 @@ const MAINTENANCE_ALLOW_PREFIXES = [
   "/favicon",
   "/api/health",
   "/maintenance",
+  // 점검 중에 크롤 규칙까지 503으로 막을 이유는 없다
+  "/robots.txt",
 ];
 
 export async function proxy(request: NextRequest) {
