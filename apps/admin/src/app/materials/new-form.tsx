@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { FileUp, Upload } from "lucide-react";
@@ -121,137 +122,166 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
   const totalSize = formatBytes(files.reduce((sum, f) => sum + f.size, 0));
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 rounded-md border bg-card p-5">
-      <div className="space-y-2">
-        <Label htmlFor="title">제목 *</Label>
-        <Input
-          id="title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="예) 9월 모의고사 해설 PDF"
-          required
-        />
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* 자료 정보 */}
+      <section className="rounded-md border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">자료 정보</h2>
+        </div>
+        <div className="space-y-4 p-4">
+          <div className="space-y-2">
+            <Label htmlFor="title">제목 *</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="예) 9월 모의고사 해설 PDF"
+              required
+            />
+          </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="description">설명 (선택)</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          placeholder="자료 설명. 알림 본문으로도 노출돼요."
-        />
-      </div>
+          <div className="space-y-2">
+            <Label htmlFor="description">설명 (선택)</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="자료 설명. 알림 본문으로도 노출돼요."
+            />
+          </div>
+        </div>
+      </section>
 
-      <div className="space-y-2">
-        <Label htmlFor="audience">배부 대상 *</Label>
-        <Select
-          value={audience}
-          onValueChange={(v) => setAudience(v as MaterialAudience)}
-        >
-          <SelectTrigger id="audience" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="group">
-              {MATERIAL_AUDIENCE_LABEL.group}
-            </SelectItem>
-            <SelectItem value="targeted">
-              {MATERIAL_AUDIENCE_LABEL.targeted} (학교/학생 선택)
-            </SelectItem>
-            <SelectItem value="all">{MATERIAL_AUDIENCE_LABEL.all}</SelectItem>
-            <SelectItem value="student">
-              {MATERIAL_AUDIENCE_LABEL.student}
-            </SelectItem>
-            <SelectItem value="parent">
-              {MATERIAL_AUDIENCE_LABEL.parent}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-muted-foreground text-xs">{AUDIENCE_HINT[audience]}</p>
+      {/* 배부 설정 */}
+      <section className="rounded-md border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">배부 설정</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            누구에게 보낼지와 언제까지 보일지를 정해요.
+          </p>
+        </div>
+        <div className="space-y-4 p-4">
+          <div className="space-y-2">
+            <Label htmlFor="audience">배부 대상 *</Label>
+            <Select
+              value={audience}
+              onValueChange={(v) => setAudience(v as MaterialAudience)}
+            >
+              <SelectTrigger id="audience" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="group">
+                  {MATERIAL_AUDIENCE_LABEL.group}
+                </SelectItem>
+                <SelectItem value="targeted">
+                  {MATERIAL_AUDIENCE_LABEL.targeted} (학교/학생 선택)
+                </SelectItem>
+                <SelectItem value="all">{MATERIAL_AUDIENCE_LABEL.all}</SelectItem>
+                <SelectItem value="student">
+                  {MATERIAL_AUDIENCE_LABEL.student}
+                </SelectItem>
+                <SelectItem value="parent">
+                  {MATERIAL_AUDIENCE_LABEL.parent}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">{AUDIENCE_HINT[audience]}</p>
 
-        {audience === "group" && (
-          <div className="mt-2 space-y-1.5">
-            {groups.length === 0 ? (
-              <p className="text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-xs">
-                만든 그룹이 없어요. [그룹(반)] 메뉴에서 먼저 그룹을 만들어주세요.
-              </p>
-            ) : (
-              <ul className="max-h-48 divide-y overflow-y-auto rounded-md border">
-                {groups.map((g) => (
-                  <li key={g.id}>
-                    <label className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={groupIds.has(g.id)}
-                        onChange={() => toggleGroup(g.id)}
-                        className="size-4 accent-current"
-                      />
-                      <span className="flex-1 text-sm font-medium">{g.name}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {g.member_count}명
-                      </span>
-                    </label>
+            {audience === "group" && (
+              <div className="mt-2 space-y-1.5">
+                {groups.length === 0 ? (
+                  <p className="text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-xs">
+                    만든 그룹이 없어요. [그룹(반)] 메뉴에서 먼저 그룹을 만들어주세요.
+                  </p>
+                ) : (
+                  <ul className="max-h-48 divide-y overflow-y-auto rounded-md border">
+                    {groups.map((g) => (
+                      <li key={g.id}>
+                        <label className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={groupIds.has(g.id)}
+                            onChange={() => toggleGroup(g.id)}
+                            className="size-4 accent-current"
+                          />
+                          <span className="flex-1 text-sm font-medium">{g.name}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {g.member_count}명
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="expires">만료 일시 (선택)</Label>
+            <Input
+              id="expires"
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+            <p className="text-muted-foreground text-xs">
+              만료 후엔 학생/학부모 자료 목록에서 자동 제거돼요.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 파일 */}
+      <section className="rounded-md border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">PDF 파일 *</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            여러 개를 한 번에 올리면 한 자료(세트)로 묶여서 배부돼요. 각 30MB 이하.
+          </p>
+        </div>
+        <div className="p-4">
+          <div className="space-y-2">
+            <Label htmlFor="file" className="sr-only">
+              PDF 파일
+            </Label>
+            <div className="border-input flex items-center gap-3 rounded-md border border-dashed bg-background p-4">
+              <FileUp className="text-muted-foreground size-5" />
+              <input
+                id="file"
+                type="file"
+                accept="application/pdf"
+                multiple
+                onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                className="flex-1 text-sm"
+                required
+              />
+            </div>
+            {files.length > 0 && (
+              <ul className="space-y-1">
+                {files.map((f, i) => (
+                  <li
+                    key={`${f.name}-${i}`}
+                    className="text-muted-foreground flex items-center justify-between gap-2 text-xs"
+                  >
+                    <span className="truncate">
+                      {i + 1}. {f.name}
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {formatBytes(f.size)}
+                    </span>
                   </li>
                 ))}
+                <li className="text-muted-foreground text-xs font-medium">
+                  총 {files.length}개 · {totalSize}
+                </li>
               </ul>
             )}
           </div>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="expires">만료 일시 (선택)</Label>
-        <Input
-          id="expires"
-          type="datetime-local"
-          value={expiresAt}
-          onChange={(e) => setExpiresAt(e.target.value)}
-        />
-        <p className="text-muted-foreground text-xs">
-          만료 후엔 학생/학부모 자료 목록에서 자동 제거돼요.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="file">PDF 파일 * (여러 개 가능, 각 ≤30MB)</Label>
-        <div className="border-input flex items-center gap-3 rounded-md border border-dashed bg-background p-4">
-          <FileUp className="text-muted-foreground size-5" />
-          <input
-            id="file"
-            type="file"
-            accept="application/pdf"
-            multiple
-            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-            className="flex-1 text-sm"
-            required
-          />
         </div>
-        {files.length > 0 && (
-          <ul className="space-y-1">
-            {files.map((f, i) => (
-              <li
-                key={`${f.name}-${i}`}
-                className="text-muted-foreground flex items-center justify-between gap-2 text-xs"
-              >
-                <span className="truncate">
-                  {i + 1}. {f.name}
-                </span>
-                <span className="shrink-0 tabular-nums">
-                  {formatBytes(f.size)}
-                </span>
-              </li>
-            ))}
-            <li className="text-muted-foreground text-xs font-medium">
-              총 {files.length}개 · {totalSize}
-            </li>
-          </ul>
-        )}
-        <p className="text-muted-foreground text-xs">
-          여러 PDF를 한 번에 올리면 한 자료(세트)로 묶여서 배부돼요.
-        </p>
-      </div>
+      </section>
 
       {error && (
         <Alert variant="destructive">
@@ -260,13 +290,8 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
       )}
 
       <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => history.back()}
-          disabled={pending}
-        >
-          취소
+        <Button asChild type="button" variant="outline" disabled={pending}>
+          <Link href="/materials">취소</Link>
         </Button>
         <Button type="submit" disabled={pending || files.length === 0}>
           <Upload className="size-4" />
