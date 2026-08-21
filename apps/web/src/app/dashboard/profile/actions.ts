@@ -2,7 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { friendlyDbError } from "@ipsi/lib";
+import { headers } from "next/headers";
+import { CONSENT_DOC_VERSIONS } from "@ipsi/types";
+import { extractClientIp, friendlyDbError } from "@ipsi/lib";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
@@ -156,6 +158,29 @@ export async function withdrawAction(
     .delete()
     .eq("parent_id", user.id);
 
+  // 플래너 인증사진은 학생의 얼굴·필기가 담긴 개인정보다. 탈퇴 후에도 스토리지에
+  // 남아 있었다 — 프로필을 마스킹해도 사진은 익명화되지 않는다.
+  // 경로 규칙은 `{user.id}/{uuid}.{ext}` (upload-proof.ts)라 폴더째 지운다.
+  const { data: proofs } = await admin.storage
+    .from("planner-proofs")
+    .list(user.id, { limit: 1000 });
+  if (proofs && proofs.length > 0) {
+    await admin.storage
+      .from("planner-proofs")
+      .remove(proofs.map((f) => `${user.id}/${f.name}`));
+  }
+
+  // 체크 행 자체(정량 이력)는 익명 보존하되, 자유서술과 사진 참조는 지운다 —
+  // study_journals를 파기하는 것과 같은 이유다.
+  await admin
+    .from("planner_task_checks")
+    .update({ late_reason: null, photo_path: null })
+    .eq("student_id", user.id);
+
+  // 동의 이력 파기 — profiles의 동의 시각 컬럼을 null로 지우는 것과 같은 기준.
+  // 처리방침에 고지한 보유기간이 "회원 탈퇴 시까지"다.
+  await admin.from("consent_records").delete().eq("user_id", user.id);
+
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/login?withdrawn=1");
@@ -214,5 +239,57 @@ export async function changeMyPasswordAction(
 
   revalidatePath("/dashboard/profile");
   revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+/**
+ * 광고성 정보 수신 동의 설정·철회.
+ *
+ * 처리방침이 "[내 정보]에서 언제든 철회할 수 있다"고 약속하는 항목이라
+ * 실제로 동작해야 한다. 없으면 처리방침이 거짓 기재가 된다.
+ *
+ * 동의/철회 둘 다 consent_records에 행을 쌓는다 — 이력이 남지 않으면
+ * "언제 껐는지" 다툼이 생겼을 때 확인할 방법이 없다. 그 테이블은 insert
+ * 정책이 없어서(클라이언트 위조 방지) service_role로 쓴다.
+ */
+export async function setMarketingConsentAction(
+  _prev: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const agreed = formData.get("agreed") === "on";
+
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "로그인이 필요합니다" };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ marketing_agreed_at: agreed ? new Date().toISOString() : null })
+    .eq("id", user.id);
+  if (error) return { ok: false, message: friendlyDbError(error) };
+
+  const h = await headers();
+  const ip = extractClientIp(h);
+  const { error: recordError } = await createAdminSupabaseClient()
+    .from("consent_records")
+    .insert({
+      user_id: user.id,
+      kind: "marketing",
+      doc_version: CONSENT_DOC_VERSIONS.marketing,
+      agreed,
+      ip: ip && ip.length > 0 ? ip : null,
+      user_agent: h.get("user-agent"),
+    });
+  // 이력 저장 실패로 설정 자체를 되돌리진 않는다 — 사용자가 끈 건 이미 반영됐다
+  if (recordError) {
+    console.error("[consent] 마케팅 동의 이력 저장 실패", {
+      userId: user.id,
+      recordError,
+    });
+  }
+
+  revalidatePath("/dashboard/profile");
   return { ok: true };
 }

@@ -8,6 +8,7 @@ import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileForm, type ProfileInitial } from "./profile-form";
 import { PasswordSection } from "./password-section";
+import { MarketingSection } from "./marketing-section";
 import { WithdrawSection } from "./withdraw-section";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,9 @@ export default async function ProfilePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, phone, school, grade, role, must_change_password")
+    .select(
+      "full_name, phone, school, grade, role, must_change_password, marketing_agreed_at",
+    )
     .eq("id", state.userId)
     .maybeSingle();
 
@@ -58,6 +61,7 @@ export default async function ProfilePage() {
         </div>
         <ProfileForm initial={initial} />
         <PasswordSection mustChange={profile?.must_change_password === true} />
+        <MarketingSection agreedAt={profile?.marketing_agreed_at ?? null} />
         <WithdrawSection />
       </main>
     </div>
