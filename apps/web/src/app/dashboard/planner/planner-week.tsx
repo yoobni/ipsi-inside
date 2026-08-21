@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { resizeImageToJpeg } from "@/lib/image-resize";
 import { cn } from "@/lib/utils";
+import { PlannerTimetable } from "./planner-timetable";
 import { submitPlannerChecksAction } from "./actions";
 import { uploadPlannerProofAction } from "./upload-proof";
 
@@ -307,6 +308,11 @@ export function PlannerWeek({
         </div>
       )}
 
+      {/* 주간 타임테이블 — 체크리스트만으로는 언제 무엇이 있는지 안 읽힌다 */}
+      {!isEmptyWeek && (
+        <PlannerTimetable weekStart={weekStart} today={today} days={days} />
+      )}
+
       {/* 요일별 카드 — 모바일 우선 */}
       <div className="space-y-3">
         {days.map((day) => {
@@ -318,6 +324,7 @@ export function PlannerWeek({
           return (
             <section
               key={day.date}
+              id={`planner-day-${day.date}`}
               className={cn(
                 "border-hairline bg-surface rounded-[14px] border p-4",
                 isToday && "border-primary/50",
