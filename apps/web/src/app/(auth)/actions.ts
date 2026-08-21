@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import {
+  CONSENT_DOC_VERSIONS,
   loginSchema,
   parentSignupSchema,
   studentSignupSchema,
+  type ConsentKind,
 } from "@ipsi/types";
 import { checkRateLimit, extractClientIp } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
@@ -115,7 +117,7 @@ export async function studentSignupAction(
     };
   }
 
-  const consent = readConsent(formData);
+  const consent = readConsent(formData, "student");
   if (consent.error) return consent.error;
 
   // TODO: rate limit — 가입 폭주 방지
@@ -147,6 +149,9 @@ export async function studentSignupAction(
   }
 
   const nowIso = new Date().toISOString();
+  const marketingAgreed = consent.decisions.some(
+    (d) => d.kind === "marketing" && d.agreed,
+  );
   const { error: profileErr } = await admin.from("profiles").insert({
     id: created.user.id,
     role: "student",
@@ -157,12 +162,14 @@ export async function studentSignupAction(
     grade: parsed.data.grade,
     terms_agreed_at: nowIso,
     privacy_agreed_at: nowIso,
-    marketing_agreed_at: consent.marketing ? nowIso : null,
+    marketing_agreed_at: marketingAgreed ? nowIso : null,
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(created.user.id);
     return { ok: false, message: "가입 정보 저장 중 오류가 발생했습니다" };
   }
+
+  await recordConsents(admin, created.user.id, consent.decisions, h);
 
   // 가입 후 자동 로그인
   const supabase = await createServerSupabaseClient();
@@ -197,7 +204,7 @@ export async function parentSignupAction(
     };
   }
 
-  const consent = readConsent(formData);
+  const consent = readConsent(formData, "parent");
   if (consent.error) return consent.error;
 
   // TODO: rate limit — 가입 폭주 방지
@@ -229,6 +236,9 @@ export async function parentSignupAction(
   }
 
   const nowIso = new Date().toISOString();
+  const marketingAgreed = consent.decisions.some(
+    (d) => d.kind === "marketing" && d.agreed,
+  );
   const { error: profileErr } = await admin.from("profiles").insert({
     id: created.user.id,
     role: "parent",
@@ -237,12 +247,14 @@ export async function parentSignupAction(
     phone: parsed.data.phone,
     terms_agreed_at: nowIso,
     privacy_agreed_at: nowIso,
-    marketing_agreed_at: consent.marketing ? nowIso : null,
+    marketing_agreed_at: marketingAgreed ? nowIso : null,
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(created.user.id);
     return { ok: false, message: "가입 정보 저장 중 오류가 발생했습니다" };
   }
+
+  await recordConsents(admin, created.user.id, consent.decisions, h);
 
   // 어드민이 매칭할 수 있게 자녀 정보 보관
   await admin.from("parent_signup_requests").insert({
@@ -365,39 +377,102 @@ export async function updatePasswordAction(
   redirect("/login?reset=success");
 }
 
+type ConsentDecision = { kind: ConsentKind; agreed: boolean };
+
 /**
- * 가입 동의 체크박스 검증.
- *  - termsAgreed/privacyAgreed (필수) 미체크 시 fieldErrors 반환
- *  - marketingAgreed (선택) boolean으로 변환
+ * 가입 폼의 동의 체크를 읽어 검증한다.
+ *
+ * 체크박스에 native `required`가 걸려 있지만 그것만 믿으면 안 된다 — 서버
+ * 액션은 폼을 우회해서도 호출될 수 있고, 동의는 우회되면 안 되는 항목이다.
+ *
+ * 학부모는 자녀의 이름·휴대폰 번호를 입력하므로 법정대리인으로서의 제3자
+ * 정보 제공 동의(child_info)를 추가로 받는다.
  */
-function readConsent(formData: FormData):
-  | { error: null; marketing: boolean }
+function readConsent(
+  formData: FormData,
+  role: "student" | "parent",
+):
+  | { error: null; decisions: ConsentDecision[] }
   | {
       error: {
         ok: false;
         message: string;
         fieldErrors: Record<string, string[]>;
       };
-      marketing: false;
+      decisions: null;
     } {
+  const age14 = formData.get("age14Confirmed") === "on";
   const terms = formData.get("termsAgreed") === "on";
   const privacy = formData.get("privacyAgreed") === "on";
+  const childInfo = formData.get("childInfoAgreed") === "on";
   const marketing = formData.get("marketingAgreed") === "on";
 
-  if (!terms || !privacy) {
-    const fieldErrors: Record<string, string[]> = {};
-    if (!terms) fieldErrors.termsAgreed = ["이용약관에 동의해주세요"];
-    if (!privacy)
-      fieldErrors.privacyAgreed = ["개인정보처리방침에 동의해주세요"];
+  const fieldErrors: Record<string, string[]> = {};
+  if (!age14) {
+    fieldErrors.age14Confirmed = [
+      "만 14세 미만은 온라인 가입이 불가능해요. 학원으로 문의해주세요.",
+    ];
+  }
+  if (!terms) fieldErrors.termsAgreed = ["이용약관에 동의해주세요"];
+  if (!privacy) {
+    fieldErrors.privacyAgreed = ["개인정보 수집·이용에 동의해주세요"];
+  }
+  if (role === "parent" && !childInfo) {
+    fieldErrors.childInfoAgreed = ["자녀의 개인정보 제공에 동의해주세요"];
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
     return {
       error: {
         ok: false,
-        message: "필수 약관에 동의해주세요",
+        message: "필수 동의 항목을 확인해주세요",
         fieldErrors,
       },
-      marketing: false,
+      decisions: null,
     };
   }
 
-  return { error: null, marketing };
+  const decisions: ConsentDecision[] = [
+    { kind: "age14", agreed: true },
+    { kind: "terms", agreed: true },
+    { kind: "privacy", agreed: true },
+    // 선택 항목은 미동의도 기록한다 — "안 물어봤다"와 "거부했다"를 구분해야 한다
+    { kind: "marketing", agreed: marketing },
+  ];
+  if (role === "parent") {
+    decisions.push({ kind: "child_info", agreed: true });
+  }
+
+  return { error: null, decisions };
+}
+
+/**
+ * 동의 이력을 한 번에 남긴다.
+ *
+ * consent_records는 append-only이고 RLS에 insert 정책이 없다 — 쓰기는 여기
+ * (service_role)만 한다. 동의 시점의 문서 버전과 접속 정보를 같이 박아둬야
+ * 나중에 "무엇에 동의했는지"를 증명할 수 있다.
+ */
+async function recordConsents(
+  admin: ReturnType<typeof createAdminSupabaseClient>,
+  userId: string,
+  decisions: ConsentDecision[],
+  h: Headers,
+) {
+  const ip = extractClientIp(h);
+  const rows = decisions.map((d) => ({
+    user_id: userId,
+    kind: d.kind,
+    doc_version: CONSENT_DOC_VERSIONS[d.kind],
+    agreed: d.agreed,
+    // extractClientIp이 못 찾으면 빈 문자열을 줄 수 있다 — inet 컬럼에 넣으면 터진다
+    ip: ip && ip.length > 0 ? ip : null,
+    user_agent: h.get("user-agent"),
+  }));
+  const { error } = await admin.from("consent_records").insert(rows);
+  // 동의 기록 실패로 가입을 되돌리진 않는다(계정은 이미 만들어졌고 profiles에
+  // 동의 시각이 남는다). 대신 서버 로그에 남겨 사후 보정이 가능하게 한다.
+  if (error) {
+    console.error("[consent] 이력 저장 실패", { userId, error });
+  }
 }

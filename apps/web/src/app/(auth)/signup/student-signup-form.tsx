@@ -24,7 +24,8 @@ type FieldName =
   | "school"
   | "grade"
   | "termsAgreed"
-  | "privacyAgreed";
+  | "privacyAgreed"
+  | "age14Confirmed";
 
 export function StudentSignupForm() {
   const [grade, setGrade] = useState<string>("1");
@@ -99,9 +100,11 @@ export function StudentSignupForm() {
         errors={fieldErrors?.passwordConfirm}
       />
       <ConsentChecks
+        role="student"
         errors={{
           termsAgreed: fieldErrors?.termsAgreed,
           privacyAgreed: fieldErrors?.privacyAgreed,
+          age14Confirmed: fieldErrors?.age14Confirmed,
         }}
       />
       <Button type="submit" disabled={pending} size="lg" className="w-full">

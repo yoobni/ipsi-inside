@@ -116,6 +116,41 @@ export type Database = {
         Relationships: [];
       };
 
+      // ─── 동의 이력 (append-only, 쓰기는 서버만) ──────────────────────────────
+      consent_records: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: string;
+          doc_version: string;
+          agreed: boolean;
+          agreed_at: string;
+          ip: string | null;
+          user_agent: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          kind: string;
+          doc_version: string;
+          agreed: boolean;
+          agreed_at?: string;
+          ip?: string | null;
+          user_agent?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          kind?: string;
+          doc_version?: string;
+          agreed?: boolean;
+          agreed_at?: string;
+          ip?: string | null;
+          user_agent?: string | null;
+        };
+        Relationships: [];
+      };
+
       // ─── 학생 그룹(반) ───────────────────────────────────────────────────────
       student_groups: {
         Row: {

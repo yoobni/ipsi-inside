@@ -17,7 +17,9 @@ type FieldName =
   | "studentFullName"
   | "studentPhone"
   | "termsAgreed"
-  | "privacyAgreed";
+  | "privacyAgreed"
+  | "age14Confirmed"
+  | "childInfoAgreed";
 
 export function ParentSignupForm() {
   const [state, formAction, pending] = useActionState(parentSignupAction, null);
@@ -88,9 +90,12 @@ export function ParentSignupForm() {
       </div>
 
       <ConsentChecks
+        role="parent"
         errors={{
           termsAgreed: fieldErrors?.termsAgreed,
           privacyAgreed: fieldErrors?.privacyAgreed,
+          age14Confirmed: fieldErrors?.age14Confirmed,
+          childInfoAgreed: fieldErrors?.childInfoAgreed,
         }}
       />
 
