@@ -134,6 +134,7 @@ function draftFromBlock(b: PlannerBlockInput): BlockDraft {
 }
 
 export function PlannerClient({
+  syncKey,
   students,
   groups,
   selectedGroupId,
@@ -145,6 +146,8 @@ export function PlannerClient({
   tags,
   templates,
 }: {
+  /** 학생-주차 식별자. 바뀌면 로컬 상태를 새 서버 값으로 맞춘다 */
+  syncKey: string;
   students: PlannerStudent[];
   groups: GroupChoice[];
   selectedGroupId: string | null;
@@ -175,6 +178,19 @@ export function PlannerClient({
   // 원장이 못 보고 넘어간다
   const [sheetError, setSheetError] = useState<string | null>(null);
 
+  // 학생·주차가 바뀌면 렌더 중에 상태를 새 서버 값으로 되돌린다.
+  // remount(key)로 처리하면 Radix Select가 닫히는 도중 언마운트돼
+  // body 락이 남아 페이지 전체가 클릭을 안 받는다.
+  const [syncedKey, setSyncedKey] = useState(syncKey);
+  if (syncedKey !== syncKey) {
+    setSyncedKey(syncKey);
+    setBlocks(initialBlocks);
+    setCurrentWeekId(weekId);
+    setMessage(null);
+    setEditIndex(undefined);
+    setSheetError(null);
+  }
+
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [tplName, setTplName] = useState("");
   const [tplDesc, setTplDesc] = useState("");
@@ -186,7 +202,11 @@ export function PlannerClient({
     if (value === null) params.delete(key);
     else params.set(key, value);
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    // transition으로 감싸면 서버 응답을 기다리는 동안 pending이 켜져
+    // "눌렸는지 모르겠는" 상태가 사라진다 (force-dynamic이라 매번 왕복한다)
+    startTransition(() => {
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+    });
   };
 
   /**

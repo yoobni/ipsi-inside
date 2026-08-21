@@ -169,13 +169,12 @@ export default async function PlannerPage({
         </p>
       </div>
 
-      {/* 학생/주차가 바뀌면 두 컴포넌트 모두 remount 한다.
-          blocks(PlannerClient)와 총평 입력값(PlannerStats)을 useState로 들고
-          있어서, 소프트 내비게이션으로 학생을 바꿔도 상태가 그대로 남는다.
-          총평은 특히 위험 — A 학생 텍스트가 입력창에 남은 채 저장을 누르면
-          B 학생 주차에 A의 총평이 기록되고 알림까지 나간다. */}
+      {/* 학생/주차가 바뀌면 두 컴포넌트가 들고 있는 로컬 상태(블록 목록,
+          총평 입력값)를 초기화해야 한다. key로 remount 시키면 Radix Select가
+          닫히는 중에 언마운트돼 body의 스크롤·포인터 락이 해제되지 않고
+          페이지가 먹통이 된다 — 그래서 syncKey를 넘겨 렌더 중에 상태만 맞춘다. */}
       <PlannerClient
-        key={plannerKey}
+        syncKey={plannerKey}
         students={studentRows}
         groups={(groups ?? []).map((g) => ({ id: g.id, name: g.name }))}
         selectedGroupId={groupId}
@@ -189,7 +188,7 @@ export default async function PlannerPage({
       />
 
       <PlannerStats
-        key={plannerKey}
+        syncKey={plannerKey}
         stats={stats}
         weekId={weekId}
         weeklyComment={weeklyComment}

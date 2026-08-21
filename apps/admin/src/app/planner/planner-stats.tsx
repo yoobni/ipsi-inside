@@ -23,11 +23,14 @@ import { savePlannerWeeklyCommentAction } from "./actions";
  * 뜨면 학생이 안 한 것처럼 보인다.
  */
 export function PlannerStats({
+  syncKey,
   stats,
   weekId,
   weeklyComment,
   weekStatus,
 }: {
+  /** 학생-주차 식별자. 바뀌면 입력 중이던 총평을 새 주차 값으로 되돌린다 */
+  syncKey: string;
   stats: PlannerWeekStats | null;
   weekId: string | null;
   weeklyComment: string | null;
@@ -40,6 +43,16 @@ export function PlannerStats({
     kind: "ok" | "error";
     text: string;
   } | null>(null);
+
+  // 학생·주차가 바뀌면 입력창을 새 주차의 총평으로 맞춘다. 안 맞추면 A 학생
+  // 텍스트가 남은 채 저장을 눌러 B 학생 주차에 기록되고 알림까지 나간다.
+  // (remount 대신 렌더 중 동기화 — key로 하면 Radix 락이 남는다)
+  const [syncedKey, setSyncedKey] = useState(syncKey);
+  if (syncedKey !== syncKey) {
+    setSyncedKey(syncKey);
+    setComment(weeklyComment ?? "");
+    setMessage(null);
+  }
 
   // 블록을 아직 저장하지 않은 주차엔 planner_weeks 행이 없어 총평을 붙일 데가
   // 없다. 섹션을 통째로 숨기면 원장은 왜 안 나오는지 알 수 없으므로 이유를 적는다.
