@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -30,8 +31,17 @@ export async function GET(
     .maybeSingle();
   if (!f) return new NextResponse("Forbidden or not found", { status: 403 });
 
-  const { data: signed, error } = await supabase.storage
-    .from("materials")
+  // signed URL은 service_role로 발급한다.
+  //
+  // materials 버킷의 storage 정책은 is_admin()만 허용해서, 학생·학부모 세션으로
+  // createSignedUrl을 부르면 막히고 500이 났다(자료 배부가 학생 쪽에서 한 번도
+  // 동작하지 않던 원인). 스토리지 정책에 audience 규칙을 복제하는 대신 여기서
+  // service_role을 쓴다 — 권한 판단은 바로 위 material_files 조회가 이미 끝냈고
+  // (materials_audience_read가 발행·예약·만료·audience 5종을 모두 판정한다),
+  // storage_path도 그 검증된 행에서 꺼낸 값이라 클라이언트가 지정할 수 없다.
+  // 규칙을 두 곳에 두면 이번처럼 한쪽이 잊힌다.
+  const { data: signed, error } = await createAdminSupabaseClient()
+    .storage.from("materials")
     .createSignedUrl(f.storage_path, 60, { download: f.file_name });
   if (error || !signed?.signedUrl) {
     return new NextResponse("Signed URL failed", { status: 500 });
@@ -43,5 +53,9 @@ export async function GET(
     source: "download",
   });
 
-  return NextResponse.redirect(signed.signedUrl, 302);
+  // 302를 캐시하면 만료된 signed URL을 물고 깨진다
+  return NextResponse.redirect(signed.signedUrl, {
+    status: 302,
+    headers: { "Cache-Control": "no-store" },
+  });
 }
