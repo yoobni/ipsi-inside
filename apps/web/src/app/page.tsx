@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
@@ -5,8 +6,30 @@ import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoutButton } from "@/components/logout-button";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 const AREAS = ["독서", "문학", "화법과 작문", "언어와 매체"] as const;
+
+/**
+ * 검색결과에 학원 정보로 묶여 보이게 하는 구조화 데이터.
+ * 주소·전화번호·평점은 확인된 값이 없어 넣지 않는다 — 틀린 값이 노출되면
+ * 지우기가 더 어렵다.
+ */
+const ORGANIZATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "EducationalOrganization",
+  name: SITE_NAME,
+  url: SITE_URL,
+  logo: `${SITE_URL}/icon.png`,
+  description: SITE_DESCRIPTION,
+  inLanguage: "ko-KR",
+  areaServed: "KR",
+  knowsAbout: ["수능 국어", ...AREAS],
+} as const;
 
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient();
@@ -24,6 +47,12 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(ORGANIZATION_JSON_LD),
+        }}
+      />
       <header className="sticky top-0 z-10 border-b border-hairline bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Wordmark size="md" />
@@ -129,7 +158,7 @@ export default async function HomePage() {
               입시인사이드<span className="text-primary">.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-background/80 md:text-lg">
-              강의 · 문제 풀이 · 자동 채점 · 약점 분석.
+              주간 플래너 · 학습 일지 · 시험 리포트 · 자료 배부.
               <br className="hidden md:inline" />
               원장이 직접 짠 수능 국어 커리큘럼을, 한 화면에서.
             </p>
@@ -183,30 +212,67 @@ export default async function HomePage() {
         </section>
 
         <section className="mx-auto max-w-6xl px-6 py-14">
-          <div className="grid gap-4 md:grid-cols-3">
+          <h2 className="font-display text-2xl md:text-3xl">
+            계획부터 복기까지, 끊기지 않게.
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            원장이 짜고 학생이 채우고, 다시 원장이 읽는 한 사이클.
+          </p>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <FeatureCard
-              tag="강의"
-              title="VOD 강의 + 필기노트"
-              body="강의 화면 옆에 지문 PDF와 원장 필기노트가 항상 붙어있어요."
+              tag="플래너"
+              title="주간 국어 플래너"
+              body="원장이 요일·시간 단위로 짠 계획을 학생이 O·△·X로 체크하고, 사진으로 인증해요."
             />
             <FeatureCard
-              tag="문제"
-              title="수능형 문제풀이"
-              body="긴 지문 · 5지선다 · 타이머. 푸는 동안 시뮬레이션."
+              tag="일지"
+              title="학습 일지 + 원장 피드백"
+              body="오늘 배운 것과 막힌 것을 적으면, 원장이 어제보다 나아진 점과 내일 고칠 것을 붙여줘요."
             />
             <FeatureCard
-              tag="리포트"
-              title="자동 채점 · 약점 분석"
-              body="객관식 답안만 마킹하면 단원별 오답률이 그래프로 자동 정리돼요."
+              tag="시험"
+              title="수능형 시험 · 자동 채점"
+              body="긴 지문 · 5지선다 · 타이머. 제출하면 바로 채점되고 오답이 정리돼요."
             />
+            <FeatureCard
+              tag="자료"
+              title="지문 · 해설 PDF 배부"
+              body="반 단위로도 개인별로도. 만료일을 걸어 필요한 기간에만 열어둬요."
+            />
+          </div>
+        </section>
+
+        <section className="border-t border-hairline bg-surface">
+          <div className="mx-auto max-w-6xl px-6 py-14">
+            <span className="inline-flex items-center rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-bold text-primary">
+              학부모
+            </span>
+            <h2 className="mt-3 font-display text-2xl md:text-3xl">
+              집에서도 같은 기록을 봅니다.
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              별도 계정으로 자녀의 플래너 이행률, 일지와 원장 피드백, 시험
+              리포트를 그대로 열어볼 수 있어요. &ldquo;오늘 뭐 했어?&rdquo;를
+              물어보지 않아도 되게.
+            </p>
           </div>
         </section>
       </main>
 
       <footer className="border-t border-hairline">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-2 px-6 py-6 text-sm text-muted-foreground md:flex-row md:items-center">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 px-6 py-6 text-sm text-muted-foreground md:flex-row md:items-center">
           <Wordmark size="sm" />
-          <p>© {new Date().getFullYear()} 입시인사이드. All rights reserved.</p>
+          <div className="flex flex-col items-start gap-2 md:flex-row md:items-center md:gap-5">
+            <nav className="flex items-center gap-4">
+              <Link href="/terms" className="hover:text-foreground">
+                이용약관
+              </Link>
+              <Link href="/privacy" className="hover:text-foreground">
+                개인정보처리방침
+              </Link>
+            </nav>
+            <p>© {new Date().getFullYear()} 입시인사이드. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>
