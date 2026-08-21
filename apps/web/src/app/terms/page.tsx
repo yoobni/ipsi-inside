@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 
 export const dynamic = "force-static";
+
+export const metadata: Metadata = {
+  title: "이용약관",
+  description: "입시인사이드 서비스 이용약관입니다.",
+  alternates: { canonical: "/terms" },
+};
 
 export default function TermsPage() {
   return (

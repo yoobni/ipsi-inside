@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 
 export const dynamic = "force-static";
+
+export const metadata: Metadata = {
+  title: "개인정보처리방침",
+  description: "입시인사이드가 수집하는 개인정보 항목과 이용·보관·파기 절차를 안내합니다.",
+  alternates: { canonical: "/privacy" },
+};
 
 export default function PrivacyPage() {
   return (

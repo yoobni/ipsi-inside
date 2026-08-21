@@ -1,9 +1,11 @@
 import { Wordmark } from "@/components/wordmark";
+import { NOINDEX } from "@/lib/site";
 
 export const dynamic = "force-static";
 
 export const metadata = {
-  title: "점검 중 · 입시인사이드",
+  title: "점검 중",
+  ...NOINDEX,
 };
 
 export default function MaintenancePage() {
