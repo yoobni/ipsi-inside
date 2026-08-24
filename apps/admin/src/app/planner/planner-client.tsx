@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -48,6 +48,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
+  GRID_END_HOUR,
+  GRID_START_MIN,
+  MAX_BLOCK_END_MIN,
+  GRID_HEIGHT,
+  GRID_START_HOUR,
+  HOUR_PX,
+  minToY,
+  useGridDrag,
+  yToMin,
+} from "./use-grid-drag";
+import {
   savePlannerWeekAction,
   publishPlannerWeekAction,
   savePlannerTemplateAction,
@@ -69,7 +80,6 @@ type GroupChoice = { id: string; name: string };
 
 const ALL_GROUPS = "__all__";
 const NO_TAG = "__none__";
-const HOUR_PX = 44;
 
 /** Tailwind는 동적 클래스명을 못 뽑아내므로 색상은 정적 맵으로 */
 const FIXED_COLOR_CLASS: Record<string, string> = {
@@ -178,6 +188,11 @@ export function PlannerClient({
   // 원장이 못 보고 넘어간다
   const [sheetError, setSheetError] = useState<string | null>(null);
 
+  // 대신 "열면 내 블록이 보인다"는 초기 스크롤로 살린다.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const scrolledFor = useRef<string | null>(null);
+
   // 학생·주차가 바뀌면 렌더 중에 상태를 새 서버 값으로 되돌린다.
   // remount(key)로 처리하면 Radix Select가 닫히는 도중 언마운트돼
   // body 락이 남아 페이지 전체가 클릭을 안 받는다.
@@ -247,8 +262,24 @@ export function PlannerClient({
     });
   };
 
-  const openNew = () => {
-    setDraft(emptyDraft());
+  /**
+   * 신규 블록 시트. 격자에서 온 경우 요일·시간을 그 자리로 미리 채운다.
+   *
+   * 드래그가 끝나자마자 저장하지 않고 시트를 여는 이유: 국어 블록은 과제가
+   * 1개 이상 있어야 저장된다(submitDraft 검증). 드래그만으로는 완성될 수 없다.
+   */
+  const openNew = (prefill?: { day: number; start: number; end: number }) => {
+    const base = emptyDraft();
+    setDraft(
+      prefill
+        ? {
+            ...base,
+            days: [prefill.day],
+            start: minToHHMM(prefill.start),
+            end: minToHHMM(prefill.end),
+          }
+        : base,
+    );
     setSheetError(null);
     setEditIndex(null);
   };
@@ -258,6 +289,22 @@ export function PlannerClient({
     setSheetError(null);
     setEditIndex(index);
   };
+
+  const { drag, begin, move, end, cancel } = useGridDrag({
+    blocks,
+    gridRef,
+    onCreate: (day, start, end) => openNew({ day, start, end }),
+    onPick: (index) => openEdit(index),
+    onCommit: (index, day, start_min, end_min) => {
+      const previous = blocks;
+      // id를 그대로 두는 게 핵심 — 새 행으로 만들면 학생 체크가 cascade로 날아간다
+      const next = blocks.map((b, i) =>
+        i === index ? { ...b, day_of_week: day, start_min, end_min } : b,
+      );
+      setBlocks(next);
+      persist(next, { rollbackTo: previous });
+    },
+  });
 
   const closeSheet = () => {
     setSheetError(null);
@@ -273,6 +320,14 @@ export function PlannerClient({
     }
     if (endMin <= startMin) {
       setSheetError("종료 시각이 시작보다 늦어야 해요");
+      return;
+    }
+    // 격자는 06:00~24:00만 그린다. 밖으로 저장하면 저장은 되지만 타임테이블에서
+    // 사라져서, 원장이 "만들었는데 없다"고 겪게 된다.
+    if (startMin < GRID_START_MIN || endMin > MAX_BLOCK_END_MIN) {
+      setSheetError(
+        `시간표에 보이는 ${String(GRID_START_HOUR).padStart(2, "0")}:00~${minToHHMM(MAX_BLOCK_END_MIN)} 사이로 정해주세요`,
+      );
       return;
     }
     if (draft.kind === "fixed" && !draft.label.trim()) {
@@ -415,22 +470,43 @@ export function PlannerClient({
     });
   };
 
-  // 표시할 시간 범위 — 블록이 있으면 그에 맞추고, 없으면 08:00~24:00
-  const { startHour, endHour } = useMemo(() => {
-    if (blocks.length === 0) return { startHour: 8, endHour: 24 };
-    const min = Math.min(...blocks.map((b) => b.start_min));
-    const max = Math.max(...blocks.map((b) => b.end_min));
-    return {
-      startHour: Math.max(0, Math.floor(min / 60) - 1),
-      endHour: Math.min(24, Math.ceil(max / 60) + 1),
-    };
-  }, [blocks]);
-
+  // 시간 범위는 06:00~24:00 고정 (use-grid-drag). 예전처럼 블록에 맞춰 자동으로
+  // 좁히면 그 범위가 곧 "드래그로 만들 수 있는 시간의 한계"가 된다.
   const hours = useMemo(
-    () => Array.from({ length: endHour - startHour }, (_, i) => startHour + i),
-    [startHour, endHour],
+    () =>
+      Array.from(
+        { length: GRID_END_HOUR - GRID_START_HOUR },
+        (_, i) => GRID_START_HOUR + i,
+      ),
+    [],
   );
-  const gridHeight = (endHour - startHour) * HOUR_PX;
+
+  // 초기 스크롤 위치는 아래 useEffect에서 정한다.
+  useEffect(() => {
+    if (!scrollRef.current || scrolledFor.current === syncKey) return;
+    scrolledFor.current = syncKey;
+    const earliest =
+      blocks.length > 0
+        ? Math.min(...blocks.map((b) => b.start_min))
+        : 8 * 60;
+    scrollRef.current.scrollTop = Math.max(0, minToY(earliest) - HOUR_PX / 2);
+  }, [syncKey, blocks]);
+
+  // 터치에서 고른 블록. 마우스는 본체를 바로 끌 수 있지만, 터치는 격자 스크롤과
+  // 충돌해서 탭으로 고른 뒤 핸들에서만 끌게 한다.
+  //
+  // 값은 blocks 배열의 인덱스다. 저장하면 서버가 돌려준 배열로 갈아끼워져
+  // 같은 인덱스가 다른 블록을 가리킬 수 있으므로, 배열이 바뀌면 선택을 푼다.
+  const [touchPick, setTouchPick] = useState<number | null>(null);
+  // 렌더 중 동기화 — 위 syncKey 처리와 같은 방식. effect에서 setState하면
+  // 한 번 더 렌더가 돌고 lint가 cascading render로 잡는다.
+  const [pickedFor, setPickedFor] = useState(blocks);
+  if (pickedFor !== blocks) {
+    setPickedFor(blocks);
+    setTouchPick(null);
+  }
+  // 터치로 빈 칸을 "탭"했는지 판별 — 스크롤과 구분하려면 이동량을 봐야 한다
+  const tapRef = useRef<{ x: number; y: number; day: number } | null>(null);
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
   const koreanMinutes = blocks
@@ -509,7 +585,7 @@ export function PlannerClient({
         <div className="flex shrink-0 items-center gap-2">
           <Button
             variant="outline"
-            onClick={openNew}
+            onClick={() => openNew()}
             disabled={!selectedStudentId || pending}
           >
             <Plus /> 블록 추가
@@ -630,91 +706,246 @@ export function PlannerClient({
 
       {/* 타임테이블 */}
       {selectedStudentId && (
-        <div className="overflow-x-auto rounded-lg border bg-card">
-          <div className="min-w-[720px]">
-            {/* 요일 헤더 */}
-            <div className="grid grid-cols-[52px_repeat(7,1fr)] border-b">
-              <div />
-              {DAY_LABELS.map((label, i) => (
-                <div
-                  key={label}
-                  className="border-l px-2 py-2 text-center text-xs"
-                >
-                  <div className="font-semibold">{label}</div>
-                  <div className="text-muted-foreground">
-                    {dateOfDay(weekStart, i).slice(5).replace("-", "/")}
-                  </div>
+        <div className="rounded-lg border bg-card">
+          <div className="text-muted-foreground border-b px-3 py-1.5 text-[11px]">
+            빈 칸을 끌면 새 블록 · 블록을 끌면 이동 · 아래끝을 끌면 시간 조절
+            <span className="ml-1 md:hidden">
+              (폰에서는 블록을 한 번 눌러 고른 뒤 손잡이를 끄세요)
+            </span>
+          </div>
+          {/* 06~24시를 다 그리므로 세로로 스크롤된다. 요일 머리는 붙여둔다. */}
+          <div ref={scrollRef} className="max-h-[68vh] overflow-auto">
+            <div className="min-w-[720px]">
+              {/* 요일 헤더 */}
+              <div className="bg-card sticky top-0 z-20 grid grid-cols-[52px_1fr] border-b">
+                <div />
+                <div className="grid grid-cols-7">
+                  {DAY_LABELS.map((label, i) => (
+                    <div
+                      key={label}
+                      className="border-l px-2 py-2 text-center text-xs"
+                    >
+                      <div className="font-semibold">{label}</div>
+                      <div className="text-muted-foreground">
+                        {dateOfDay(weekStart, i).slice(5).replace("-", "/")}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-
-            {/* 본문 */}
-            <div className="grid grid-cols-[52px_repeat(7,1fr)]">
-              {/* 시간 눈금 */}
-              <div className="relative" style={{ height: gridHeight }}>
-                {hours.map((h, i) => (
-                  <div
-                    key={h}
-                    className="text-muted-foreground absolute right-2 -translate-y-1/2 text-[11px]"
-                    style={{ top: i * HOUR_PX }}
-                  >
-                    {String(h).padStart(2, "0")}:00
-                  </div>
-                ))}
               </div>
 
-              {DAY_LABELS.map((label, day) => (
-                <div
-                  key={label}
-                  className="relative border-l"
-                  style={{ height: gridHeight }}
-                >
-                  {/* 시간선 */}
+              {/* 본문 */}
+              <div className="grid grid-cols-[52px_1fr]">
+                {/* 시간 눈금 */}
+                <div className="relative" style={{ height: GRID_HEIGHT }}>
                   {hours.map((h, i) => (
                     <div
                       key={h}
-                      className="absolute inset-x-0 border-t border-dashed border-border/60"
+                      className="text-muted-foreground absolute right-2 -translate-y-1/2 text-[11px]"
                       style={{ top: i * HOUR_PX }}
-                    />
+                    >
+                      {String(h).padStart(2, "0")}:00
+                    </div>
+                  ))}
+                </div>
+
+                {/* 좌표 계산 기준 — 정확히 7개 열만 감싼다 */}
+                <div
+                  ref={gridRef}
+                  className={cn(
+                    "relative grid grid-cols-7",
+                    drag && "select-none",
+                  )}
+                  style={{ height: GRID_HEIGHT }}
+                >
+                  {DAY_LABELS.map((label, day) => (
+                    <div
+                      key={label}
+                      className="relative border-l"
+                      onPointerDown={(e) => {
+                        // 빈 칸 쓸어서 만들기는 마우스만. 터치로 열면 격자
+                        // 스크롤과 충돌한다 (아래 onPointerUp에서 탭만 받는다).
+                        if (e.pointerType !== "mouse") {
+                          tapRef.current = {
+                            x: e.clientX,
+                            y: e.clientY,
+                            day,
+                          };
+                          return;
+                        }
+                        begin(e, "create");
+                      }}
+                      onPointerMove={move}
+                      onPointerUp={(e) => {
+                        if (e.pointerType !== "mouse") {
+                          const t = tapRef.current;
+                          tapRef.current = null;
+                          if (
+                            t &&
+                            Math.abs(e.clientX - t.x) < 8 &&
+                            Math.abs(e.clientY - t.y) < 8
+                          ) {
+                            const rect =
+                              gridRef.current?.getBoundingClientRect();
+                            if (!rect) return;
+                            const min = yToMin(e.clientY - rect.top);
+                            setTouchPick(null);
+                            openNew({
+                              day: t.day,
+                              start: Math.min(min, MAX_BLOCK_END_MIN - 120),
+                              end: Math.min(min + 120, MAX_BLOCK_END_MIN),
+                            });
+                          }
+                          return;
+                        }
+                        end(e);
+                      }}
+                      onPointerCancel={cancel}
+                    >
+                      {/* 시간선 */}
+                      {hours.map((h, i) => (
+                        <div
+                          key={h}
+                          className="border-border/60 absolute inset-x-0 border-t border-dashed"
+                          style={{ top: i * HOUR_PX }}
+                        />
+                      ))}
+
+                      {blocks.map((b, index) => {
+                        if (b.day_of_week !== day) return null;
+                        const top = minToY(b.start_min);
+                        const height = minToY(b.end_min) - top - 2;
+                        const dragging = drag?.index === index;
+                        const picked = touchPick === index;
+                        return (
+                          <div
+                            key={b.id ?? `new-${index}`}
+                            className={cn(
+                              "absolute inset-x-0.5 rounded-md border",
+                              dragging && "opacity-30",
+                              picked && "ring-primary z-10 ring-2",
+                              b.kind === "korean"
+                                ? KOREAN_COLOR_CLASS
+                                : (FIXED_COLOR_CLASS[b.color ?? "slate"] ??
+                                  FIXED_COLOR_CLASS.slate),
+                            )}
+                            style={{ top, height: Math.max(height, 18) }}
+                          >
+                            <button
+                              type="button"
+                              aria-label={`${label}요일 ${minToHHMM(b.start_min)}부터 ${minToHHMM(b.end_min)}까지 ${b.kind === "korean" ? "국어" : b.label} 블록`}
+                              className="size-full cursor-grab overflow-hidden px-1.5 py-1 text-left text-[11px] leading-tight active:cursor-grabbing"
+                              onPointerDown={(e) => {
+                                if (e.pointerType !== "mouse") {
+                                  // 터치는 여기서 끌지 않는다 — 고르기만 한다
+                                  e.stopPropagation();
+                                  return;
+                                }
+                                begin(e, "move", index);
+                              }}
+                              onPointerMove={move}
+                              onPointerUp={(e) => {
+                                if (e.pointerType !== "mouse") {
+                                  e.stopPropagation();
+                                  // 이미 고른 블록을 다시 누르면 편집
+                                  if (picked) openEdit(index);
+                                  else setTouchPick(index);
+                                  return;
+                                }
+                                end(e);
+                              }}
+                              onPointerCancel={cancel}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  openEdit(index);
+                                }
+                              }}
+                            >
+                              <div className="font-semibold">
+                                {b.kind === "korean" ? "국어" : b.label}
+                              </div>
+                              <div className="opacity-80 tabular-nums">
+                                {minToHHMM(b.start_min)}~{minToHHMM(b.end_min)}
+                              </div>
+                              {b.kind === "korean" &&
+                                (b.tasks ?? []).map((t, ti) => (
+                                  <div key={t.id ?? ti} className="truncate">
+                                    · {t.title}
+                                  </div>
+                                ))}
+                            </button>
+
+                            {/* 길이 조절 — 마우스는 아래끝 6px, 터치는 고른 뒤 큰 손잡이 */}
+                            <div
+                              role="presentation"
+                              onPointerDown={(e) => begin(e, "resize", index)}
+                              onPointerMove={move}
+                              onPointerUp={end}
+                              onPointerCancel={cancel}
+                              className={cn(
+                                "absolute inset-x-0 bottom-0 cursor-ns-resize",
+                                picked ? "h-7" : "hidden h-1.5 md:block",
+                              )}
+                              // 손잡이에서만 브라우저 제스처를 끈다 — 격자 스크롤과 안 싸운다
+                              style={{ touchAction: "none" }}
+                            >
+                              {picked && (
+                                <div className="bg-primary mx-auto mt-1 h-1.5 w-10 rounded-full" />
+                              )}
+                            </div>
+
+                            {/* 터치 이동 손잡이 */}
+                            {picked && (
+                              <div
+                                role="presentation"
+                                onPointerDown={(e) => begin(e, "move", index)}
+                                onPointerMove={move}
+                                onPointerUp={end}
+                                onPointerCancel={cancel}
+                                style={{ touchAction: "none" }}
+                                className="bg-primary text-primary-foreground absolute -top-3 left-1/2 flex h-6 w-12 -translate-x-1/2 items-center justify-center rounded-full text-[10px] font-bold"
+                              >
+                                이동
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   ))}
 
-                  {blocks.map((b, index) => {
-                    if (b.day_of_week !== day) return null;
-                    const top =
-                      ((b.start_min - startHour * 60) / 60) * HOUR_PX;
-                    const height =
-                      ((b.end_min - b.start_min) / 60) * HOUR_PX - 2;
-                    return (
-                      <button
-                        key={b.id ?? `new-${index}`}
-                        type="button"
-                        onClick={() => openEdit(index)}
-                        className={cn(
-                          "absolute inset-x-0.5 overflow-hidden rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight transition-opacity hover:opacity-80",
-                          b.kind === "korean"
-                            ? KOREAN_COLOR_CLASS
-                            : (FIXED_COLOR_CLASS[b.color ?? "slate"] ??
-                              FIXED_COLOR_CLASS.slate),
-                        )}
-                        style={{ top, height: Math.max(height, 18) }}
-                      >
-                        <div className="font-semibold">
-                          {b.kind === "korean" ? "국어" : b.label}
+                  {/* 드래그 미리보기 — 겹치면 빨갛게, 놓아도 저장하지 않는다 */}
+                  {drag && (
+                    <div
+                      className={cn(
+                        "pointer-events-none absolute z-30 rounded-md border-2",
+                        drag.invalid
+                          ? "border-destructive bg-destructive/20"
+                          : "border-primary bg-primary/20",
+                      )}
+                      style={{
+                        left: `${(drag.day / 7) * 100}%`,
+                        width: `${100 / 7}%`,
+                        top: minToY(drag.start_min),
+                        height: Math.max(
+                          minToY(drag.end_min) - minToY(drag.start_min),
+                          16,
+                        ),
+                      }}
+                    >
+                      <div className="px-1 py-0.5 text-[10px] font-bold tabular-nums">
+                        {minToHHMM(drag.start_min)}~{minToHHMM(drag.end_min)}
+                      </div>
+                      {drag.invalid && (
+                        <div className="text-destructive px-1 text-[10px] font-bold">
+                          겹침
                         </div>
-                        <div className="opacity-80">
-                          {minToHHMM(b.start_min)}~{minToHHMM(b.end_min)}
-                        </div>
-                        {b.kind === "korean" &&
-                          (b.tasks ?? []).map((t, ti) => (
-                            <div key={t.id ?? ti} className="truncate">
-                              · {t.title}
-                            </div>
-                          ))}
-                      </button>
-                    );
-                  })}
+                      )}
+                    </div>
+                  )}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         </div>
@@ -816,6 +1047,8 @@ export function PlannerClient({
                   id="block-start"
                   type="time"
                   step={300}
+                  min="06:00"
+                  max="23:55"
                   value={draft.start}
                   onChange={(e) => setDraft({ ...draft, start: e.target.value })}
                 />
@@ -826,6 +1059,8 @@ export function PlannerClient({
                   id="block-end"
                   type="time"
                   step={300}
+                  min="06:05"
+                  max="23:59"
                   value={draft.end}
                   onChange={(e) => setDraft({ ...draft, end: e.target.value })}
                 />

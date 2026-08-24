@@ -176,6 +176,38 @@ export const plannerTemplatePayloadSchema = z.object({
 });
 
 /** 템플릿에 넣기 전 행 id 제거 — 남아 있으면 불러올 때 남의 행을 덮어쓸 수 있다 */
+/**
+ * 같은 요일 안에서 블록끼리 시간이 겹치는지 — 겹치면 타임테이블이 포개져 읽을 수 없다.
+ *
+ * 서버(savePlannerWeekAction)와 클라이언트(드래그 미리보기)가 **같은 함수**를 쓴다.
+ * 규칙을 두 곳에 각각 적으면 갈라진다 — 자료 배부에서 audience 규칙을 스토리지
+ * 정책과 RLS 양쪽에 적었다가 한쪽이 잊혀 학생이 자료를 못 열던 것과 같은 실수다.
+ *
+ * ignoreIndex: 드래그 중인 블록 자신은 겹침 판정에서 뺀다.
+ */
+export function findPlannerOverlap(
+  blocks: Array<Pick<PlannerBlockInput, "day_of_week" | "start_min" | "end_min">>,
+  ignoreIndex?: number,
+): string | null {
+  const byDay = new Map<number, Array<{ start_min: number; end_min: number }>>();
+  blocks.forEach((b, i) => {
+    if (i === ignoreIndex) return;
+    const list = byDay.get(b.day_of_week) ?? [];
+    list.push({ start_min: b.start_min, end_min: b.end_min });
+    byDay.set(b.day_of_week, list);
+  });
+
+  for (const [day, list] of byDay) {
+    const sorted = [...list].sort((a, b) => a.start_min - b.start_min);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].start_min < sorted[i - 1].end_min) {
+        return `${DAY_LABELS[day]}요일에 시간이 겹치는 블록이 있어요`;
+      }
+    }
+  }
+  return null;
+}
+
 export function stripBlockIds(blocks: PlannerBlockInput[]): PlannerBlockInput[] {
   return blocks.map((block) => ({
     day_of_week: block.day_of_week,

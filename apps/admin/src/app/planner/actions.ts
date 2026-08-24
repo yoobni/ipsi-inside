@@ -12,6 +12,7 @@ import {
   plannerTemplateApplySchema,
   plannerTemplatePayloadSchema,
   stripBlockIds,
+  findPlannerOverlap,
   shortDayLabel,
   dateOfDay,
   weekStartOf,
@@ -46,27 +47,6 @@ async function ensureAdmin(): Promise<{ adminId: string } | { error: Fail }> {
   return { adminId: user.id };
 }
 
-/** 같은 요일 안에서 블록끼리 시간이 겹치는지 — 겹치면 타임테이블이 포개져 읽을 수 없다 */
-function findOverlap(blocks: PlannerBlockInput[]): string | null {
-  const byDay = new Map<number, PlannerBlockInput[]>();
-  blocks.forEach((b) => {
-    const list = byDay.get(b.day_of_week) ?? [];
-    list.push(b);
-    byDay.set(b.day_of_week, list);
-  });
-
-  for (const [day, list] of byDay) {
-    const sorted = [...list].sort((a, b) => a.start_min - b.start_min);
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].start_min < sorted[i - 1].end_min) {
-        const dayName = ["월", "화", "수", "목", "금", "토", "일"][day];
-        return `${dayName}요일에 시간이 겹치는 블록이 있어요`;
-      }
-    }
-  }
-  return null;
-}
-
 /**
  * 한 주 플래너 저장.
  *
@@ -88,7 +68,7 @@ export async function savePlannerWeekAction(input: {
   }
   const { student_id, week_start, blocks } = parsed.data;
 
-  const overlap = findOverlap(blocks);
+  const overlap = findPlannerOverlap(blocks);
   if (overlap) return { ok: false, message: overlap };
 
   const db = createAdminSupabaseClient();
