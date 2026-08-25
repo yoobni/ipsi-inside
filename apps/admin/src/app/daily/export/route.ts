@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { logAdminAccess } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { csvResponse, toCsv } from "@/lib/csv";
 
@@ -48,6 +50,16 @@ export async function GET(req: Request) {
   const profMap = new Map(
     (students ?? []).map((s) => [s.id, s] as const),
   );
+
+  // 이름·학교·학년이 담긴 파일이 밖으로 나간다. 대상이 여러 명이라 target_id
+  // 하나로는 못 적으므로 기간과 건수를 detail에 남긴다.
+  await logAdminAccess({
+    actorId: user.id,
+    action: "attendance.export",
+    targetType: "daily_attendance",
+    detail: { from, to, rows: records?.length ?? 0, students: studentIds.length },
+    headers: await headers(),
+  });
 
   const rows: (string | number | null)[][] = (records ?? []).map((r) => {
     const p = profMap.get(r.student_id);

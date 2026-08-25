@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { friendlyDbError } from "@ipsi/lib";
+import { headers } from "next/headers";
+import { friendlyDbError, logAdminAccess } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 
@@ -165,6 +166,15 @@ export async function issueTempPasswordAction(
     .update({ must_change_password: true })
     .eq("id", profileId);
   if (error) return { ok: false, message: friendlyDbError(error) };
+
+  // 남의 계정 비밀번호를 바꾸는 일이다 — 접속기록에 반드시 남는다.
+  await logAdminAccess({
+    actorId: check.adminId,
+    action: "password.issue",
+    targetType: "profile",
+    targetId: profileId,
+    headers: await headers(),
+  });
 
   revalidatePath("/members");
   revalidatePath(`/members/${profileId}`);

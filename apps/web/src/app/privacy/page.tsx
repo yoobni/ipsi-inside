@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import {
   ALL_COLLECTION_ROWS,
+  BUSINESS_INFO,
   MARKETING_CHANNELS,
   MARKETING_ROWS,
   OPTIONAL_REFUSAL_NOTICE,
@@ -239,6 +240,13 @@ export default function PrivacyPage() {
             <li>비밀번호는 해시되어 저장</li>
             <li>파일 스토리지는 만료 시간이 있는 서명 URL로만 접근 허용</li>
             <li>접근 권한 최소화 및 정기적 권한 점검</li>
+            <li>
+              관리자가 회원 정보를 열람·반출한 기록을 보관하고 정기적으로
+              점검
+            </li>
+            <li>
+              로그인 시도 횟수를 제한하여 비밀번호 무차별 대입 시도를 차단
+            </li>
           </ul>
         </Section>
 
@@ -286,14 +294,13 @@ export default function PrivacyPage() {
 
         <Section title="12. 사업자 정보">
           <ul className="list-disc space-y-1 pl-5">
-            <li>상호: HYCO</li>
-            <li>대표자: 고유빈</li>
-            <li>사업자등록번호: 760-24-01825</li>
+            <li>상호: {BUSINESS_INFO.name}</li>
+            <li>대표자: {BUSINESS_INFO.representative}</li>
+            <li>사업자등록번호: {BUSINESS_INFO.registrationNumber}</li>
             <li>
-              주소: (22006) 인천광역시 연수구 센트럴로 313, C동 **층 **호 11-2
-              (송도동, 송도씨워크인테라스한라)
+              주소: ({BUSINESS_INFO.postalCode}) {BUSINESS_INFO.address}
             </li>
-            <li>연락처: 070-8080-2607</li>
+            <li>연락처: {BUSINESS_INFO.phone}</li>
           </ul>
         </Section>
 
@@ -305,11 +312,16 @@ export default function PrivacyPage() {
           <p className="mt-2 font-semibold text-foreground">변경 이력</p>
           <ul className="mt-1 list-disc space-y-1 pl-5">
             <li>
-              {PRIVACY_EFFECTIVE_DATE} — 만 14세 미만 아동, 국외 이전, 파기
-              절차·방법, 자동화된 결정에 대한 권리, 열람청구 접수 부서 항목 신설.
-              수집 항목을 목적·보유기간과 함께 표로 정비.
+              {PRIVACY_EFFECTIVE_DATE} — 개인정보 보호책임자 이메일 기재.
+              사업자 주소를 상세 주소까지 표기. 안전성 확보 조치에 접속기록
+              보관·점검과 인증 시도 제한을 추가.
             </li>
-            <li>{PRIVACY_PREVIOUS_EFFECTIVE_DATE} — 최초 시행</li>
+            <li>
+              {PRIVACY_PREVIOUS_EFFECTIVE_DATE} — 만 14세 미만 아동, 국외 이전,
+              파기 절차·방법, 자동화된 결정에 대한 권리, 열람청구 접수 부서 항목
+              신설. 수집 항목을 목적·보유기간과 함께 표로 정비.
+            </li>
+            <li>2026년 6월 24일 — 최초 시행</li>
           </ul>
         </Section>
 

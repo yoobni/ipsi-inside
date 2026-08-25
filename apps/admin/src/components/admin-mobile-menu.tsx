@@ -13,6 +13,7 @@ import {
   Megaphone,
   Menu,
   NotebookPen,
+  ShieldCheck,
   UserCheck,
   Users,
   X,
@@ -38,6 +39,7 @@ const MENU: MenuItem[] = [
   { href: "/journals", label: "학습 일지", icon: NotebookPen, matchPrefix: "/journals" },
   { href: "/daily", label: "일일 마킹", icon: CalendarCheck, matchPrefix: "/daily" },
   { href: "/announcements", label: "공지사항", icon: Megaphone, matchPrefix: "/announcements" },
+  { href: "/access-logs", label: "접속기록", icon: ShieldCheck, matchPrefix: "/access-logs" },
 ];
 
 /**

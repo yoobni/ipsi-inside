@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { friendlyDbError } from "@ipsi/lib";
+import { friendlyDbError, sanitizeRichHtml } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import {
   PASSAGE_SOURCE,
@@ -151,7 +151,8 @@ export async function importPassagesCsvAction(
       .insert({
         title: parsed.data.passage.title,
         source_type: parsed.data.passage.source_type,
-        content: parsed.data.passage.content,
+        // 밖에서 받은 CSV가 이 경로로 들어온다 — 저장 전에 거른다 (보안조사 L-1)
+        content: sanitizeRichHtml(parsed.data.passage.content),
         unit_major: parsed.data.passage.unit_major,
         unit_minor: parsed.data.passage.unit_minor ?? null,
         created_by: user.id,
@@ -166,9 +167,15 @@ export async function importPassagesCsvAction(
     const rows = parsed.data.questions.map((q) => ({
       passage_id: passage.id,
       position_in_passage: q.position_in_passage,
-      stem: q.stem,
-      supplementary: q.supplementary ?? null,
-      choices: q.choices,
+      stem: sanitizeRichHtml(q.stem),
+      supplementary: q.supplementary ? sanitizeRichHtml(q.supplementary) : null,
+      choices: Array.isArray(q.choices)
+        ? q.choices.map((c) =>
+            c && typeof c === "object" && "text" in c
+              ? { ...c, text: sanitizeRichHtml(String(c.text)) }
+              : c,
+          )
+        : q.choices,
       correct_answer: q.correct_answer,
       points: q.points,
       difficulty: q.difficulty ?? null,

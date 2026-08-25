@@ -6,7 +6,13 @@ import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 type Result = { ok: true; url: string } | { ok: false; message: string };
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
-const ALLOWED = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const EXT_BY_MIME: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+};
+const ALLOWED = Object.keys(EXT_BY_MIME);
 
 /**
  * 지문/문항 본문에 들어갈 이미지를 Supabase Storage(question-assets)에 업로드.
@@ -30,7 +36,10 @@ export async function uploadImageAction(fd: FormData): Promise<Result> {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "인증 필요" };
 
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
+  // 확장자는 파일명이 아니라 검증을 통과한 MIME에서 뽑는다.
+  // file.name은 사용자가 정하는 값이라 경로에 그대로 넣을 게 못 된다
+  // (upload-proof.ts가 쓰는 방식과 같다).
+  const ext = EXT_BY_MIME[file.type] ?? "png";
   const path = `passages/${user.id}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage

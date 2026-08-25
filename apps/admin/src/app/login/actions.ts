@@ -2,7 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { loginSchema } from "@ipsi/types";
+import {
+  checkRateLimit,
+  extractClientIp,
+  pruneRateLimitBuckets,
+} from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 
 type ActionResult =
@@ -24,6 +30,24 @@ export async function adminLoginAction(
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
+
+  // 원장 계정은 모든 학생의 개인정보에 닿는다 — 무차별 대입을 가장 먼저 막아야
+  // 할 문이다. 학생/학부모 로그인(web)보다 한도를 좁게 잡았다.
+  const h = await headers();
+  const rl = await checkRateLimit({
+    name: "admin-login",
+    key: `${extractClientIp(h)}:${parsed.data.email}`,
+    limit: 5,
+    windowSec: 600,
+  });
+  if (!rl.ok) {
+    return {
+      ok: false,
+      message: `로그인 시도가 많았어요. ${rl.retryAfterSec}초 후 다시 시도해주세요.`,
+    };
+  }
+  // 만료 버킷 청소를 크론 대신 여기 얹는다 (실패해도 무시)
+  void pruneRateLimitBuckets();
 
   const supabase = await createServerSupabaseClient();
   const { data: signIn, error } = await supabase.auth.signInWithPassword(

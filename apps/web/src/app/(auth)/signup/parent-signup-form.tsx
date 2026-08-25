@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parentSignupAction } from "../actions";
 import { ConsentChecks } from "./consent-checks";
+import { PASSWORD_RULE_TEXT } from "@ipsi/types";
 
 type FieldName =
   | "email"
@@ -53,7 +54,7 @@ export function ParentSignupForm() {
           name="password"
           type="password"
           autoComplete="new-password"
-          placeholder="영문+숫자 포함 8자 이상"
+          placeholder={PASSWORD_RULE_TEXT}
           required
           errors={fieldErrors?.password}
         />

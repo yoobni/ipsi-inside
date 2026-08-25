@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { studentSignupAction } from "../actions";
 import { ConsentChecks } from "./consent-checks";
+import { PASSWORD_RULE_TEXT } from "@ipsi/types";
 
 type FieldName =
   | "email"
@@ -87,7 +88,7 @@ export function StudentSignupForm() {
         name="password"
         type="password"
         autoComplete="new-password"
-        placeholder="영문+숫자 포함 8자 이상"
+        placeholder={PASSWORD_RULE_TEXT}
         required
         errors={fieldErrors?.password}
       />

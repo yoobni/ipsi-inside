@@ -7,6 +7,7 @@ import {
   CONSENT_DOC_VERSIONS,
   loginSchema,
   parentSignupSchema,
+  passwordSchema,
   studentSignupSchema,
   type ConsentKind,
 } from "@ipsi/types";
@@ -34,7 +35,6 @@ export async function loginAction(
     };
   }
 
-  // TODO: rate limit — 운영 전 실제 구현 연결 ([[packages/lib/src/rate-limit.ts]])
   const h = await headers();
   const rl = await checkRateLimit({
     name: "login",
@@ -120,7 +120,6 @@ export async function studentSignupAction(
   const consent = readConsent(formData, "student");
   if (consent.error) return consent.error;
 
-  // TODO: rate limit — 가입 폭주 방지
   const h = await headers();
   const rl = await checkRateLimit({
     name: "signup",
@@ -207,7 +206,6 @@ export async function parentSignupAction(
   const consent = readConsent(formData, "parent");
   if (consent.error) return consent.error;
 
-  // TODO: rate limit — 가입 폭주 방지
   const h = await headers();
   const rl = await checkRateLimit({
     name: "signup",
@@ -294,7 +292,6 @@ export async function sendPasswordResetAction(
 
   const h = await headers();
 
-  // TODO: rate limit — 메일 폭주/사용자 열거 보조 방어
   const rl = await checkRateLimit({
     name: "password-reset",
     key: email,
@@ -339,12 +336,12 @@ export async function updatePasswordAction(
   const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
   const fieldErrors: Record<string, string[]> = {};
-  if (password.length < 8)
-    fieldErrors.password = ["비밀번호는 8자 이상이어야 합니다"];
-  else if (!/[A-Za-z]/.test(password))
-    fieldErrors.password = ["영문을 포함해야 합니다"];
-  else if (!/[0-9]/.test(password))
-    fieldErrors.password = ["숫자를 포함해야 합니다"];
+  const parsedPassword = passwordSchema.safeParse(password);
+  if (!parsedPassword.success) {
+    fieldErrors.password = [
+      parsedPassword.error.issues[0]?.message ?? "비밀번호를 확인해주세요",
+    ];
+  }
 
   if (password !== passwordConfirm)
     fieldErrors.passwordConfirm = ["비밀번호가 일치하지 않습니다"];

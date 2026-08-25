@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { friendlyDbError } from "@ipsi/lib";
+import { friendlyDbError, sanitizeRichHtml } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
-import { passageWithQuestionsSchema } from "@ipsi/types";
+import { passageWithQuestionsSchema, type QuestionChoice } from "@ipsi/types";
 
 type Result = { ok: true; id: string } | { ok: false; message: string };
 
@@ -37,7 +37,7 @@ export async function createPassageWithQuestionsAction(
     .insert({
       title: parsed.passage.title,
       source_type: parsed.passage.source_type,
-      content: parsed.passage.content,
+      content: sanitizeRichHtml(parsed.passage.content),
       unit_major: parsed.passage.unit_major,
       unit_minor: parsed.passage.unit_minor ?? null,
       created_by: user.id,
@@ -55,9 +55,9 @@ export async function createPassageWithQuestionsAction(
   const rows = parsed.questions.map((q) => ({
     passage_id: passage.id,
     position_in_passage: q.position_in_passage,
-    stem: q.stem,
-    supplementary: q.supplementary ?? null,
-    choices: q.choices,
+    stem: sanitizeRichHtml(q.stem),
+    supplementary: q.supplementary ? sanitizeRichHtml(q.supplementary) : null,
+    choices: sanitizeChoices(q.choices),
     correct_answer: q.correct_answer,
     points: q.points,
     difficulty: q.difficulty ?? null,
@@ -135,7 +135,7 @@ export async function updatePassageWithQuestionsAction(
     .update({
       title: parsed.passage.title,
       source_type: parsed.passage.source_type,
-      content: parsed.passage.content,
+      content: sanitizeRichHtml(parsed.passage.content),
       unit_major: parsed.passage.unit_major,
       unit_minor: parsed.passage.unit_minor ?? null,
     })
@@ -148,9 +148,9 @@ export async function updatePassageWithQuestionsAction(
   const rows = parsed.questions.map((q) => ({
     passage_id: passageId,
     position_in_passage: q.position_in_passage,
-    stem: q.stem,
-    supplementary: q.supplementary ?? null,
-    choices: q.choices,
+    stem: sanitizeRichHtml(q.stem),
+    supplementary: q.supplementary ? sanitizeRichHtml(q.supplementary) : null,
+    choices: sanitizeChoices(q.choices),
     correct_answer: q.correct_answer,
     points: q.points,
     difficulty: q.difficulty ?? null,
@@ -191,4 +191,9 @@ export async function deletePassageAction(passageId: string): Promise<Result> {
 
   revalidatePath("/passages");
   return { ok: true, id: passageId };
+}
+
+/** 선지도 화면에서 HTML로 그려진다(`c.text`). 지문·발문과 같은 기준으로 거른다. */
+function sanitizeChoices(choices: QuestionChoice[]): QuestionChoice[] {
+  return choices.map((c) => ({ ...c, text: sanitizeRichHtml(c.text) }));
 }

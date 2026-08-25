@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { friendlyDbError } from "@ipsi/lib";
+import { headers } from "next/headers";
+import { friendlyDbError, logAdminAccess } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 
@@ -66,6 +67,17 @@ export async function approveProfileAction(
 
   if (error) return { ok: false, message: friendlyDbError(error) };
 
+  // 승인은 그 계정이 개인정보에 접근할 수 있게 되는 시점이다.
+  // 학부모 승인이면 어느 자녀에 연결했는지가 열람 범위 그 자체라 함께 남긴다.
+  await logAdminAccess({
+    actorId: check.adminId,
+    action: "member.approve",
+    targetType: "profile",
+    targetId: profileId,
+    detail: matchedStudentId ? { matchedStudentId } : null,
+    headers: await headers(),
+  });
+
   revalidatePath("/members/pending");
   return { ok: true };
 }
@@ -81,6 +93,15 @@ export async function rejectProfileAction(profileId: string): Promise<Result> {
     .eq("id", profileId);
 
   if (error) return { ok: false, message: friendlyDbError(error) };
+
+  await logAdminAccess({
+    actorId: check.adminId,
+    action: "member.reject",
+    targetType: "profile",
+    targetId: profileId,
+    headers: await headers(),
+  });
+
   revalidatePath("/members/pending");
   return { ok: true };
 }

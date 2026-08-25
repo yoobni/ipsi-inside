@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { BUSINESS_INFO, TERMS_EFFECTIVE_DATE } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 
@@ -27,7 +28,9 @@ export default function TermsPage() {
       <main className="mx-auto max-w-3xl px-6 py-10 space-y-8 text-sm leading-relaxed">
         <header className="space-y-1">
           <h1 className="font-display text-[28px] leading-tight">이용약관</h1>
-          <p className="text-muted-foreground text-xs">시행일: 2026년 6월 24일</p>
+          <p className="text-muted-foreground text-xs">
+            시행일: {TERMS_EFFECTIVE_DATE}
+          </p>
         </header>
 
         <Section title="제1조 (목적)">
@@ -147,19 +150,18 @@ export default function TermsPage() {
 
         <Section title="제12조 (사업자 정보)">
           <ul className="list-disc space-y-1 pl-5">
-            <li>상호: HYCO</li>
-            <li>대표자: 고유빈</li>
-            <li>사업자등록번호: 760-24-01825</li>
+            <li>상호: {BUSINESS_INFO.name}</li>
+            <li>대표자: {BUSINESS_INFO.representative}</li>
+            <li>사업자등록번호: {BUSINESS_INFO.registrationNumber}</li>
             <li>
-              주소: (22006) 인천광역시 연수구 센트럴로 313, C동 **층 **호 11-2
-              (송도동, 송도씨워크인테라스한라)
+              주소: ({BUSINESS_INFO.postalCode}) {BUSINESS_INFO.address}
             </li>
-            <li>연락처: 070-8080-2607</li>
+            <li>연락처: {BUSINESS_INFO.phone}</li>
           </ul>
         </Section>
 
         <footer className="text-muted-foreground border-hairline border-t pt-6 text-xs">
-          부칙 — 본 약관은 2026년 6월 24일부터 시행합니다.
+          부칙 — 본 약관은 {TERMS_EFFECTIVE_DATE}부터 시행합니다.
         </footer>
       </main>
     </div>

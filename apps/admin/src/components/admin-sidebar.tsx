@@ -11,6 +11,7 @@ import {
   Layers,
   Megaphone,
   NotebookPen,
+  ShieldCheck,
   UserCheck,
   Users,
   type LucideIcon,
@@ -84,6 +85,12 @@ const MENU: MenuItem[] = [
     label: "공지사항",
     icon: Megaphone,
     matchPrefix: "/announcements",
+  },
+  {
+    href: "/access-logs",
+    label: "접속기록",
+    icon: ShieldCheck,
+    matchPrefix: "/access-logs",
   },
 ];
 

@@ -162,6 +162,17 @@ export function ConsentChecks({
         <CollectionTable rows={MARKETING_ROWS} />
         <p className="mt-2">가입 후 [내 정보]에서 언제든 철회할 수 있어요.</p>
       </ConsentRow>
+      {/*
+        가입 시 이메일을 검증하지 않는다(email_confirm: true). 오타 주소를 적은
+        학생이 계정에 잠기는 걸 막으려는 선택이고, 대신 원장 승인이 실질 게이트다.
+        그 사실을 가입자에게 알려야 "아무나 남의 이메일로 가입된다"는 오해가 없다.
+        승인 시 대면·전화로 본인을 확인하는 절차는 docs/operations-privacy.md에 있다.
+      */}
+      <p className="text-muted-foreground border-hairline border-t pt-3 text-xs leading-relaxed">
+        가입 신청 후 원장의 승인을 거쳐야 서비스를 이용할 수 있습니다. 승인
+        과정에서 학원에 등록된 정보와 대조해 본인 확인을 진행하며, 확인되지
+        않으면 승인이 거절될 수 있습니다.
+      </p>
     </fieldset>
   );
 }

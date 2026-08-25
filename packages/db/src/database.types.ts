@@ -151,6 +151,66 @@ export type Database = {
         Relationships: [];
       };
 
+      // ─── 접속기록 (안전성 확보조치 고시 제8조) ──────────────────────────────
+      // 쓰기는 service_role만 — RLS에 insert 정책이 없다.
+      admin_access_logs: {
+        Row: {
+          id: string;
+          actor_id: string | null;
+          action: string;
+          target_type: string | null;
+          target_id: string | null;
+          detail: Json | null;
+          ip: string | null;
+          user_agent: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_id?: string | null;
+          action: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          detail?: Json | null;
+          ip?: string | null;
+          user_agent?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          actor_id?: string | null;
+          action?: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          detail?: Json | null;
+          ip?: string | null;
+          user_agent?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      // ─── 인증 시도 카운터 ───────────────────────────────────────────────────
+      // 직접 select/insert 하지 않는다 — consume_rate_limit()으로만 만진다.
+      rate_limit_hits: {
+        Row: {
+          bucket: string;
+          count: number;
+          window_started_at: string;
+        };
+        Insert: {
+          bucket: string;
+          count: number;
+          window_started_at?: string;
+        };
+        Update: {
+          bucket?: string;
+          count?: number;
+          window_started_at?: string;
+        };
+        Relationships: [];
+      };
+
       // ─── 학생 그룹(반) ───────────────────────────────────────────────────────
       student_groups: {
         Row: {
@@ -1007,6 +1067,22 @@ export type Database = {
           earned_points: number;
           score_percent: number;
         }[];
+      };
+      // 시험 제출 — 소유 확인·채점·기록을 원자적으로. 학생에게 UPDATE 권한을
+      // 주지 않기 위해 SECURITY DEFINER로 뺐다 (보안조사 H-1).
+      submit_attempt: {
+        Args: { p_attempt_id: string };
+        Returns: { score: number; total_points: number }[];
+      };
+      // 인증 시도 제한 — 증가와 판정이 한 문장에서 끝난다(경합 없음).
+      consume_rate_limit: {
+        Args: { p_bucket: string; p_limit: number; p_window_sec: number };
+        Returns: { allowed: boolean; retry_after_sec: number }[];
+      };
+      prune_rate_limit_hits: { Args: Record<string, never>; Returns: undefined };
+      prune_admin_access_logs: {
+        Args: Record<string, never>;
+        Returns: undefined;
       };
       attempt_unit_stats: {
         Args: { p_attempt_id: string };

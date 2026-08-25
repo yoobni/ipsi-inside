@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BUSINESS_INFO, PRIVACY_OFFICER } from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
 import { Button } from "@/components/ui/button";
@@ -259,10 +260,15 @@ export default async function HomePage() {
         </section>
       </main>
 
+      {/*
+        사업자 정보는 전자상거래법 제10조에 따라 **초기화면에** 있어야 한다.
+        약관·처리방침 안에만 두면 표시의무를 채우지 못한다.
+        값은 @ipsi/types의 BUSINESS_INFO 한 곳에서 온다.
+      */}
       <footer className="border-t border-hairline">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 px-6 py-6 text-sm text-muted-foreground md:flex-row md:items-center">
-          <Wordmark size="sm" />
-          <div className="flex flex-col items-start gap-2 md:flex-row md:items-center md:gap-5">
+        <div className="mx-auto max-w-6xl space-y-5 px-6 py-8 text-sm text-muted-foreground">
+          <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+            <Wordmark size="sm" />
             <nav className="flex items-center gap-4">
               <Link href="/terms" className="hover:text-foreground">
                 이용약관
@@ -271,7 +277,30 @@ export default async function HomePage() {
                 개인정보처리방침
               </Link>
             </nav>
-            <p>© {new Date().getFullYear()} 입시인사이드. All rights reserved.</p>
+          </div>
+
+          <div className="space-y-1 border-t border-hairline pt-5 text-xs leading-relaxed">
+            <p>
+              <span className="font-semibold text-foreground">
+                {BUSINESS_INFO.name}
+              </span>
+              <span className="mx-1.5 text-hairline">|</span>
+              대표자 {BUSINESS_INFO.representative}
+              <span className="mx-1.5 text-hairline">|</span>
+              사업자등록번호 {BUSINESS_INFO.registrationNumber}
+            </p>
+            <p>
+              ({BUSINESS_INFO.postalCode}) {BUSINESS_INFO.address}
+            </p>
+            <p>
+              전화 {BUSINESS_INFO.phone}
+              <span className="mx-1.5 text-hairline">|</span>
+              개인정보 보호책임자 {PRIVACY_OFFICER.name}
+              {PRIVACY_OFFICER.email ? ` (${PRIVACY_OFFICER.email})` : ""}
+            </p>
+            <p className="pt-2">
+              © {new Date().getFullYear()} 입시인사이드. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>

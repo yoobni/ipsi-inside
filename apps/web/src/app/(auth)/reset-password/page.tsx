@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AuthShell } from "@/components/auth-shell";
 import { ResetPasswordForm } from "./reset-password-form";
+import { PASSWORD_RULE_TEXT } from "@ipsi/types";
 
 export default function ResetPasswordPage() {
   return (
@@ -11,7 +12,7 @@ export default function ResetPasswordPage() {
             새 비밀번호 설정
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            영문과 숫자를 포함한 8자 이상으로 설정해주세요.
+            {PASSWORD_RULE_TEXT}으로 설정해주세요.
           </p>
         </div>
 

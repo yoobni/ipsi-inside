@@ -114,7 +114,13 @@ export async function saveAnswerAction(
 }
 
 /**
- * 시험 제출 — status='submitted', score/total_points 계산.
+ * 시험 제출.
+ *
+ * 점수 계산과 기록은 `submit_attempt()`(SECURITY DEFINER)가 한 번에 한다.
+ * 예전엔 여기서 rpc로 계산한 값을 클라이언트 세션으로 update 했는데,
+ * 그러려면 학생에게 test_attempts UPDATE 권한이 있어야 했고 그 권한으로
+ * 브라우저에서 직접 점수를 고칠 수 있었다(보안조사 H-1).
+ * 이제 학생에게 남은 건 SELECT와 응시 시작 INSERT뿐이다.
  */
 export async function submitAttemptAction(
   attemptId: string,
@@ -125,22 +131,12 @@ export async function submitAttemptAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "인증 필요" };
 
-  // 채점 결과 계산
-  const { data: rows } = await supabase.rpc("attempt_total_score", {
+  // 소유 확인·채점·기록이 함수 안에서 끝난다. 이미 제출된 응시면 값을 그대로 돌려준다.
+  const { data: submitted, error: uErr } = await supabase.rpc("submit_attempt", {
     p_attempt_id: attemptId,
   });
-  const totals = rows?.[0];
-
-  const { error: uErr } = await supabase
-    .from("test_attempts")
-    .update({
-      status: "submitted",
-      submitted_at: new Date().toISOString(),
-      score: totals?.earned_points ?? 0,
-      total_points: totals?.total_points ?? 0,
-    })
-    .eq("id", attemptId);
   if (uErr) return { ok: false, message: friendlyDbError(uErr) };
+  const totals = Array.isArray(submitted) ? submitted[0] : submitted;
 
   // 시험지/학생 메타 + admin 알림 발송
   const { data: att } = await supabase
@@ -184,7 +180,7 @@ export async function submitAttemptAction(
 
       const scoreStr =
         totals && totals.total_points > 0
-          ? ` ${totals.earned_points}/${totals.total_points}점`
+          ? ` ${totals.score}/${totals.total_points}점`
           : "";
       const attemptStr = att.attempt_no > 1 ? ` (${att.attempt_no}회차)` : "";
 

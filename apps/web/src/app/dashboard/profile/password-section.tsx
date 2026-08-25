@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { changeMyPasswordAction } from "./actions";
+import { PASSWORD_RULE_TEXT } from "@ipsi/types";
 
 /**
  * 비밀번호 변경. mustChange가 true면 원장이 발급한 임시 비밀번호를 쓰는
@@ -49,7 +50,9 @@ export function PasswordSection({ mustChange }: { mustChange: boolean }) {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="new_password">새 비밀번호 (8자 이상)</Label>
+          <Label htmlFor="new_password">
+            새 비밀번호 ({PASSWORD_RULE_TEXT})
+          </Label>
           <Input
             id="new_password"
             name="new_password"

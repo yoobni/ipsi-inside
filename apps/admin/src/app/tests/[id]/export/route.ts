@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { logAdminAccess } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { csvResponse, toCsv } from "@/lib/csv";
 
@@ -46,6 +48,16 @@ export async function GET(
   const profMap = new Map(
     (students ?? []).map((s) => [s.id, s] as const),
   );
+
+  // 이 CSV엔 이름·학교·학년에 더해 **전화번호**까지 들어간다.
+  await logAdminAccess({
+    actorId: user.id,
+    action: "test.export",
+    targetType: "test_sheet",
+    targetId: id,
+    detail: { sheet: sheet.title, students: studentIds.length },
+    headers: await headers(),
+  });
 
   const asgIds = (asgs ?? []).map((a) => a.id);
   const { data: attempts } =

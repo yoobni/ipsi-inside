@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { logAdminAccess } from "@ipsi/lib";
 import { formatPhone } from "@ipsi/lib/format";
 import { ResetPasswordButton } from "./reset-password-button";
 import { notFound } from "next/navigation";
@@ -25,6 +27,22 @@ export default async function MemberDetailPage({
     .eq("id", id)
     .maybeSingle();
   if (!member) notFound();
+
+  // 이름·연락처·학교가 화면에 뜨는 순간이 곧 개인정보 열람이다 — 남긴다.
+  // (안전성 확보조치 고시 제8조. proxy.ts가 admin+approved만 통과시키므로
+  //  여기 도달한 세션은 개인정보취급자다.)
+  const {
+    data: { user: viewer },
+  } = await supabase.auth.getUser();
+  if (viewer) {
+    await logAdminAccess({
+      actorId: viewer.id,
+      action: "member.view",
+      targetType: "profile",
+      targetId: member.id,
+      headers: await headers(),
+    });
+  }
 
   // 학생만 종합 리포트. 학부모/admin은 회원 목록으로 돌려보냄
   if (member.role !== "student") {

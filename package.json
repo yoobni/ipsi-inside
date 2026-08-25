@@ -20,5 +20,10 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion@1": "^1.1.18"
+    }
   }
 }

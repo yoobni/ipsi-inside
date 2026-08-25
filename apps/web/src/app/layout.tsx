@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Black_Han_Sans, Gamja_Flower, Nanum_Pen_Script } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
 import {
   SITE_DESCRIPTION,
@@ -8,6 +9,26 @@ import {
   SITE_URL,
 } from "@/lib/site";
 import "./globals.css";
+
+/**
+ * 본문 폰트 — 저장소에 넣고 self-host 한다.
+ *
+ * 예전엔 <link>로 jsdelivr CDN에서 받았다. 그러면 방문자 브라우저가 그 CDN에
+ * 직접 붙어 IP가 국외 제3자에게 전달되는데, 처리방침 §4(위탁)·§5(국외 이전)
+ * 목록엔 Supabase·Vercel만 적혀 있었다. 고지를 늘리는 것보다 요청을 없애는
+ * 쪽이 간단하다.
+ *
+ * next/font/google로 부르는 아래 장식용 폰트들은 빌드 타임에 받아 함께
+ * self-host되므로(런타임 요청 없음) 같은 문제가 없다.
+ *
+ * weight 범위는 원본 pretendardvariable.css의 `font-weight: 45 920`과 맞춘다.
+ */
+const pretendard = localFont({
+  src: "./fonts/PretendardVariable.woff2",
+  variable: "--font-pretendard",
+  display: "swap",
+  weight: "45 920",
+});
 
 const blackHanSans = Black_Han_Sans({
   weight: "400",
@@ -83,14 +104,8 @@ export default function RootLayout({
     <html
       lang="ko"
       suppressHydrationWarning
-      className={`${blackHanSans.variable} ${gamjaFlower.variable} ${nanumPen.variable} h-full`}
+      className={`${pretendard.variable} ${blackHanSans.variable} ${gamjaFlower.variable} ${nanumPen.variable} h-full`}
     >
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css"
-        />
-      </head>
       <body className="min-h-full flex flex-col antialiased">
         <ThemeProvider
           attribute="class"

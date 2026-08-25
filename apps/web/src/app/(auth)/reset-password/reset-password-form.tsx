@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { updatePasswordAction } from "../actions";
+import { PASSWORD_RULE_TEXT } from "@ipsi/types";
 
 export function ResetPasswordForm() {
   const [state, formAction, pending] = useActionState(
@@ -28,7 +29,7 @@ export function ResetPasswordForm() {
           name="password"
           type="password"
           autoComplete="new-password"
-          placeholder="영문+숫자 포함 8자 이상"
+          placeholder={PASSWORD_RULE_TEXT}
           required
           aria-invalid={!!fieldErrors?.password}
         />

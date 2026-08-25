@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { CONSENT_DOC_VERSIONS } from "@ipsi/types";
+import { CONSENT_DOC_VERSIONS, passwordSchema } from "@ipsi/types";
 import { extractClientIp, friendlyDbError } from "@ipsi/lib";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
@@ -123,6 +123,23 @@ export async function withdrawAction(
 
   // admin client로 마스킹 (RLS bypass — 사용자가 본인 status 변경 못 하는 정책 대비)
   const admin = createAdminSupabaseClient();
+
+  // 마스킹하면 원래 이름·번호를 잃는다. 다른 테이블에 흩어진 같은 값을 지우려면
+  // 지금 붙잡아 둬야 한다 — 아래 parent_signup_requests와 notifications 정리에 쓴다.
+  const { data: before } = await admin
+    .from("profiles")
+    .select("full_name, phone, role")
+    .eq("id", user.id)
+    .maybeSingle();
+  const originalName = before?.full_name?.trim() ?? null;
+  const originalPhone = before?.phone?.trim() ?? null;
+
+  // 링크를 지우기 전에 자녀 기록을 받아 본 학부모가 누구였는지 확보한다.
+  const { data: linkedParents } = await admin
+    .from("parent_student_links")
+    .select("parent_id")
+    .eq("student_id", user.id);
+
   const { error: updErr } = await admin
     .from("profiles")
     .update({
@@ -158,6 +175,28 @@ export async function withdrawAction(
     .delete()
     .eq("parent_id", user.id);
 
+  // **학생**이 탈퇴하면 이 테이블에 그 학생의 이름·전화가 남는다.
+  // 학부모가 가입할 때 자녀로 적어 넣은 값이라 parent_id가 학부모라서
+  // 위 delete로는 걸리지 않는다. 행 자체를 지우면 학부모 계정의 매칭
+  // 근거가 사라지므로 자녀 식별 정보만 지운다 — 처리방침 §6의
+  // "이름·휴대폰 번호 즉시 파기"가 가리키는 대상이다.
+  if (before?.role === "student") {
+    const masked = { student_full_name: "(탈퇴회원)", student_phone: "" };
+    // 승인되어 매칭이 끝난 행
+    await admin
+      .from("parent_signup_requests")
+      .update(masked)
+      .eq("matched_student_id", user.id);
+    // 아직 매칭 전인 행은 연결고리가 없다. 전화번호가 유일한 단서다.
+    if (originalPhone) {
+      await admin
+        .from("parent_signup_requests")
+        .update(masked)
+        .is("matched_student_id", null)
+        .eq("student_phone", originalPhone);
+    }
+  }
+
   // 플래너 인증사진은 학생의 얼굴·필기가 담긴 개인정보다. 탈퇴 후에도 스토리지에
   // 남아 있었다 — 프로필을 마스킹해도 사진은 익명화되지 않는다.
   // 경로 규칙은 `{user.id}/{uuid}.{ext}` (upload-proof.ts)라 폴더째 지운다.
@@ -181,6 +220,35 @@ export async function withdrawAction(
   // 처리방침에 고지한 보유기간이 "회원 탈퇴 시까지"다.
   await admin.from("consent_records").delete().eq("user_id", user.id);
 
+  // 알림에 이름이 박혀 있다. 본인 알림은 통째로,
+  // 남의 알림함에 들어간 것은 실명이 든 행만 지운다:
+  //   - 학부모: "{이름} 학생의 주간 플래너가 배정됐어요" (admin/planner/actions.ts)
+  //   - 원장:   "{이름} 일지 제출", "{이름} 시험 제출"
+  // 이 행들은 **받는 사람 소유**라 프로필을 마스킹해도 그대로 남는다.
+  await admin.from("notifications").delete().eq("user_id", user.id);
+
+  if (originalName) {
+    const { data: admins } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin");
+    const recipients = [
+      ...(linkedParents ?? []).map((l) => l.parent_id),
+      ...(admins ?? []).map((a) => a.id),
+    ];
+    if (recipients.length > 0) {
+      // like 와일드카드가 이름에 섞여 들어가지 않게 이스케이프한다.
+      const pattern = `%${originalName.replace(/[\\%_]/g, "\\$&")}%`;
+      // 동명이인이 있으면 그 학생의 알림도 함께 지워진다. 알림은 다시 만들 수
+      // 없는 기록이 아니고, 이름을 남겨두는 쪽이 더 큰 문제라 이렇게 둔다.
+      await admin
+        .from("notifications")
+        .delete()
+        .in("user_id", recipients)
+        .ilike("title", pattern);
+    }
+  }
+
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/login?withdrawn=1");
@@ -202,8 +270,12 @@ export async function changeMyPasswordAction(
   const confirm = String(formData.get("confirm_password") ?? "");
 
   if (!current) return { ok: false, message: "지금 쓰는 비밀번호를 입력해주세요" };
-  if (next.length < 8) {
-    return { ok: false, message: "새 비밀번호는 8자 이상으로 정해주세요" };
+  const parsedNext = passwordSchema.safeParse(next);
+  if (!parsedNext.success) {
+    return {
+      ok: false,
+      message: parsedNext.error.issues[0]?.message ?? "비밀번호를 확인해주세요",
+    };
   }
   if (next !== confirm) {
     return { ok: false, message: "새 비밀번호가 서로 달라요" };
@@ -230,8 +302,11 @@ export async function changeMyPasswordAction(
   const { error } = await supabase.auth.updateUser({ password: next });
   if (error) return { ok: false, message: error.message };
 
-  // 임시 비밀번호 잠금 해제
-  const { error: flagError } = await supabase
+  // 임시 비밀번호 잠금 해제.
+  // profiles는 본인이 이름·연락처·학교·학년만 쓸 수 있게 컬럼 권한을 좁혔다
+  // (보안조사 H-2 — 안 그러면 학생이 이 잠금을 스스로 풀 수 있다).
+  // 여기는 현재 비밀번호 확인을 이미 통과한 지점이라 service_role로 쓴다.
+  const { error: flagError } = await createAdminSupabaseClient()
     .from("profiles")
     .update({ must_change_password: false })
     .eq("id", user.id);
@@ -264,7 +339,9 @@ export async function setMarketingConsentAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "로그인이 필요합니다" };
 
-  const { error } = await supabase
+  // 동의 시각도 본인이 직접 못 쓴다(H-2와 같은 이유 — 증적이 조작되면 안 된다).
+  // 사용자의 선택은 여기서 받고, 기록은 서버가 남긴다.
+  const { error } = await createAdminSupabaseClient()
     .from("profiles")
     .update({ marketing_agreed_at: agreed ? new Date().toISOString() : null })
     .eq("id", user.id);
