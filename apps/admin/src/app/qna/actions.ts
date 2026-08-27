@@ -68,7 +68,9 @@ export async function saveAnswerAction(
   );
   if (error) return { ok: false, message: friendlyDbError(error) };
 
-  // 질문 상태 갱신 + (발행 시) 학생 알림
+  // 질문 상태를 답변 노출 여부와 일치시킨다. 발행하면 answered, 초안으로
+  // 되돌리면 open — 안 그러면 학생 화면엔 답변이 사라졌는데(발행취소) 질문은
+  // 계속 answered라 학생이 수정·삭제도 못 하는 상태가 된다.
   if (parsed.data.publish) {
     const { data: q } = await supabase
       .from("qna_questions")
@@ -88,6 +90,12 @@ export async function saveAnswerAction(
         link: "/dashboard/qna",
       });
     }
+  } else {
+    // 초안 저장(발행 안 함) = 학생에겐 아직 답변 없음
+    await supabase
+      .from("qna_questions")
+      .update({ status: "open" })
+      .eq("id", parsed.data.questionId);
   }
 
   revalidatePath("/qna");
@@ -128,13 +136,10 @@ export async function generateDraftAction(
   });
   if (!res.ok) return res;
 
-  // 생성 성공 시 ai_draft에 보관 (원장이 검수 후 body로 다듬어 발행)
-  await supabase
-    .from("qna_answers")
-    .upsert(
-      { question_id: questionId, ai_draft: res.draft, body: res.draft },
-      { onConflict: "question_id" },
-    );
+  // 초안은 화면(textarea)에만 채우고 DB엔 쓰지 않는다. 예전엔 여기서 body를
+  // 덮어썼는데, 이미 발행된 답변(published_at 있음)에 AI 초안을 다시 뽑으면
+  // 미검수 텍스트가 그대로 학생에게 노출됐다(qna-ai.ts 불변식 위반).
+  // 원장이 검수·수정한 뒤 saveAnswerAction으로 저장/발행해야 학생에게 나간다.
   return { ok: true, draft: res.draft };
 }
 

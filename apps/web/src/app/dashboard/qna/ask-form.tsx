@@ -52,8 +52,10 @@ export function AskForm({ categories }: { categories: Category[] }) {
     setError(null);
     const fd = new FormData();
     fd.set("categoryId", categoryId);
-    fd.set("referenceLabel", reference);
-    fd.set("questionNo", questionNo);
+    // 교재/문항은 needs_reference 카테고리에서만 의미가 있다. 다른 분류로
+    // 바꾼 뒤에도 이전에 입력한 값이 남아 저장되지 않도록 여기서 거른다.
+    fd.set("referenceLabel", needsRef ? reference : "");
+    fd.set("questionNo", needsRef ? questionNo : "");
     fd.set("body", body);
     if (imagePath) fd.set("imagePath", imagePath);
     startTransition(async () => {

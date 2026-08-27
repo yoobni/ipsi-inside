@@ -216,6 +216,18 @@ export async function withdrawAction(
     .update({ late_reason: null, photo_path: null })
     .eq("student_id", user.id);
 
+  // Q&A 질문(자유서술)과 첨부 사진 파기 — 플래너 인증사진과 같은 기준.
+  // 질문 행은 개인 식별 서술이라 통째로 지운다(답변도 cascade). 사진은 폴더째.
+  await admin.from("qna_questions").delete().eq("student_id", user.id);
+  const { data: qnaImgs } = await admin.storage
+    .from("qna-images")
+    .list(user.id, { limit: 1000 });
+  if (qnaImgs && qnaImgs.length > 0) {
+    await admin.storage
+      .from("qna-images")
+      .remove(qnaImgs.map((f) => `${user.id}/${f.name}`));
+  }
+
   // 동의 이력 파기 — profiles의 동의 시각 컬럼을 null로 지우는 것과 같은 기준.
   // 처리방침에 고지한 보유기간이 "회원 탈퇴 시까지"다.
   await admin.from("consent_records").delete().eq("user_id", user.id);

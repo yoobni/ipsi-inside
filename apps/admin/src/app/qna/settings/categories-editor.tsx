@@ -151,7 +151,7 @@ function CategoryForm({
         교재/문항 번호 입력 칸 표시
       </label>
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onDone}>
+        <Button variant="outline" onClick={onDone}>
           취소
         </Button>
         <Button onClick={save} disabled={pending || label.trim().length === 0}>

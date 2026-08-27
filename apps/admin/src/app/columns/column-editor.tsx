@@ -81,7 +81,7 @@ export function ColumnEditor({
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button asChild variant="ghost" size="lg">
+        <Button asChild variant="outline" size="lg">
           <Link href="/columns">취소</Link>
         </Button>
         <Button size="lg" onClick={save} disabled={pending}>
