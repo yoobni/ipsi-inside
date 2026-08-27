@@ -9,7 +9,9 @@ import {
   FileDown,
   FileText,
   Layers,
+  BookMarked,
   Megaphone,
+  MessagesSquare,
   NotebookPen,
   ShieldCheck,
   UserCheck,
@@ -85,6 +87,18 @@ const MENU: MenuItem[] = [
     label: "공지사항",
     icon: Megaphone,
     matchPrefix: "/announcements",
+  },
+  {
+    href: "/columns",
+    label: "칼럼",
+    icon: BookMarked,
+    matchPrefix: "/columns",
+  },
+  {
+    href: "/qna",
+    label: "Q&A",
+    icon: MessagesSquare,
+    matchPrefix: "/qna",
   },
   {
     href: "/access-logs",

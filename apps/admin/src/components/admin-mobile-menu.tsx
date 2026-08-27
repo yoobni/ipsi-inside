@@ -10,8 +10,10 @@ import {
   FileDown,
   FileText,
   Layers,
+  BookMarked,
   Megaphone,
   Menu,
+  MessagesSquare,
   NotebookPen,
   ShieldCheck,
   UserCheck,
@@ -39,6 +41,8 @@ const MENU: MenuItem[] = [
   { href: "/journals", label: "학습 일지", icon: NotebookPen, matchPrefix: "/journals" },
   { href: "/daily", label: "일일 마킹", icon: CalendarCheck, matchPrefix: "/daily" },
   { href: "/announcements", label: "공지사항", icon: Megaphone, matchPrefix: "/announcements" },
+  { href: "/columns", label: "칼럼", icon: BookMarked, matchPrefix: "/columns" },
+  { href: "/qna", label: "Q&A", icon: MessagesSquare, matchPrefix: "/qna" },
   { href: "/access-logs", label: "접속기록", icon: ShieldCheck, matchPrefix: "/access-logs" },
 ];
 

@@ -843,6 +843,154 @@ export type Database = {
         };
         Relationships: [];
       };
+      // ─── 칼럼 (원장 글 + 읽기완료 추적) ─────────────────────────────────────
+      columns: {
+        Row: {
+          id: string;
+          title: string;
+          body: string;
+          is_published: boolean;
+          published_at: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          body: string;
+          is_published?: boolean;
+          published_at?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          body?: string;
+          is_published?: boolean;
+          published_at?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      column_reads: {
+        Row: { column_id: string; student_id: string; read_at: string };
+        Insert: { column_id: string; student_id: string; read_at?: string };
+        Update: { column_id?: string; student_id?: string; read_at?: string };
+        Relationships: [];
+      };
+
+      // ─── Q&A ────────────────────────────────────────────────────────────────
+      qna_categories: {
+        Row: {
+          id: string;
+          label: string;
+          placeholder: string | null;
+          needs_reference: boolean;
+          position: number;
+          archived: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          label: string;
+          placeholder?: string | null;
+          needs_reference?: boolean;
+          position?: number;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          label?: string;
+          placeholder?: string | null;
+          needs_reference?: boolean;
+          position?: number;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      qna_questions: {
+        Row: {
+          id: string;
+          student_id: string;
+          category_id: string | null;
+          reference_label: string | null;
+          question_no: string | null;
+          body: string;
+          image_path: string | null;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          category_id?: string | null;
+          reference_label?: string | null;
+          question_no?: string | null;
+          body: string;
+          image_path?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          category_id?: string | null;
+          reference_label?: string | null;
+          question_no?: string | null;
+          body?: string;
+          image_path?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      qna_answers: {
+        Row: {
+          id: string;
+          question_id: string;
+          ai_draft: string | null;
+          body: string;
+          answered_by: string | null;
+          published_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          question_id: string;
+          ai_draft?: string | null;
+          body: string;
+          answered_by?: string | null;
+          published_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          question_id?: string;
+          ai_draft?: string | null;
+          body?: string;
+          answered_by?: string | null;
+          published_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
       planner_weeks: {
         Row: {
           id: string;
