@@ -11,7 +11,7 @@ import {
   studentSignupSchema,
   type ConsentKind,
 } from "@ipsi/types";
-import { checkRateLimit, extractClientIp } from "@ipsi/lib";
+import { checkRateLimit, extractClientIp, verifyTurnstile } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 
@@ -53,8 +53,20 @@ export async function loginAction(
   const intendedRole =
     formData.get("role") === "parent" ? "parent" : "student";
 
+  // 사람인지 확인 — 자동화된 무차별 대입을 앞단에서 끊는다 (보안조사 E-1)
+  const captcha = await verifyTurnstile(
+    formData.get("cf-turnstile-response") as string | null,
+    extractClientIp(h),
+  );
+  if (!captcha.ok) return { ok: false, message: captcha.message };
+
   const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  // captchaToken을 함께 넘기면 Supabase 대시보드 캡차가 켜졌을 때 Auth 측에서도
+  // 검증한다 — anon key로 Auth를 직접 때리는 우회 경로까지 막는 건 그쪽이다.
+  const { error } = await supabase.auth.signInWithPassword({
+    ...parsed.data,
+    options: { captchaToken: (formData.get("cf-turnstile-response") as string) || undefined },
+  });
   if (error) {
     return { ok: false, message: "이메일 또는 비밀번호가 올바르지 않습니다" };
   }
@@ -133,6 +145,14 @@ export async function studentSignupAction(
       message: `잠시 후 다시 시도해주세요 (${rl.retryAfterSec}초)`,
     };
   }
+
+  // 가입은 우리 서버가 admin API로 계정을 만든다 — Supabase 대시보드 캡차가
+  // 적용되지 않는 경로라, 대량 가입(보안조사 E-2)은 여기서 직접 막는다.
+  const captcha = await verifyTurnstile(
+    formData.get("cf-turnstile-response") as string | null,
+    extractClientIp(h),
+  );
+  if (!captcha.ok) return { ok: false, message: captcha.message };
 
   const admin = createAdminSupabaseClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -219,6 +239,14 @@ export async function parentSignupAction(
       message: `잠시 후 다시 시도해주세요 (${rl.retryAfterSec}초)`,
     };
   }
+
+  // 가입은 우리 서버가 admin API로 계정을 만든다 — Supabase 대시보드 캡차가
+  // 적용되지 않는 경로라, 대량 가입(보안조사 E-2)은 여기서 직접 막는다.
+  const captcha = await verifyTurnstile(
+    formData.get("cf-turnstile-response") as string | null,
+    extractClientIp(h),
+  );
+  if (!captcha.ok) return { ok: false, message: captcha.message };
 
   const admin = createAdminSupabaseClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -315,8 +343,15 @@ export async function sendPasswordResetAction(
     process.env.NEXT_PUBLIC_SITE_URL ??
     (host ? `${proto}://${host}` : "http://localhost:1234");
 
+  const captcha = await verifyTurnstile(
+    formData.get("cf-turnstile-response") as string | null,
+    extractClientIp(h),
+  );
+  if (!captcha.ok) return { ok: false, message: captcha.message };
+
   await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/callback?next=/reset-password`,
+    captchaToken: (formData.get("cf-turnstile-response") as string) || undefined,
   });
 
   // 가입 여부와 무관하게 동일 응답 (사용자 열거 공격 방지)

@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parentSignupAction } from "../actions";
 import { ConsentChecks } from "./consent-checks";
 import { PASSWORD_RULE_TEXT } from "@ipsi/types";
+import { TurnstileWidget } from "@/components/turnstile-widget";
 
 type FieldName =
   | "email"
@@ -100,6 +101,7 @@ export function ParentSignupForm() {
         }}
       />
 
+      <TurnstileWidget />
       <Button type="submit" disabled={pending} size="lg" className="w-full">
         {pending ? "가입 중..." : "학부모로 가입 신청"}
       </Button>

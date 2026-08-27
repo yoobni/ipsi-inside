@@ -26,3 +26,20 @@ export function getSupabaseServiceRoleKey(): string {
 export function getSupabaseAuthCookieName(): string | undefined {
   return process.env.NEXT_PUBLIC_SUPABASE_AUTH_COOKIE_NAME || undefined;
 }
+
+/**
+ * Cloudflare Turnstile(캡차) 키 — 둘 다 선택값이다.
+ *
+ * 미설정이면 캡차 기능이 통째로 꺼진다(위젯 안 뜸, 서버 검증 skip). 로컬 개발과
+ * 아직 대시보드 설정 전 단계를 막지 않기 위해서다. 운영에서 켜려면 site/secret을
+ * 모두 채우고, **Supabase 대시보드 Auth CAPTCHA도 함께 켜야** anon key로 Auth를
+ * 직접 때리는 무차별 대입(보안조사 E-1)까지 막힌다 — 우리 서버 검증만으로는
+ * 서버를 우회하는 공격을 못 막는다.
+ */
+export function getTurnstileSiteKey(): string | undefined {
+  return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined;
+}
+
+export function getTurnstileSecretKey(): string | undefined {
+  return process.env.TURNSTILE_SECRET_KEY || undefined;
+}

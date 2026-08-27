@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { sendPasswordResetAction } from "../actions";
+import { TurnstileWidget } from "@/components/turnstile-widget";
 
 export function ForgotPasswordForm() {
   const [state, formAction, pending] = useActionState(
@@ -39,6 +40,7 @@ export function ForgotPasswordForm() {
           required
         />
       </div>
+      <TurnstileWidget />
       <Button type="submit" disabled={pending} size="lg" className="w-full">
         {pending ? "보내는 중..." : "재설정 링크 받기"}
       </Button>

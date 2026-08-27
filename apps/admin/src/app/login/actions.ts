@@ -8,6 +8,7 @@ import {
   checkRateLimit,
   extractClientIp,
   pruneRateLimitBuckets,
+  verifyTurnstile,
 } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 
@@ -49,10 +50,17 @@ export async function adminLoginAction(
   // 만료 버킷 청소를 크론 대신 여기 얹는다 (실패해도 무시)
   void pruneRateLimitBuckets();
 
-  const supabase = await createServerSupabaseClient();
-  const { data: signIn, error } = await supabase.auth.signInWithPassword(
-    parsed.data,
+  const captcha = await verifyTurnstile(
+    formData.get("cf-turnstile-response") as string | null,
+    extractClientIp(h),
   );
+  if (!captcha.ok) return { ok: false, message: captcha.message };
+
+  const supabase = await createServerSupabaseClient();
+  const { data: signIn, error } = await supabase.auth.signInWithPassword({
+    ...parsed.data,
+    options: { captchaToken: (formData.get("cf-turnstile-response") as string) || undefined },
+  });
   if (error || !signIn.user) {
     return { ok: false, message: "이메일 또는 비밀번호가 올바르지 않습니다" };
   }

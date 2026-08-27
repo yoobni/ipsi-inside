@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loginAction } from "../actions";
+import { TurnstileWidget } from "@/components/turnstile-widget";
 
 export function LoginForm({ role = "student" }: { role?: "student" | "parent" }) {
   const [state, formAction, pending] = useActionState(loginAction, null);
@@ -57,6 +58,7 @@ export function LoginForm({ role = "student" }: { role?: "student" | "parent" })
           <p className="text-xs text-primary">{fieldErrors.password[0]}</p>
         )}
       </div>
+      <TurnstileWidget />
       <Button type="submit" disabled={pending} size="lg" className="w-full">
         {pending
           ? "로그인 중..."

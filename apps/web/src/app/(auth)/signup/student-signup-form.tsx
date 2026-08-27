@@ -15,6 +15,7 @@ import {
 import { studentSignupAction } from "../actions";
 import { ConsentChecks } from "./consent-checks";
 import { PASSWORD_RULE_TEXT } from "@ipsi/types";
+import { TurnstileWidget } from "@/components/turnstile-widget";
 
 type FieldName =
   | "email"
@@ -108,6 +109,7 @@ export function StudentSignupForm() {
           age14Confirmed: fieldErrors?.age14Confirmed,
         }}
       />
+      <TurnstileWidget />
       <Button type="submit" disabled={pending} size="lg" className="w-full">
         {pending ? "가입 중..." : "학생으로 가입 신청"}
       </Button>
