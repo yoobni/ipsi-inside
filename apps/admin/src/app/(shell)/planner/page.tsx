@@ -103,12 +103,17 @@ export default async function PlannerPage({
       weekStatus = week.status;
       weeklyComment = week.weekly_comment;
 
-      const { data: blockRows } = await supabase
-        .from("planner_blocks")
-        .select("id, day_of_week, start_min, end_min, kind, label, color, memo")
-        .eq("week_id", week.id)
-        .order("day_of_week")
-        .order("start_min");
+      // 블록과 이행 통계는 서로를 기다릴 이유가 없다 — 둘 다 week.id만 있으면
+      // 된다. 순서대로 await 하면 화면이 뜨기까지 왕복이 하나 더 늘어난다.
+      const [{ data: blockRows }, { data: statsJson }] = await Promise.all([
+        supabase
+          .from("planner_blocks")
+          .select("id, day_of_week, start_min, end_min, kind, label, color, memo")
+          .eq("week_id", week.id)
+          .order("day_of_week")
+          .order("start_min"),
+        supabase.rpc("planner_week_stats", { p_week_id: week.id }),
+      ]);
 
       const blockIds = (blockRows ?? []).map((b) => b.id);
       const { data: taskRows } = blockIds.length
@@ -134,9 +139,6 @@ export default async function PlannerPage({
       }));
 
       // 이행 통계는 SQL 함수가 한 번에 집계한다 (분자/분모만, 비율은 화면에서)
-      const { data: statsJson } = await supabase.rpc("planner_week_stats", {
-        p_week_id: week.id,
-      });
       const parsedStats = plannerWeekStatsSchema.safeParse(statsJson);
       stats = parsedStats.success ? parsedStats.data : null;
     }

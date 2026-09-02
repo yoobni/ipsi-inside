@@ -98,7 +98,13 @@ export async function savePlannerWeekAction(input: {
     weekId = created.id;
   }
 
-  // 2) 블록 diff
+  // 2) 블록 diff — 지울 것부터 정리한다.
+  //
+  // 저장은 드래그·편집 한 번마다 그 주 전체를 다시 보낸다. 예전엔 블록마다
+  // update/insert → 과제 select → 과제별 update/insert를 순서대로 await 해서,
+  // 블록 20·과제 30개인 주차를 한 칸 옮기는 데 왕복이 70번 넘게 났다.
+  // 신규 행의 id를 여기서 미리 만들어 두면 블록·과제를 각각 upsert 한 번으로
+  // 끝낼 수 있고, 왕복 수가 주차 크기와 무관해진다.
   const { data: currentBlocks } = await db
     .from("planner_blocks")
     .select("id")
@@ -122,84 +128,101 @@ export async function savePlannerWeekAction(input: {
     if (error) return { ok: false, message: friendlyDbError(error) };
   }
 
-  // 3) 블록별 upsert + 과제 diff
-  for (let i = 0; i < blocks.length; i++) {
-    const b = blocks[i];
-    const row = {
-      week_id: weekId,
-      day_of_week: b.day_of_week,
-      start_min: b.start_min,
-      end_min: b.end_min,
-      kind: b.kind,
-      label: b.label?.trim() || null,
-      color: b.color ?? null,
-      memo: b.memo?.trim() || null,
-      position: i + 1,
+  // 3) 블록 일괄 upsert.
+  //
+  // 유지 블록은 id를 그대로 둬야 과제 → planner_task_checks가 cascade로
+  // 날아가지 않는다(학생이 남긴 O/△/X 보존).
+  //
+  // 같은 id가 두 번 실려 오면 upsert 한 문장이 같은 행을 두 번 건드려 Postgres가
+  // 통째로 거부한다("ON CONFLICT DO UPDATE ... a second time"). 클라이언트가 보낸
+  // id는 믿지 않는다는 원칙대로, 두 번째부터는 신규 행으로 돌린다.
+  const usedBlockIds = new Set<string>();
+  const prepared = blocks.map((b, i) => {
+    const kept = !!b.id && keptBlockIds.has(b.id) && !usedBlockIds.has(b.id);
+    if (kept) usedBlockIds.add(b.id as string);
+    return {
+      incoming: b,
+      row: {
+        id: kept ? (b.id as string) : crypto.randomUUID(),
+        week_id: weekId,
+        day_of_week: b.day_of_week,
+        start_min: b.start_min,
+        end_min: b.end_min,
+        kind: b.kind,
+        label: b.label?.trim() || null,
+        color: b.color ?? null,
+        memo: b.memo?.trim() || null,
+        position: i + 1,
+      },
     };
+  });
 
-    let blockId: string;
-    if (b.id && keptBlockIds.has(b.id)) {
-      const { error } = await db
-        .from("planner_blocks")
-        .update(row)
-        .eq("id", b.id);
-      if (error) return { ok: false, message: friendlyDbError(error) };
-      blockId = b.id;
-    } else {
-      const { data: inserted, error } = await db
-        .from("planner_blocks")
-        .insert(row)
-        .select("id")
-        .single();
-      if (error || !inserted) {
-        return { ok: false, message: friendlyDbError(error) };
-      }
-      blockId = inserted.id;
-    }
+  if (prepared.length > 0) {
+    const { error } = await db
+      .from("planner_blocks")
+      .upsert(prepared.map((p) => p.row));
+    if (error) return { ok: false, message: friendlyDbError(error) };
+  }
 
-    const incomingTasks = b.kind === "korean" ? (b.tasks ?? []) : [];
-
-    const { data: currentTasks } = await db
-      .from("planner_tasks")
-      .select("id")
-      .eq("block_id", blockId);
-    const currentTaskIds = new Set((currentTasks ?? []).map((t) => t.id));
-
-    const keptTaskIds = new Set<string>();
-    incomingTasks.forEach((t) => {
-      if (t.id && currentTaskIds.has(t.id)) keptTaskIds.add(t.id);
-    });
-
-    const removedTaskIds = [...currentTaskIds].filter(
-      (id) => !keptTaskIds.has(id),
-    );
-    if (removedTaskIds.length > 0) {
-      const { error } = await db
+  // 4) 과제 diff — 유지 블록의 현재 과제를 한 번에 읽는다.
+  const keptBlockIdList = [...keptBlockIds];
+  const { data: currentTasks } = keptBlockIdList.length
+    ? await db
         .from("planner_tasks")
-        .delete()
-        .in("id", removedTaskIds);
-      if (error) return { ok: false, message: friendlyDbError(error) };
-    }
+        .select("id, block_id")
+        .in("block_id", keptBlockIdList)
+    : { data: [] };
 
-    for (let j = 0; j < incomingTasks.length; j++) {
-      const t = incomingTasks[j];
-      const taskRow = {
+  const currentTaskIdsByBlock = new Map<string, Set<string>>();
+  (currentTasks ?? []).forEach((t) => {
+    const set = currentTaskIdsByBlock.get(t.block_id) ?? new Set<string>();
+    set.add(t.id);
+    currentTaskIdsByBlock.set(t.block_id, set);
+  });
+
+  const keptTaskIds = new Set<string>();
+  const taskRows: {
+    id: string;
+    block_id: string;
+    tag_id: string | null;
+    title: string;
+    position: number;
+  }[] = [];
+
+  prepared.forEach((p) => {
+    const blockId = p.row.id;
+    const incomingTasks =
+      p.incoming.kind === "korean" ? (p.incoming.tasks ?? []) : [];
+    // 과제 id는 "같은 블록에 이미 있는 것"만 인정한다 — 블록 간 이동은
+    // UI에 없고, 남의 블록 과제 id를 보내 가로채는 것도 막는다.
+    const currentIds = currentTaskIdsByBlock.get(blockId) ?? new Set<string>();
+    incomingTasks.forEach((t, j) => {
+      const kept = !!t.id && currentIds.has(t.id) && !keptTaskIds.has(t.id);
+      if (kept) keptTaskIds.add(t.id as string);
+      taskRows.push({
+        id: kept ? (t.id as string) : crypto.randomUUID(),
         block_id: blockId,
         tag_id: t.tag_id ?? null,
         title: t.title.trim(),
         position: j + 1,
-      };
-      if (t.id && keptTaskIds.has(t.id)) {
-        const { error } = await db
-          .from("planner_tasks")
-          .update(taskRow)
-          .eq("id", t.id);
-        if (error) return { ok: false, message: friendlyDbError(error) };
-      } else {
-        const { error } = await db.from("planner_tasks").insert(taskRow);
-        if (error) return { ok: false, message: friendlyDbError(error) };
-      }
-    }
+      });
+    });
+  });
+
+  const removedTaskIds = (currentTasks ?? [])
+    .map((t) => t.id)
+    .filter((id) => !keptTaskIds.has(id));
+  if (removedTaskIds.length > 0) {
+    const { error } = await db
+      .from("planner_tasks")
+      .delete()
+      .in("id", removedTaskIds);
+    if (error) return { ok: false, message: friendlyDbError(error) };
+  }
+
+  if (taskRows.length > 0) {
+    const { error } = await db.from("planner_tasks").upsert(taskRows);
+    if (error) return { ok: false, message: friendlyDbError(error) };
   }
 
   revalidatePath("/planner");

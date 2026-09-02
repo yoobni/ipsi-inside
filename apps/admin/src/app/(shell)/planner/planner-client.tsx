@@ -78,6 +78,9 @@ export type PlannerTemplateChoice = {
 };
 type GroupChoice = { id: string; name: string };
 
+/** 저장이 멎은 뒤 통계·총평을 다시 읽어오기까지 기다리는 시간 */
+const STATS_REFRESH_DELAY_MS = 800;
+
 const ALL_GROUPS = "__all__";
 const NO_TAG = "__none__";
 
@@ -225,6 +228,30 @@ export function PlannerClient({
   };
 
   /**
+   * 저장 뒤 서버 화면 갱신 — 마지막 저장 한 번으로 모은다.
+   *
+   * 저장은 드래그·편집 한 번마다 일어난다. 그때마다 router.refresh()를 부르면
+   * 플래너 페이지 서버 렌더(쿼리 예닐곱 개)가 그 횟수만큼 다시 돌고, 라우터
+   * 캐시까지 비워져 곧바로 누른 메뉴 이동이 매번 콜드로 시작한다. 여기서
+   * 뒤늦게 맞으면 되는 값은 이행 통계·총평뿐이라 몰아서 한 번만 부른다.
+   * (블록 자체는 저장 응답(res.blocks)으로 이미 확정 상태에 맞춰진다)
+   */
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefresh = () => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      refreshTimer.current = null;
+      router.refresh();
+    }, STATS_REFRESH_DELAY_MS);
+  };
+  useEffect(
+    () => () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    },
+    [],
+  );
+
+  /**
    * 블록 배열이 바뀔 때마다 곧바로 서버에 저장 — 저장 버튼을 따로 두면 작업이 유실된다.
    *
    * 화면을 먼저 바꿔놓고(낙관적) 저장하므로, 실패하면 **반드시 되돌려야** 한다.
@@ -253,12 +280,16 @@ export function PlannerClient({
         else setMessage({ kind: "error", text: res.message });
         return;
       }
+      const hadWeekRow = currentWeekId !== null;
       // 서버가 돌려준 확정 상태로 정렬 (신규 행의 id를 받아야 다음 저장이 중복되지 않음)
       setBlocks(res.blocks);
       setCurrentWeekId(res.week_id);
       opts?.onOk?.();
       setMessage({ kind: "ok", text: "저장했어요" });
-      router.refresh();
+      // 첫 저장은 이때 비로소 주차 행이 생긴다 — 통계·총평 영역이 "저장 전"
+      // 안내에서 실제 화면으로 바뀌어야 하므로 미루지 않는다.
+      if (hadWeekRow) scheduleRefresh();
+      else router.refresh();
     });
   };
 

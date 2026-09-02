@@ -23,7 +23,8 @@ import {
   Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { uploadImageAction } from "@/app/passages/upload-image";
+// 라우트 그룹 (shell) 안에 있다 — 그룹 이름은 URL엔 안 들어가지만 경로에는 남는다
+import { uploadImageAction } from "@/app/(shell)/passages/upload-image";
 
 type Props = {
   value: string;
