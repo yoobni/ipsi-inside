@@ -17,21 +17,23 @@ export async function getMyNotifications(
   limit = 20,
 ): Promise<{ items: NotificationItem[]; unreadCount: number }> {
   const nowIso = new Date().toISOString();
-  const { data } = await supabase
-    .from("notifications")
-    .select("id, type, title, body, link, read_at, created_at")
-    .eq("user_id", userId)
-    .lte("created_at", nowIso)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  // 목록과 안 읽은 개수는 서로 독립 — 한 번에
+  const [{ data }, { count: unread }] = await Promise.all([
+    supabase
+      .from("notifications")
+      .select("id, type, title, body, link, read_at, created_at")
+      .eq("user_id", userId)
+      .lte("created_at", nowIso)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .is("read_at", null)
+      .lte("created_at", nowIso),
+  ]);
   const items = (data ?? []) as NotificationItem[];
-
-  const { count: unread } = await supabase
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .is("read_at", null)
-    .lte("created_at", nowIso);
 
   return { items, unreadCount: unread ?? 0 };
 }

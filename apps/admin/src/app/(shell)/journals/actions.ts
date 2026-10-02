@@ -3,27 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
 import { journalFeedbackSchema } from "@ipsi/types";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
+import { ensureAdmin } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; message: string };
-
-async function ensureAdmin(): Promise<{ adminId: string } | { error: Result }> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: { ok: false, message: "로그인이 필요합니다" } };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, status")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (profile?.role !== "admin" || profile?.status !== "approved") {
-    return { error: { ok: false, message: "권한이 없습니다" } };
-  }
-  return { adminId: user.id };
-}
 
 /**
  * 피드백 저장 (초안 — publish_at 변경 안 함)

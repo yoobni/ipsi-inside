@@ -32,10 +32,16 @@ export default async function JournalArchivePage({
     redirect("/dashboard/journal");
   }
 
+  // 알림은 대상 학생과 무관 — 아래 조회들과 겹쳐 보낸다
+  const notifP = getMyNotifications(supabase, state.userId);
+
   // 대상 학생 결정
   let targetStudentIds: string[] = [];
   let studentChoices: { id: string; full_name: string }[] = [];
   let selectedStudentId: string | null = null;
+  // 학부모: 자녀 이름 조회는 대상 결정(링크)에만 기대므로 일지 조회와 겹친다
+  let profsP: PromiseLike<{ data: { id: string; full_name: string }[] | null }> =
+    Promise.resolve({ data: null });
 
   if (state.role === "student") {
     targetStudentIds = [state.userId];
@@ -47,14 +53,10 @@ export default async function JournalArchivePage({
       .eq("parent_id", state.userId);
     const childIds = (links ?? []).map((l) => l.student_id);
     if (childIds.length > 0) {
-      const { data: profs } = await supabase
+      profsP = supabase
         .from("profiles")
         .select("id, full_name")
         .in("id", childIds);
-      studentChoices = (profs ?? []).map((p) => ({
-        id: p.id,
-        full_name: p.full_name,
-      }));
       const queryStudent = sp.studentId;
       selectedStudentId =
         queryStudent && childIds.includes(queryStudent) ? queryStudent : (childIds[0] ?? null);
@@ -63,7 +65,7 @@ export default async function JournalArchivePage({
   }
 
   if (targetStudentIds.length === 0) {
-    const earlyNotif = await getMyNotifications(supabase, state.userId);
+    const earlyNotif = await notifP;
     return (
       <Shell notif={earlyNotif}>
         <p className="text-muted-foreground text-sm">연결된 학생이 없어요.</p>
@@ -76,28 +78,41 @@ export default async function JournalArchivePage({
   const nextMonth = new Date(Date.UTC(year, monthNum, 1));
   const monthEnd = `${nextMonth.getUTCFullYear()}-${String(nextMonth.getUTCMonth() + 1).padStart(2, "0")}-01`;
 
-  const { data: journals } = await supabase
-    .from("study_journals")
-    .select(
-      "id, journal_date, content, class_question, test_question, message_to_teacher, learning_log",
-    )
-    .in("student_id", targetStudentIds)
-    .gte("journal_date", monthStart)
-    .lt("journal_date", monthEnd)
-    .order("journal_date");
+  // 일지 → 피드백은 순차(피드백이 일지 id에 기댄다). 자녀 이름·알림과는 독립.
+  const [{ journals, feedbacks }, { data: profs }, notif] = await Promise.all([
+    (async () => {
+      const { data: journals } = await supabase
+        .from("study_journals")
+        .select(
+          "id, journal_date, content, class_question, test_question, message_to_teacher, learning_log",
+        )
+        .in("student_id", targetStudentIds)
+        .gte("journal_date", monthStart)
+        .lt("journal_date", monthEnd)
+        .order("journal_date");
 
-  const journalIds = (journals ?? []).map((j) => j.id);
-  const { data: feedbacks } =
-    journalIds.length > 0
-      ? await supabase
-          .from("journal_feedbacks")
-          .select(
-            "journal_id, overall_comment, better_than_yesterday, worse_than_yesterday, must_fix_tomorrow, publish_at",
-          )
-          .in("journal_id", journalIds)
-          .not("publish_at", "is", null)
-          .lte("publish_at", new Date().toISOString())
-      : { data: [] };
+      const journalIds = (journals ?? []).map((j) => j.id);
+      const { data: feedbacks } =
+        journalIds.length > 0
+          ? await supabase
+              .from("journal_feedbacks")
+              .select(
+                "journal_id, overall_comment, better_than_yesterday, worse_than_yesterday, must_fix_tomorrow, publish_at",
+              )
+              .in("journal_id", journalIds)
+              .not("publish_at", "is", null)
+              .lte("publish_at", new Date().toISOString())
+          : { data: [] };
+      return { journals, feedbacks };
+    })(),
+    profsP,
+    notifP,
+  ]);
+
+  studentChoices = (profs ?? []).map((p) => ({
+    id: p.id,
+    full_name: p.full_name,
+  }));
 
   const feedbackByJournalId = new Map(
     (feedbacks ?? []).map((f) => [f.journal_id, f] as const),
@@ -120,8 +135,6 @@ export default async function JournalArchivePage({
       feedback: feedbackByJournalId.get(j.id) ?? null,
     };
   });
-
-  const notif = await getMyNotifications(supabase, state.userId);
 
   return (
     <Shell notif={notif}>

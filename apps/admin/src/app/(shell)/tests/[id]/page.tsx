@@ -19,44 +19,106 @@ export default async function TestDetailPage({
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
 
-  const { data: sheet } = await supabase
-    .from("test_sheets")
-    .select(
-      "id, title, description, target_school, target_grade, open_at, due_at, allow_retake, max_attempts, created_at",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  // 시험지 id만 있으면 되는 조회는 전부 한 번에 보낸다.
+  // (시험지가 없으면 나머지는 빈 결과로 끝나고 아래에서 notFound)
+  const [
+    { data: sheet },
+    { data: tsq },
+    { data: assignments },
+    { data: allStudents },
+    { data: groups },
+    { data: memberships },
+  ] = await Promise.all([
+    supabase
+      .from("test_sheets")
+      .select(
+        "id, title, description, target_school, target_grade, open_at, due_at, allow_retake, max_attempts, created_at",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    // 시험지 문항
+    supabase
+      .from("test_sheet_questions")
+      .select("position, question_id")
+      .eq("test_sheet_id", id)
+      .order("position"),
+    // 배정 학생 — 정답률 집계(제출 attempt)와 배정 목록이 같이 쓴다
+    supabase
+      .from("test_assignments")
+      .select("id, student_id, assigned_at, assigned_by_school")
+      .eq("test_sheet_id", id),
+    // 배정 가능한 학생 (승인된 학생 - 이미 배정된 학생 제외)
+    supabase
+      .from("profiles")
+      .select("id, full_name, phone, school, grade")
+      .eq("role", "student")
+      .eq("status", "approved")
+      .order("full_name"),
+    // 그룹 목록(현재 멤버 수 포함) — 배정 드로어 "그룹" 탭용
+    supabase
+      .from("student_groups")
+      .select("id, name")
+      .eq("archived", false)
+      .order("name"),
+    supabase.from("group_members").select("group_id"),
+  ]);
   if (!sheet) notFound();
 
-  // 시험지 문항
-  const { data: tsq } = await supabase
-    .from("test_sheet_questions")
-    .select("position, question_id")
-    .eq("test_sheet_id", id)
-    .order("position");
-
   const questionIds = (tsq ?? []).map((r) => r.question_id);
+  const studentIds = (assignments ?? []).map((a) => a.student_id);
+  const assignmentIds = (assignments ?? []).map((a) => a.id);
 
-  const { data: questions } =
-    questionIds.length > 0
-      ? await supabase
-          .from("questions")
-          .select(
-            "id, passage_id, position_in_passage, stem, supplementary, choices, correct_answer, points, difficulty",
-          )
-          .in("id", questionIds)
-      : { data: [] };
+  // 문항·응시·학생 프로필은 서로 독립
+  const [{ data: questions }, { data: attempts }, { data: studentProfiles }] =
+    await Promise.all([
+      questionIds.length > 0
+        ? supabase
+            .from("questions")
+            .select(
+              "id, passage_id, position_in_passage, stem, supplementary, choices, correct_answer, points, difficulty",
+            )
+            .in("id", questionIds)
+        : Promise.resolve({ data: [] }),
+      assignmentIds.length > 0
+        ? supabase
+            .from("test_attempts")
+            .select(
+              "id, assignment_id, attempt_no, status, score, total_points, submitted_at",
+            )
+            .in("assignment_id", assignmentIds)
+            .order("attempt_no", { ascending: false })
+        : Promise.resolve({ data: [] }),
+      studentIds.length > 0
+        ? supabase
+            .from("profiles")
+            .select("id, full_name, phone, school, grade")
+            .in("id", studentIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+  // 문항별 정답률 집계 (제출된 attempt만) — 위 응시 목록에서 뽑는다
+  const submittedAttemptIdsForSheet = (attempts ?? [])
+    .filter((a) => a.status === "submitted")
+    .map((a) => a.id);
 
   const passageIds = Array.from(
     new Set((questions ?? []).map((q) => q.passage_id)),
   );
-  const { data: passages } =
+  const [{ data: passages }, { data: answers }] = await Promise.all([
     passageIds.length > 0
-      ? await supabase
+      ? supabase
           .from("passages")
           .select("id, title, source_type, unit_major, content")
           .in("id", passageIds)
-      : { data: [] };
+      : Promise.resolve({ data: [] }),
+    submittedAttemptIdsForSheet.length > 0 && questionIds.length > 0
+      ? supabase
+          .from("student_answers")
+          .select("question_id, is_correct")
+          .in("attempt_id", submittedAttemptIdsForSheet)
+          .in("question_id", questionIds)
+      : Promise.resolve({ data: [] }),
+  ]);
 
   const passageMap = new Map(
     (passages ?? []).map((p) => [p.id, p] as const),
@@ -93,36 +155,13 @@ export default async function TestDetailPage({
     })
     .filter((x): x is PreviewQuestion => x !== null);
 
-  // 문항별 정답률 집계 (제출된 attempt만)
-  const submittedAttemptIdsForSheet = await (async () => {
-    const { data: asgs } = await supabase
-      .from("test_assignments")
-      .select("id")
-      .eq("test_sheet_id", id);
-    const aIds = (asgs ?? []).map((a) => a.id);
-    if (aIds.length === 0) return [];
-    const { data: ats } = await supabase
-      .from("test_attempts")
-      .select("id")
-      .in("assignment_id", aIds)
-      .eq("status", "submitted");
-    return (ats ?? []).map((a) => a.id);
-  })();
-
   const perQuestion = new Map<string, { correct: number; total: number }>();
-  if (submittedAttemptIdsForSheet.length > 0 && questionIds.length > 0) {
-    const { data: answers } = await supabase
-      .from("student_answers")
-      .select("question_id, is_correct")
-      .in("attempt_id", submittedAttemptIdsForSheet)
-      .in("question_id", questionIds);
-    (answers ?? []).forEach((a) => {
-      const cur = perQuestion.get(a.question_id) ?? { correct: 0, total: 0 };
-      cur.total += 1;
-      if (a.is_correct) cur.correct += 1;
-      perQuestion.set(a.question_id, cur);
-    });
-  }
+  (answers ?? []).forEach((a) => {
+    const cur = perQuestion.get(a.question_id) ?? { correct: 0, total: 0 };
+    cur.total += 1;
+    if (a.is_correct) cur.correct += 1;
+    perQuestion.set(a.question_id, cur);
+  });
 
   const questionStats = orderedQuestions
     .map(({ position, q }) => {
@@ -137,33 +176,6 @@ export default async function TestDetailPage({
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
-
-  // 배정 학생
-  const { data: assignments } = await supabase
-    .from("test_assignments")
-    .select("id, student_id, assigned_at, assigned_by_school")
-    .eq("test_sheet_id", id);
-
-  const studentIds = (assignments ?? []).map((a) => a.student_id);
-  const { data: studentProfiles } =
-    studentIds.length > 0
-      ? await supabase
-          .from("profiles")
-          .select("id, full_name, phone, school, grade")
-          .in("id", studentIds)
-      : { data: [] };
-
-  const assignmentIds = (assignments ?? []).map((a) => a.id);
-  const { data: attempts } =
-    assignmentIds.length > 0
-      ? await supabase
-          .from("test_attempts")
-          .select(
-            "id, assignment_id, attempt_no, status, score, total_points, submitted_at",
-          )
-          .in("assignment_id", assignmentIds)
-          .order("attempt_no", { ascending: false })
-      : { data: [] };
 
   // 학생별 최신 attempt
   const latestAttemptByAssignment = new Map<
@@ -200,14 +212,6 @@ export default async function TestDetailPage({
     };
   });
 
-  // 배정 가능한 학생 (승인된 학생 - 이미 배정된 학생 제외)
-  const { data: allStudents } = await supabase
-    .from("profiles")
-    .select("id, full_name, phone, school, grade")
-    .eq("role", "student")
-    .eq("status", "approved")
-    .order("full_name");
-
   const alreadyAssigned = new Set(studentIds);
   const availableStudents: AvailableStudent[] = (allStudents ?? [])
     .filter((s) => !alreadyAssigned.has(s.id))
@@ -227,15 +231,6 @@ export default async function TestDetailPage({
     ),
   ).sort();
 
-  // 그룹 목록(현재 멤버 수 포함) — 배정 드로어 "그룹" 탭용
-  const [{ data: groups }, { data: memberships }] = await Promise.all([
-    supabase
-      .from("student_groups")
-      .select("id, name")
-      .eq("archived", false)
-      .order("name"),
-    supabase.from("group_members").select("group_id"),
-  ]);
   const countByGroup = new Map<string, number>();
   (memberships ?? []).forEach((mm) =>
     countByGroup.set(mm.group_id, (countByGroup.get(mm.group_id) ?? 0) + 1),

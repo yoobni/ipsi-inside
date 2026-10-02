@@ -34,8 +34,11 @@ export default async function MaterialsPage() {
     );
   }
 
-  const notif = await getMyNotifications(supabase, state.userId);
-  const materials = await getActiveMaterials(supabase);
+  // 알림과 자료 목록은 서로 독립 — 한 번에 보낸다
+  const [notif, materials] = await Promise.all([
+    getMyNotifications(supabase, state.userId),
+    getActiveMaterials(supabase),
+  ]);
 
   return (
     <Shell notifItems={notif.items} unreadCount={notif.unreadCount}>

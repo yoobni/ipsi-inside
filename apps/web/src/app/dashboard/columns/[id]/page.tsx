@@ -26,23 +26,24 @@ export default async function ColumnDetailPage({
   if (state.kind === "ok" && state.status !== "approved") redirect("/pending");
   if (state.kind !== "ok") return null;
 
-  const { data: col } = await supabase
-    .from("columns")
-    .select("id, title, body, published_at")
-    .eq("id", id)
-    .maybeSingle();
-  if (!col) notFound();
-
-  const { data: read } =
+  // 칼럼·읽음 여부·알림을 한 번에. 읽음 조회는 본인 행만(RLS)이라 칼럼이
+  // 안 보여 404가 나면 결과는 그냥 버려진다.
+  const [{ data: col }, { data: read }, notif] = await Promise.all([
+    supabase
+      .from("columns")
+      .select("id, title, body, published_at")
+      .eq("id", id)
+      .maybeSingle(),
     state.role === "student"
-      ? await supabase
+      ? supabase
           .from("column_reads")
           .select("column_id")
           .eq("column_id", id)
           .maybeSingle()
-      : { data: null };
-
-  const notif = await getMyNotifications(supabase, state.userId);
+      : Promise.resolve({ data: null }),
+    getMyNotifications(supabase, state.userId),
+  ]);
+  if (!col) notFound();
 
   return (
     <Shell notifItems={notif.items} unreadCount={notif.unreadCount}>

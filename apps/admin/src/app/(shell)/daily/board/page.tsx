@@ -48,20 +48,21 @@ export default async function DailyBoardPage({
 
   const supabase = await createServerSupabaseClient();
 
-  const { data: groups } = await supabase
-    .from("student_groups")
-    .select("id, name")
-    .eq("archived", false)
-    .order("name");
-
-  let memberIds: string[] | null = null;
-  if (groupId) {
-    const { data: members } = await supabase
-      .from("group_members")
-      .select("student_id")
-      .eq("group_id", groupId);
-    memberIds = (members ?? []).map((m) => m.student_id);
-  }
+  // 그룹 목록(필터용) + 선택 그룹의 멤버 — 서로 독립이라 한 번에
+  const [{ data: groups }, memberIds] = await Promise.all([
+    supabase
+      .from("student_groups")
+      .select("id, name")
+      .eq("archived", false)
+      .order("name"),
+    groupId
+      ? supabase
+          .from("group_members")
+          .select("student_id")
+          .eq("group_id", groupId)
+          .then(({ data: members }) => (members ?? []).map((m) => m.student_id))
+      : Promise.resolve<string[] | null>(null),
+  ]);
 
   let studentQuery = supabase
     .from("profiles")

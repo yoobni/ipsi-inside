@@ -70,18 +70,23 @@ export async function submitPlannerChecksAction(
       }),
     ),
   );
-  const { data: weeks } = await supabase
-    .from("planner_weeks")
-    .select("id, week_start, student_id, status")
-    .in("id", weekIds);
-  const weekById = new Map((weeks ?? []).map((w) => [w.id, w]));
-
+  // 주차(소유·발행·날짜 검증용)와 기존 체크는 서로 독립 — 한 번에 읽는다.
+  // 기존 체크는 읽기만 하고(RLS), 아래 검증이 실패하면 쓰이지 않고 버려진다.
+  //
   // 이미 붙어 있는 사진 경로. 상태만 다시 누른 요청(photo_path 미포함)에서
   // 사진이 조용히 날아가지 않게 이어받고, 교체·해제된 파일은 버킷에서 지운다.
-  const { data: prevChecks } = await supabase
-    .from("planner_task_checks")
-    .select("task_id, photo_path")
-    .in("task_id", taskIds);
+  const [{ data: weeks }, { data: prevChecks }] = await Promise.all([
+    supabase
+      .from("planner_weeks")
+      .select("id, week_start, student_id, status")
+      .in("id", weekIds),
+    supabase
+      .from("planner_task_checks")
+      .select("task_id, photo_path")
+      .in("task_id", taskIds),
+  ]);
+  const weekById = new Map((weeks ?? []).map((w) => [w.id, w]));
+
   const prevPhoto = new Map(
     (prevChecks ?? []).map((c) => [c.task_id, c.photo_path]),
   );

@@ -27,17 +27,17 @@ export default async function DashboardPage() {
   if (state.kind === "guest") redirect("/login");
   if (state.kind === "ok" && state.status !== "approved") redirect("/pending");
 
-  // 학생/학부모일 때 일지 + 발행된 피드백 조회
   const today = todayKst();
-  let todaysJournal: {
+
+  type TodaysJournal = {
     class_question: string | null;
     test_question: string | null;
     message_to_teacher: string | null;
     learning_log: string | null;
     submitted_at: string;
     updated_at: string;
-  } | null = null;
-  let latestPublishedFeedback: {
+  };
+  type PublishedFeedback = {
     feedback: {
       overall_comment: string | null;
       better_than_yesterday: string | null;
@@ -47,10 +47,29 @@ export default async function DashboardPage() {
     };
     journalDate: string;
     studentName?: string;
-  } | null = null;
+  };
+
+  let todaysJournal: TodaysJournal | null = null;
+  let latestPublishedFeedback: PublishedFeedback | null = null;
+  // 최근 7일 일일 마킹 (학생/학부모 공통)
+  let weeklyDays: { date: string; record: DailyRecord | null }[] = [];
+  let weeklyStudentName: string | undefined;
+  // 오늘 국어 플래너 진행률 — 학생/학부모 모두 홈에서 한눈에
+  let plannerToday: { total: number; checked: number } | null = null;
+  let notif: Awaited<ReturnType<typeof getMyNotifications>> = {
+    items: [],
+    unreadCount: 0,
+  };
+  let announcements: Awaited<ReturnType<typeof getActiveAnnouncements>> = [];
 
   if (state.kind === "ok") {
-    // 학생: 본인 일지/피드백 / 학부모: 자녀
+    // 알림·공지는 대상 학생과 무관 — 자녀 링크 조회를 기다리지 않고 먼저 띄운다
+    const notifP = getMyNotifications(supabase, state.userId);
+    const announcementsP = getActiveAnnouncements(supabase);
+
+    // 학생: 본인 / 학부모: 자녀 전체. 예전엔 피드백용(전체)·주간용(limit 1)으로
+    // 링크를 두 번 읽었는데 같은 테이블·같은 조건이라 한 번으로 합쳤다.
+    // 주간 마킹·플래너 카드는 첫 자녀 기준(기존과 동일하게 정렬 없음).
     const targetStudentIds: string[] =
       state.role === "student"
         ? [state.userId]
@@ -61,47 +80,44 @@ export default async function DashboardPage() {
               .eq("parent_id", state.userId);
             return (links ?? []).map((l) => l.student_id);
           })();
+    const targetStudentId: string | null = targetStudentIds[0] ?? null;
 
-    // 학생: 오늘 일지 조회
-    if (state.role === "student") {
-      const { data: j } = await supabase
-        .from("study_journals")
-        .select(
-          "class_question, test_question, message_to_teacher, learning_log, content, submitted_at, updated_at",
-        )
-        .eq("student_id", state.userId)
-        .eq("journal_date", today)
-        .maybeSingle();
-      if (j) {
-        // 4갈래가 모두 비어있고 content만 있는 옛 레코드는 message_to_teacher로 폴백
-        const hasNew =
-          !!j.class_question ||
-          !!j.test_question ||
-          !!j.message_to_teacher ||
-          !!j.learning_log;
-        todaysJournal = {
-          class_question: j.class_question,
-          test_question: j.test_question,
-          message_to_teacher:
-            !hasNew && j.content ? j.content : j.message_to_teacher,
-          learning_log: j.learning_log,
-          submitted_at: j.submitted_at,
-          updated_at: j.updated_at,
-        };
-      }
-    }
+    // 아래 묶음은 서로 결과를 쓰지 않는다 — 한 번에 보낸다.
+    // 각 묶음 안의 단계(피드백·플래너)는 앞 결과로 다음 조회를 정하므로 순차 유지.
+    const [
+      journalRes,
+      feedbackRes,
+      childNames,
+      records,
+      plannerRes,
+      notifRes,
+      announcementsRes,
+    ] = await Promise.all([
+      // 학생: 오늘 일지 조회
+      state.role === "student"
+        ? supabase
+            .from("study_journals")
+            .select(
+              "class_question, test_question, message_to_teacher, learning_log, content, submitted_at, updated_at",
+            )
+            .eq("student_id", state.userId)
+            .eq("journal_date", today)
+            .maybeSingle()
+            .then((r) => r.data)
+        : Promise.resolve(null),
 
-    // 가장 최근 발행된 피드백 (학생 본인 또는 자녀 중 누구든)
-    if (targetStudentIds.length > 0) {
-      const { data: journals } = await supabase
-        .from("study_journals")
-        .select("id, journal_date, student_id")
-        .in("student_id", targetStudentIds)
-        .order("journal_date", { ascending: false })
-        .limit(20);
+      // 가장 최근 발행된 피드백 (학생 본인 또는 자녀 중 누구든)
+      (async () => {
+        if (targetStudentIds.length === 0) return null;
+        const { data: journals } = await supabase
+          .from("study_journals")
+          .select("id, journal_date, student_id")
+          .in("student_id", targetStudentIds)
+          .order("journal_date", { ascending: false })
+          .limit(20);
 
-      const journalIds = (journals ?? []).map((j) => j.id);
-      if (journalIds.length > 0) {
+        const journalIds = (journals ?? []).map((j) => j.id);
+        if (journalIds.length === 0) return null;
         const { data: feedbacks } = await supabase
           .from("journal_feedbacks")
           .select(
@@ -114,139 +130,145 @@ export default async function DashboardPage() {
           .limit(1);
 
         const fb = (feedbacks ?? [])[0];
-        if (fb) {
-          const j = (journals ?? []).find((j) => j.id === fb.journal_id);
-          if (j) {
-            let studentName: string | undefined;
-            if (state.role === "parent") {
-              const { data: p } = await supabase
-                .from("profiles")
-                .select("full_name")
-                .eq("id", j.student_id)
-                .maybeSingle();
-              studentName = p?.full_name;
-            }
-            latestPublishedFeedback = {
-              feedback: {
-                overall_comment: fb.overall_comment,
-                better_than_yesterday: fb.better_than_yesterday,
-                worse_than_yesterday: fb.worse_than_yesterday,
-                must_fix_tomorrow: fb.must_fix_tomorrow,
-                publish_at: fb.publish_at!,
-              },
-              journalDate: j.journal_date,
-              studentName,
-            };
-          }
+        if (!fb) return null;
+        const j = (journals ?? []).find((j) => j.id === fb.journal_id);
+        if (!j) return null;
+        return { fb, j };
+      })(),
+
+      // 학부모: 자녀 이름 — 피드백 카드·주간 마킹 양쪽에서 쓴다(한 번에 조회)
+      state.role === "parent" && targetStudentIds.length > 0
+        ? supabase
+            .from("profiles")
+            .select("id, full_name")
+            .in("id", targetStudentIds)
+            .then(
+              (r) =>
+                new Map((r.data ?? []).map((p) => [p.id, p.full_name] as const)),
+            )
+        : Promise.resolve(new Map<string, string>()),
+
+      // 최근 7일 일일 마킹
+      (async () => {
+        if (!targetStudentId) return null;
+        // 오늘 포함 최근 7일
+        const last7: string[] = [];
+        const todayKstDate = new Date(`${today}T00:00:00Z`);
+        for (let i = 6; i >= 0; i--) {
+          const dt = new Date(todayKstDate);
+          dt.setUTCDate(dt.getUTCDate() - i);
+          last7.push(dt.toISOString().slice(0, 10));
         }
-      }
-    }
-  }
+        const earliest = last7[0]!;
 
-  // 최근 7일 일일 마킹 (학생/학부모 공통)
-  let weeklyDays: { date: string; record: DailyRecord | null }[] = [];
-  let weeklyStudentName: string | undefined;
-  // 플래너 카드에서도 같은 대상을 써야 해서 블록 밖에 둔다
-  let targetStudentId: string | null = null;
+        const { data: records } = await supabase
+          .from("daily_attendance")
+          .select("date, attendance, homework_grade, test_score")
+          .eq("student_id", targetStudentId)
+          .gte("date", earliest)
+          .lte("date", today);
+        return { last7, records: records ?? [] };
+      })(),
 
-  if (state.kind === "ok") {
-    if (state.role === "student") {
-      targetStudentId = state.userId;
-    } else {
-      const { data: links } = await supabase
-        .from("parent_student_links")
-        .select("student_id")
-        .eq("parent_id", state.userId)
-        .limit(1);
-      targetStudentId = links?.[0]?.student_id ?? null;
-      if (targetStudentId) {
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", targetStudentId)
+      // 오늘 국어 플래너 진행률 (week → blocks → tasks → checks 순차)
+      (async (): Promise<{ total: number; checked: number } | null> => {
+        if (!targetStudentId) return null;
+        const weekStart = weekStartOf(today);
+        const dayOfWeek = Math.round(
+          (Date.parse(`${today}T00:00:00Z`) -
+            Date.parse(`${weekStart}T00:00:00Z`)) /
+            86400000,
+        );
+
+        const { data: week } = await supabase
+          .from("planner_weeks")
+          .select("id")
+          .eq("student_id", targetStudentId)
+          .eq("week_start", weekStart)
           .maybeSingle();
-        weeklyStudentName = p?.full_name;
-      }
-    }
+        if (!week) return null;
 
-    if (targetStudentId) {
-      // 오늘 포함 최근 7일
-      const last7: string[] = [];
-      const todayKstDate = new Date(`${today}T00:00:00Z`);
-      for (let i = 6; i >= 0; i--) {
-        const dt = new Date(todayKstDate);
-        dt.setUTCDate(dt.getUTCDate() - i);
-        last7.push(dt.toISOString().slice(0, 10));
-      }
-      const earliest = last7[0]!;
+        const { data: blocks } = await supabase
+          .from("planner_blocks")
+          .select("id")
+          .eq("week_id", week.id)
+          .eq("kind", "korean")
+          .eq("day_of_week", dayOfWeek);
+        const blockIds = (blocks ?? []).map((b) => b.id);
+        if (blockIds.length === 0) return null;
 
-      const { data: records } = await supabase
-        .from("daily_attendance")
-        .select("date, attendance, homework_grade, test_score")
-        .eq("student_id", targetStudentId)
-        .gte("date", earliest)
-        .lte("date", today);
-
-      const recordMap = new Map(
-        (records ?? []).map((r) => [r.date, r] as const),
-      );
-      weeklyDays = last7.map((d) => ({
-        date: d,
-        record: recordMap.get(d) ?? null,
-      }));
-    }
-  }
-
-  // 오늘 국어 플래너 진행률 — 학생/학부모 모두 홈에서 한눈에
-  let plannerToday: { total: number; checked: number } | null = null;
-  if (state.kind === "ok" && targetStudentId) {
-    const weekStart = weekStartOf(today);
-    const dayOfWeek = Math.round(
-      (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${weekStart}T00:00:00Z`)) /
-        86400000,
-    );
-
-    const { data: week } = await supabase
-      .from("planner_weeks")
-      .select("id")
-      .eq("student_id", targetStudentId)
-      .eq("week_start", weekStart)
-      .maybeSingle();
-
-    if (week) {
-      const { data: blocks } = await supabase
-        .from("planner_blocks")
-        .select("id")
-        .eq("week_id", week.id)
-        .eq("kind", "korean")
-        .eq("day_of_week", dayOfWeek);
-      const blockIds = (blocks ?? []).map((b) => b.id);
-
-      if (blockIds.length > 0) {
         const { data: tasks } = await supabase
           .from("planner_tasks")
           .select("id")
           .in("block_id", blockIds);
         const taskIds = (tasks ?? []).map((t) => t.id);
+        if (taskIds.length === 0) return null;
 
-        if (taskIds.length > 0) {
-          const { count } = await supabase
-            .from("planner_task_checks")
-            .select("task_id", { count: "exact", head: true })
-            .in("task_id", taskIds);
-          plannerToday = { total: taskIds.length, checked: count ?? 0 };
-        }
-      }
+        const { count } = await supabase
+          .from("planner_task_checks")
+          .select("task_id", { count: "exact", head: true })
+          .in("task_id", taskIds);
+        return { total: taskIds.length, checked: count ?? 0 };
+      })(),
+
+      // 알림 + 공지
+      notifP,
+      announcementsP,
+    ]);
+
+    const j = journalRes;
+    if (j) {
+      // 4갈래가 모두 비어있고 content만 있는 옛 레코드는 message_to_teacher로 폴백
+      const hasNew =
+        !!j.class_question ||
+        !!j.test_question ||
+        !!j.message_to_teacher ||
+        !!j.learning_log;
+      todaysJournal = {
+        class_question: j.class_question,
+        test_question: j.test_question,
+        message_to_teacher:
+          !hasNew && j.content ? j.content : j.message_to_teacher,
+        learning_log: j.learning_log,
+        submitted_at: j.submitted_at,
+        updated_at: j.updated_at,
+      };
     }
-  }
 
-  // 알림 + 공지
-  const notif =
-    state.kind === "ok"
-      ? await getMyNotifications(supabase, state.userId)
-      : { items: [], unreadCount: 0 };
-  const announcements =
-    state.kind === "ok" ? await getActiveAnnouncements(supabase) : [];
+    if (feedbackRes) {
+      const { fb, j: fj } = feedbackRes;
+      latestPublishedFeedback = {
+        feedback: {
+          overall_comment: fb.overall_comment,
+          better_than_yesterday: fb.better_than_yesterday,
+          worse_than_yesterday: fb.worse_than_yesterday,
+          must_fix_tomorrow: fb.must_fix_tomorrow,
+          publish_at: fb.publish_at!,
+        },
+        journalDate: fj.journal_date,
+        studentName:
+          state.role === "parent" ? childNames.get(fj.student_id) : undefined,
+      };
+    }
+
+    if (state.role === "parent" && targetStudentId) {
+      weeklyStudentName = childNames.get(targetStudentId);
+    }
+
+    if (records) {
+      const recordMap = new Map(
+        records.records.map((r) => [r.date, r] as const),
+      );
+      weeklyDays = records.last7.map((d) => ({
+        date: d,
+        record: recordMap.get(d) ?? null,
+      }));
+    }
+
+    plannerToday = plannerRes;
+    notif = notifRes;
+    announcements = announcementsRes;
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

@@ -20,35 +20,40 @@ export default async function QnaPage() {
   if (state.kind === "ok" && state.status !== "approved") redirect("/pending");
   if (state.kind !== "ok") return null;
 
-  const notif = await getMyNotifications(supabase, state.userId);
+  // 알림·카테고리·질문(→답변)은 서로 독립 — 한 번에 보낸다
+  const [notif, { data: catRows }, { questions, answers }] = await Promise.all([
+    getMyNotifications(supabase, state.userId),
+    supabase
+      .from("qna_categories")
+      .select("id, label, placeholder, needs_reference")
+      .eq("archived", false)
+      .order("position"),
+    (async () => {
+      // 학생은 본인 질문만(RLS). 학부모는 Q&A 대상 아님 — 빈 목록.
+      const { data: questions } =
+        state.role === "student"
+          ? await supabase
+              .from("qna_questions")
+              .select(
+                "id, category_id, reference_label, question_no, body, image_path, status, created_at",
+              )
+              .order("created_at", { ascending: false })
+          : { data: [] };
 
-  const { data: catRows } = await supabase
-    .from("qna_categories")
-    .select("id, label, placeholder, needs_reference")
-    .eq("archived", false)
-    .order("position");
+      const qIds = (questions ?? []).map((q) => q.id);
+      const { data: answers } =
+        qIds.length > 0
+          ? await supabase
+              .from("qna_answers")
+              .select("question_id, body, published_at")
+              .in("question_id", qIds)
+          : { data: [] };
+      return { questions, answers };
+    })(),
+  ]);
   const categories: Category[] = catRows ?? [];
   const catLabel = new Map(categories.map((c) => [c.id, c.label] as const));
 
-  // 학생은 본인 질문만(RLS). 학부모는 Q&A 대상 아님 — 빈 목록.
-  const { data: questions } =
-    state.role === "student"
-      ? await supabase
-          .from("qna_questions")
-          .select(
-            "id, category_id, reference_label, question_no, body, image_path, status, created_at",
-          )
-          .order("created_at", { ascending: false })
-      : { data: [] };
-
-  const qIds = (questions ?? []).map((q) => q.id);
-  const { data: answers } =
-    qIds.length > 0
-      ? await supabase
-          .from("qna_answers")
-          .select("question_id, body, published_at")
-          .in("question_id", qIds)
-      : { data: [] };
   const answerOf = new Map(
     (answers ?? []).map((a) => [a.question_id, a] as const),
   );

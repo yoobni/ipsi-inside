@@ -53,6 +53,9 @@ export default async function TestsPage() {
   if (state.role !== "student" && state.role !== "parent")
     redirect("/dashboard");
 
+  // 알림은 대상 학생과 무관 — 아래 조회들과 겹쳐 보내고 렌더 직전에 받는다
+  const notifP = getMyNotifications(supabase, state.userId);
+
   // 대상 학생 id 결정
   let studentIds: string[] = [];
   let studentNameById: Record<string, string> = {};
@@ -138,7 +141,7 @@ export default async function TestsPage() {
 
   const isParent = state.role === "parent";
 
-  const notif = await getMyNotifications(supabase, state.userId);
+  const notif = await notifP;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

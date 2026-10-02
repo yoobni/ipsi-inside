@@ -3,29 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { friendlyDbError, logAdminAccess } from "@ipsi/lib";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
+import { ensureAdmin } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; message: string };
-
-async function ensureAdmin(): Promise<
-  { adminId: string } | { error: Result }
-> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: { ok: false, message: "로그인이 필요합니다" } };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, status")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (profile?.role !== "admin" || profile?.status !== "approved") {
-    return { error: { ok: false, message: "권한이 없습니다" } };
-  }
-  return { adminId: user.id };
-}
 
 export async function suspendMemberAction(profileId: string): Promise<Result> {
   const check = await ensureAdmin();

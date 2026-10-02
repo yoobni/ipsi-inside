@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 import {
   plannerWeekSaveSchema,
@@ -19,6 +18,7 @@ import {
   type PlannerBlockInput,
   type PlannerBlockKind,
 } from "@ipsi/types";
+import { ensureAdmin } from "@/lib/auth";
 
 type Fail = { ok: false; message: string };
 type Result = { ok: true } | Fail;
@@ -29,23 +29,6 @@ type Result = { ok: true } | Fail;
 type SaveResult =
   | { ok: true; week_id: string; blocks: PlannerBlockInput[] }
   | Fail;
-
-async function ensureAdmin(): Promise<{ adminId: string } | { error: Fail }> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: { ok: false, message: "로그인이 필요합니다" } };
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, status")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (profile?.role !== "admin" || profile?.status !== "approved") {
-    return { error: { ok: false, message: "권한이 없습니다" } };
-  }
-  return { adminId: user.id };
-}
 
 /**
  * 한 주 플래너 저장.
@@ -360,55 +343,86 @@ async function notifyPlannerPublished(
   studentId: string,
   weekStart: string,
 ): Promise<void> {
+  await notifyPlannerPublishedBulk([studentId], weekStart);
+}
+
+/**
+ * 발행 알림 fan-out (여러 학생 한 번에). 학생별로 따로 부르면 학생 수 × 3번
+ * 왕복이라, 이름·학부모 링크는 `.in()`으로 한 번씩 읽고 insert도 한 번에 한다.
+ * 만드는 행은 학생별 단건 호출과 같다(학생 본인 1건 + 연결 학부모 각 1건).
+ */
+async function notifyPlannerPublishedBulk(
+  studentIds: string[],
+  weekStart: string,
+): Promise<void> {
+  const ids = Array.from(new Set(studentIds));
+  if (ids.length === 0) return;
+
   const db = createAdminSupabaseClient();
 
-  const { data: student } = await db
-    .from("profiles")
-    .select("full_name")
-    .eq("id", studentId)
-    .maybeSingle();
+  const [{ data: students }, { data: links }] = await Promise.all([
+    db.from("profiles").select("id, full_name").in("id", ids),
+    db
+      .from("parent_student_links")
+      .select("parent_id, student_id")
+      .in("student_id", ids),
+  ]);
 
-  const { data: links } = await db
-    .from("parent_student_links")
-    .select("parent_id")
-    .eq("student_id", studentId);
+  const nameById = new Map((students ?? []).map((p) => [p.id, p.full_name]));
+  const parentsByStudent = new Map<string, string[]>();
+  for (const l of links ?? []) {
+    const arr = parentsByStudent.get(l.student_id) ?? [];
+    arr.push(l.parent_id);
+    parentsByStudent.set(l.student_id, arr);
+  }
 
   const range = `${shortDayLabel(weekStart)} ~ ${shortDayLabel(dateOfDay(weekStart, 6))}`;
   const nowIso = new Date().toISOString();
 
-  const notifs = [
-    {
-      user_id: studentId,
-      type: "planner_published",
-      // 미래 주차도 배정할 수 있으니 "이번 주"로 못 박지 않는다 (본문에 기간 표시)
-      title: "국어 플래너가 도착했어요",
-      body: range,
-      link: plannerLink(weekStart),
-      created_at: nowIso,
-    },
-    ...(links ?? []).map((l) => ({
-      user_id: l.parent_id,
-      type: "planner_published",
-      title: `${student?.full_name ?? "자녀"} 학생의 주간 플래너가 배정됐어요`,
-      body: range,
-      // 학부모 알림엔 자녀를 명시한다. 주차만 담으면 다자녀 학부모에서
-      // 자녀별 알림이 구분되지 않아, 한 자녀의 발행을 내릴 때 다른 자녀
-      // 알림까지 함께 지워진다 (링크가 바이트 단위로 같아서)
-      link: plannerLink(weekStart, studentId),
-      created_at: nowIso,
-    })),
-  ];
+  const unique = ids.flatMap((studentId) => {
+    const notifs = [
+      {
+        user_id: studentId,
+        type: "planner_published",
+        // 미래 주차도 배정할 수 있으니 "이번 주"로 못 박지 않는다 (본문에 기간 표시)
+        title: "국어 플래너가 도착했어요",
+        body: range,
+        link: plannerLink(weekStart),
+        created_at: nowIso,
+      },
+      ...(parentsByStudent.get(studentId) ?? []).map((parentId) => ({
+        user_id: parentId,
+        type: "planner_published",
+        title: `${nameById.get(studentId) ?? "자녀"} 학생의 주간 플래너가 배정됐어요`,
+        body: range,
+        // 학부모 알림엔 자녀를 명시한다. 주차만 담으면 다자녀 학부모에서
+        // 자녀별 알림이 구분되지 않아, 한 자녀의 발행을 내릴 때 다른 자녀
+        // 알림까지 함께 지워진다 (링크가 바이트 단위로 같아서)
+        link: plannerLink(weekStart, studentId),
+        created_at: nowIso,
+      })),
+    ];
 
-  // 중복 수신자 제거 (학부모 계정이 학생과 같을 일은 없지만 방어)
-  const seen = new Set<string>();
-  const unique = notifs.filter((n) => {
-    if (seen.has(n.user_id)) return false;
-    seen.add(n.user_id);
-    return true;
+    // 중복 수신자 제거 (학부모 계정이 학생과 같을 일은 없지만 방어).
+    // 학생 단위로만 거른다 — 다자녀 학부모는 자녀마다 1건씩 받아야 한다.
+    const seen = new Set<string>();
+    return notifs.filter((n) => {
+      if (seen.has(n.user_id)) return false;
+      seen.add(n.user_id);
+      return true;
+    });
   });
 
   if (unique.length > 0) {
-    await db.from("notifications").insert(unique);
+    // 한 번에 넣어서 한 행만 어긋나도 배치 전체가 빠진다 — 조용히 묻히지 않게 남긴다
+    const { error } = await db.from("notifications").insert(unique);
+    if (error) {
+      console.error("[planner] 발행 알림 insert 실패", {
+        studentCount: ids.length,
+        rowCount: unique.length,
+        error,
+      });
+    }
   }
 }
 
@@ -820,9 +834,10 @@ export async function applyPlannerTemplateAction(input: {
 
   // 5) 발행이면 알림
   if (publish) {
-    for (const studentId of weekIdByStudent.keys()) {
-      await notifyPlannerPublished(studentId, weekStart);
-    }
+    await notifyPlannerPublishedBulk(
+      Array.from(weekIdByStudent.keys()),
+      weekStart,
+    );
   }
 
   revalidatePath("/planner");

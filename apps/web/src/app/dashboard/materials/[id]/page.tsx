@@ -30,27 +30,29 @@ export default async function MaterialDetailPage({
   if (state.kind === "guest") redirect("/login");
   if (state.kind === "ok" && state.status !== "approved") redirect("/pending");
 
-  const { data: m } = await supabase
-    .from("materials")
-    .select("id, title, description, audience, published_at")
-    .eq("id", id)
-    .maybeSingle();
+  // 자료·파일·알림을 한 번에. 파일은 RLS가 "보이는 자료의 파일만" 돌려주고,
+  // 자료가 안 보여 404가 나면 결과는 그냥 버려진다.
+  const [{ data: m }, { data: fileRows }, notif] = await Promise.all([
+    supabase
+      .from("materials")
+      .select("id, title, description, audience, published_at")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("material_files")
+      .select("id, file_name, file_size_bytes, position")
+      .eq("material_id", id)
+      .order("position"),
+    state.kind === "ok"
+      ? getMyNotifications(supabase, state.userId)
+      : Promise.resolve({ items: [], unreadCount: 0 }),
+  ]);
   if (!m) notFound();
 
-  const { data: fileRows } = await supabase
-    .from("material_files")
-    .select("id, file_name, file_size_bytes, position")
-    .eq("material_id", id)
-    .order("position");
   const files = fileRows ?? [];
   const totalSize = formatBytes(
     files.reduce((s, f) => s + f.file_size_bytes, 0),
   );
-
-  const notif =
-    state.kind === "ok"
-      ? await getMyNotifications(supabase, state.userId)
-      : { items: [], unreadCount: 0 };
 
   return (
     <Shell notifItems={notif.items} unreadCount={notif.unreadCount}>

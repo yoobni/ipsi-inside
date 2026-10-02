@@ -19,20 +19,20 @@ export default async function ColumnsPage() {
   if (state.kind === "ok" && state.status !== "approved") redirect("/pending");
   if (state.kind !== "ok") return null;
 
-  const notif = await getMyNotifications(supabase, state.userId);
-
-  // 발행된 칼럼 (RLS가 발행+시점 필터)
-  const { data: cols } = await supabase
-    .from("columns")
-    .select("id, title, published_at")
-    .eq("is_published", true)
-    .order("published_at", { ascending: false });
-
-  // 내가 읽은 칼럼 (학생만 읽음 처리, 학부모는 빈 세트)
-  const { data: reads } =
+  // 알림·발행 칼럼·읽음 기록은 서로 독립 — 한 번에 보낸다
+  const [notif, { data: cols }, { data: reads }] = await Promise.all([
+    getMyNotifications(supabase, state.userId),
+    // 발행된 칼럼 (RLS가 발행+시점 필터)
+    supabase
+      .from("columns")
+      .select("id, title, published_at")
+      .eq("is_published", true)
+      .order("published_at", { ascending: false }),
+    // 내가 읽은 칼럼 (학생만 읽음 처리, 학부모는 빈 세트)
     state.role === "student"
-      ? await supabase.from("column_reads").select("column_id")
-      : { data: [] };
+      ? supabase.from("column_reads").select("column_id")
+      : Promise.resolve({ data: [] as { column_id: string }[] }),
+  ]);
   const readSet = new Set((reads ?? []).map((r) => r.column_id));
 
   return (

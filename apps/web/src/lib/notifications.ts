@@ -21,24 +21,25 @@ export async function getMyNotifications(
 ): Promise<{ items: NotificationItem[]; unreadCount: number }> {
   const nowIso = new Date().toISOString();
 
-  const { data, count } = await supabase
-    .from("notifications")
-    .select("id, type, title, body, link, read_at, created_at", {
-      count: "exact",
-    })
-    .eq("user_id", userId)
-    .lte("created_at", nowIso)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  // 목록과 미읽음 카운트는 서로 독립 — 한 번에 보낸다
+  const [{ data }, { count: unread }] = await Promise.all([
+    supabase
+      .from("notifications")
+      // 전체 count는 안 쓴다 — exact count는 별도 집계라 붙이지 않는다
+      .select("id, type, title, body, link, read_at, created_at")
+      .eq("user_id", userId)
+      .lte("created_at", nowIso)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .is("read_at", null)
+      .lte("created_at", nowIso),
+  ]);
 
   const items = (data ?? []) as NotificationItem[];
-  // unread는 별도로 count
-  const { count: unread } = await supabase
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .is("read_at", null)
-    .lte("created_at", nowIso);
 
   return {
     items,

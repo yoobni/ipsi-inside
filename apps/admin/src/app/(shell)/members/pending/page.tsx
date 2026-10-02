@@ -6,11 +6,21 @@ export const dynamic = "force-dynamic";
 export default async function PendingMembersPage() {
   const supabase = await createServerSupabaseClient();
 
-  const { data: pendingProfiles } = await supabase
-    .from("profiles")
-    .select("id, role, status, full_name, phone, school, grade, created_at")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
+  // 대기 회원(→ 학부모 가입 요청)과 승인 학생 목록은 서로 독립 — 한 번에
+  const [{ data: pendingProfiles }, { data: approvedStudents }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, role, status, full_name, phone, school, grade, created_at")
+        .eq("status", "pending")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("profiles")
+        .select("id, full_name, phone, school, grade")
+        .eq("role", "student")
+        .eq("status", "approved")
+        .order("full_name"),
+    ]);
 
   const parentIds = (pendingProfiles ?? [])
     .filter((p) => p.role === "parent")
@@ -22,13 +32,6 @@ export default async function PendingMembersPage() {
         .select("parent_id, student_full_name, student_phone")
         .in("parent_id", parentIds)
     : { data: [] };
-
-  const { data: approvedStudents } = await supabase
-    .from("profiles")
-    .select("id, full_name, phone, school, grade")
-    .eq("role", "student")
-    .eq("status", "approved")
-    .order("full_name");
 
   const studentCount = (pendingProfiles ?? []).filter(
     (p) => p.role === "student",

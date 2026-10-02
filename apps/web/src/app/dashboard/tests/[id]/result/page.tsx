@@ -57,30 +57,28 @@ export default async function ResultPage({
     redirect(`/dashboard/tests/${id}`);
   }
 
-  const { data: sheet } = await supabase
-    .from("test_sheets")
-    .select("title")
-    .eq("id", id)
-    .maybeSingle();
-
-  // 단원별
-  const { data: unitStats } = await supabase.rpc("attempt_unit_stats", {
-    p_attempt_id: attemptId,
-  });
-
-  // 문항별 정오답
-  const { data: tsq } = await supabase
-    .from("test_sheet_questions")
-    .select(
-      "position, question_id, questions(id, position_in_passage, stem, correct_answer, points, passages(title))",
-    )
-    .eq("test_sheet_id", id)
-    .order("position");
-
-  const { data: answers } = await supabase
-    .from("student_answers")
-    .select("question_id, selected, is_correct")
-    .eq("attempt_id", attemptId);
+  // 권한·제출 확인(위)은 순차로 끝낸 뒤에만 띄운다(정답이 담긴 조회라).
+  // 아래 넷은 서로 독립 — 한 번에 보낸다.
+  const [{ data: sheet }, { data: unitStats }, { data: tsq }, { data: answers }] =
+    await Promise.all([
+      supabase.from("test_sheets").select("title").eq("id", id).maybeSingle(),
+      // 단원별
+      supabase.rpc("attempt_unit_stats", {
+        p_attempt_id: attemptId,
+      }),
+      // 문항별 정오답
+      supabase
+        .from("test_sheet_questions")
+        .select(
+          "position, question_id, questions(id, position_in_passage, stem, correct_answer, points, passages(title))",
+        )
+        .eq("test_sheet_id", id)
+        .order("position"),
+      supabase
+        .from("student_answers")
+        .select("question_id, selected, is_correct")
+        .eq("attempt_id", attemptId),
+    ]);
 
   const answerMap = new Map(
     (answers ?? []).map(

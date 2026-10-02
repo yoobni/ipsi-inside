@@ -21,31 +21,37 @@ export default async function MemberDetailPage({
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
 
-  const { data: member } = await supabase
-    .from("profiles")
-    .select("id, role, status, full_name, phone, school, grade, created_at, approved_at")
-    .eq("id", id)
-    .maybeSingle();
+  // 회원 조회와 열람자 확인은 서로 무관 — 한 번에.
+  const [{ data: member }, { data: { user: viewer } }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, role, status, full_name, phone, school, grade, created_at, approved_at")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
   if (!member) notFound();
 
   // 이름·연락처·학교가 화면에 뜨는 순간이 곧 개인정보 열람이다 — 남긴다.
   // (안전성 확보조치 고시 제8조. proxy.ts가 admin+approved만 통과시키므로
   //  여기 도달한 세션은 개인정보취급자다.)
-  const {
-    data: { user: viewer },
-  } = await supabase.auth.getUser();
-  if (viewer) {
-    await logAdminAccess({
-      actorId: viewer.id,
-      action: "member.view",
-      targetType: "profile",
-      targetId: member.id,
-      headers: await headers(),
-    });
-  }
+  // logAdminAccess는 내부에서 실패를 삼키므로(throw 안 함) 아래 리포트 조회와
+  // 나란히 돌려도 기록 여부·오류 처리는 그대로다. 응답 전에 끝까지 기다린다.
+  const accessLog = viewer
+    ? headers().then((h) =>
+        logAdminAccess({
+          actorId: viewer.id,
+          action: "member.view",
+          targetType: "profile",
+          targetId: member.id,
+          headers: h,
+        }),
+      )
+    : Promise.resolve();
 
   // 학생만 종합 리포트. 학부모/admin은 회원 목록으로 돌려보냄
   if (member.role !== "student") {
+    await accessLog;
     return (
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center gap-2">
@@ -69,53 +75,60 @@ export default async function MemberDetailPage({
     );
   }
 
-  // 연결된 학부모
-  const { data: parentLinks } = await supabase
-    .from("parent_student_links")
-    .select("parent_id, profiles!parent_student_links_parent_id_fkey(full_name, phone)")
-    .eq("student_id", id);
-  const parents = (parentLinks ?? []).map((l) => {
-    const p = Array.isArray(l.profiles) ? l.profiles[0] : l.profiles;
-    return { id: l.parent_id, full_name: p?.full_name ?? "", phone: p?.phone ?? "" };
-  });
-
-  // 최근 30일 출결
+  // 최근 30일 출결 / 일지(최근 14일) 기간
   const today = todayKst();
   const todayDt = new Date(`${today}T00:00:00Z`);
   const since = new Date(todayDt);
   since.setUTCDate(since.getUTCDate() - 29);
   const sinceDate = since.toISOString().slice(0, 10);
-
-  const { data: attendance } = await supabase
-    .from("daily_attendance")
-    .select("date, attendance, homework_grade, test_score, note")
-    .eq("student_id", id)
-    .gte("date", sinceDate)
-    .lte("date", today)
-    .order("date");
-
-  // 일지 (최근 14일)
   const since14 = new Date(todayDt);
   since14.setUTCDate(since14.getUTCDate() - 13);
   const since14Date = since14.toISOString().slice(0, 10);
 
-  const { data: journals } = await supabase
-    .from("study_journals")
-    .select(
-      "journal_date, class_question, test_question, message_to_teacher, learning_log, content",
-    )
-    .eq("student_id", id)
-    .gte("journal_date", since14Date)
-    .lte("journal_date", today);
-
-  // 시험 — 응시 기록
-  const { data: assignments } = await supabase
-    .from("test_assignments")
-    .select(
-      "id, assigned_at, test_sheets(id, title, due_at, target_grade)",
-    )
-    .eq("student_id", id)
-    .order("assigned_at", { ascending: false });
+  // 학부모·출결·일지·배정은 서로 독립 — 접속기록 저장과 함께 한 번에 보낸다.
+  const [
+    ,
+    { data: parentLinks },
+    { data: attendance },
+    { data: journals },
+    { data: assignments },
+  ] = await Promise.all([
+    accessLog,
+    // 연결된 학부모
+    supabase
+      .from("parent_student_links")
+      .select("parent_id, profiles!parent_student_links_parent_id_fkey(full_name, phone)")
+      .eq("student_id", id),
+    // 최근 30일 출결
+    supabase
+      .from("daily_attendance")
+      .select("date, attendance, homework_grade, test_score, note")
+      .eq("student_id", id)
+      .gte("date", sinceDate)
+      .lte("date", today)
+      .order("date"),
+    // 일지 (최근 14일)
+    supabase
+      .from("study_journals")
+      .select(
+        "journal_date, class_question, test_question, message_to_teacher, learning_log, content",
+      )
+      .eq("student_id", id)
+      .gte("journal_date", since14Date)
+      .lte("journal_date", today),
+    // 시험 — 응시 기록
+    supabase
+      .from("test_assignments")
+      .select(
+        "id, assigned_at, test_sheets(id, title, due_at, target_grade)",
+      )
+      .eq("student_id", id)
+      .order("assigned_at", { ascending: false }),
+  ]);
+  const parents = (parentLinks ?? []).map((l) => {
+    const p = Array.isArray(l.profiles) ? l.profiles[0] : l.profiles;
+    return { id: l.parent_id, full_name: p?.full_name ?? "", phone: p?.phone ?? "" };
+  });
 
   const assignmentIds = (assignments ?? []).map((a) => a.id);
   const { data: attempts } =
@@ -140,11 +153,22 @@ export default async function MemberDetailPage({
   >();
 
   if (submittedAttemptIds.length > 0) {
-    // 각 attempt의 unit stats를 합산 (RPC 사용)
-    for (const aid of submittedAttemptIds) {
-      const { data: stats } = await supabase.rpc("attempt_unit_stats", {
-        p_attempt_id: aid,
-      });
+    // 각 attempt의 unit stats를 합산 (RPC 사용). attempt별 RPC는 8개씩 동시에
+    // 보낸다 — 응시가 많은 학생에서 한꺼번에 수백 건을 쏘면 풀러 연결이 바닥난다.
+    // 합산은 기존과 같은 attempt 순서로 한다(Map 삽입 순서 = 동률 정렬 순서 유지).
+    const STATS_CONCURRENCY = 8;
+    const statsList = [];
+    for (let i = 0; i < submittedAttemptIds.length; i += STATS_CONCURRENCY) {
+      const chunk = submittedAttemptIds.slice(i, i + STATS_CONCURRENCY);
+      statsList.push(
+        ...(await Promise.all(
+          chunk.map((aid) =>
+            supabase.rpc("attempt_unit_stats", { p_attempt_id: aid }),
+          ),
+        )),
+      );
+    }
+    for (const { data: stats } of statsList) {
       (stats ?? []).forEach((u) => {
         const key = u.unit_major;
         const cur = unitAccumulator.get(key) ?? {

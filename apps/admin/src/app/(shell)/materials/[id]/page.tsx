@@ -30,20 +30,61 @@ export default async function MaterialDetailPage({
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
 
-  const { data: m } = await supabase
-    .from("materials")
-    .select(
-      "id, title, description, audience, storage_path, file_name, file_size_bytes, is_published, published_at, expires_at, created_at",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  // 자료 id만 있으면 되는 조회는 전부 한 번에 보낸다.
+  // (자료가 없으면 나머지는 빈 결과로 끝나고 아래에서 notFound)
+  const [
+    { data: m },
+    { data: fileRows },
+    { data: assigns },
+    { data: allStudents },
+    { data: groups },
+    { data: memberships },
+    { data: groupTargets },
+    { data: downloadRows },
+  ] = await Promise.all([
+    supabase
+      .from("materials")
+      .select(
+        "id, title, description, audience, storage_path, file_name, file_size_bytes, is_published, published_at, expires_at, created_at",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("material_files")
+      .select("id, file_name, file_size_bytes, position")
+      .eq("material_id", id)
+      .order("position"),
+    // 배정 학생 (audience=targeted일 때 의미 있음)
+    supabase
+      .from("material_assignments")
+      .select("id, student_id, assigned_at, assigned_by_school")
+      .eq("material_id", id),
+    supabase
+      .from("profiles")
+      .select("id, full_name, phone, school, grade")
+      .eq("role", "student")
+      .eq("status", "approved")
+      .order("full_name"),
+    // 그룹 목록(멤버 수 포함) + 이 자료의 타깃 그룹
+    supabase
+      .from("student_groups")
+      .select("id, name")
+      .eq("archived", false)
+      .order("name"),
+    supabase.from("group_members").select("group_id"),
+    supabase
+      .from("material_group_targets")
+      .select("group_id")
+      .eq("material_id", id),
+    // 다운로드/뷰 이력 — 최근 100건
+    supabase
+      .from("material_downloads")
+      .select("id, user_id, source, downloaded_at")
+      .eq("material_id", id)
+      .order("downloaded_at", { ascending: false })
+      .limit(100),
+  ]);
   if (!m) notFound();
-
-  const { data: fileRows } = await supabase
-    .from("material_files")
-    .select("id, file_name, file_size_bytes, position")
-    .eq("material_id", id)
-    .order("position");
 
   const detail: MaterialDetail = {
     id: m.id,
@@ -62,20 +103,25 @@ export default async function MaterialDetailPage({
     created_at: m.created_at,
   };
 
-  // 배정 학생 (audience=targeted일 때 의미 있음)
-  const { data: assigns } = await supabase
-    .from("material_assignments")
-    .select("id, student_id, assigned_at, assigned_by_school")
-    .eq("material_id", id);
-
   const studentIds = (assigns ?? []).map((a) => a.student_id);
-  const { data: studentProfiles } =
+  const downloadUserIds = Array.from(
+    new Set((downloadRows ?? []).map((r) => r.user_id)),
+  );
+  // 배정 학생 프로필과 다운로드 사용자 프로필은 서로 독립
+  const [{ data: studentProfiles }, { data: dlProfiles }] = await Promise.all([
     studentIds.length > 0
-      ? await supabase
+      ? supabase
           .from("profiles")
           .select("id, full_name, phone, school, grade")
           .in("id", studentIds)
-      : { data: [] };
+      : Promise.resolve({ data: [] }),
+    downloadUserIds.length > 0
+      ? supabase
+          .from("profiles")
+          .select("id, full_name, role, school")
+          .in("id", downloadUserIds)
+      : Promise.resolve({ data: [] }),
+  ]);
 
   const profileMap = new Map(
     (studentProfiles ?? []).map((p) => [p.id, p] as const),
@@ -93,13 +139,6 @@ export default async function MaterialDetailPage({
       assigned_by_school: a.assigned_by_school,
     };
   });
-
-  const { data: allStudents } = await supabase
-    .from("profiles")
-    .select("id, full_name, phone, school, grade")
-    .eq("role", "student")
-    .eq("status", "approved")
-    .order("full_name");
 
   const alreadyAssigned = new Set(studentIds);
   const availableStudents: AvailableStudent[] = (allStudents ?? [])
@@ -120,20 +159,6 @@ export default async function MaterialDetailPage({
     ),
   ).sort();
 
-  // 그룹 목록(멤버 수 포함) + 이 자료의 타깃 그룹
-  const [{ data: groups }, { data: memberships }, { data: groupTargets }] =
-    await Promise.all([
-      supabase
-        .from("student_groups")
-        .select("id, name")
-        .eq("archived", false)
-        .order("name"),
-      supabase.from("group_members").select("group_id"),
-      supabase
-        .from("material_group_targets")
-        .select("group_id")
-        .eq("material_id", id),
-    ]);
   const countByGroup = new Map<string, number>();
   (memberships ?? []).forEach((mm) =>
     countByGroup.set(mm.group_id, (countByGroup.get(mm.group_id) ?? 0) + 1),
@@ -145,24 +170,6 @@ export default async function MaterialDetailPage({
   }));
   const targetGroupIds = (groupTargets ?? []).map((t) => t.group_id);
 
-  // 다운로드/뷰 이력 — 최근 100건
-  const { data: downloadRows } = await supabase
-    .from("material_downloads")
-    .select("id, user_id, source, downloaded_at")
-    .eq("material_id", id)
-    .order("downloaded_at", { ascending: false })
-    .limit(100);
-
-  const downloadUserIds = Array.from(
-    new Set((downloadRows ?? []).map((r) => r.user_id)),
-  );
-  const { data: dlProfiles } =
-    downloadUserIds.length > 0
-      ? await supabase
-          .from("profiles")
-          .select("id, full_name, role, school")
-          .in("id", downloadUserIds)
-      : { data: [] };
   const dlProfileMap = new Map(
     (dlProfiles ?? []).map((p) => [p.id, p] as const),
   );

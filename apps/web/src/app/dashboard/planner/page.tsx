@@ -37,7 +37,8 @@ export default async function StudentPlannerPage({
     );
   }
 
-  const notif = await getMyNotifications(supabase, state.userId);
+  // 알림은 대상 학생과 무관 — 아래 조회들과 겹쳐 보내고 렌더 직전에 받는다
+  const notifP = getMyNotifications(supabase, state.userId);
   const today = todayKst();
   const weekStart =
     sp.week && /^\d{4}-\d{2}-\d{2}$/.test(sp.week)
@@ -48,7 +49,7 @@ export default async function StudentPlannerPage({
 
   // 학생은 본인, 학부모는 자녀의 플래너
   let targetStudentId = state.userId;
-  let childName: string | null = null;
+  let childNameP: Promise<string | null> = Promise.resolve(null);
   if (state.role === "parent") {
     const { data: links } = await supabase
       .from("parent_student_links")
@@ -58,6 +59,7 @@ export default async function StudentPlannerPage({
     const picked =
       sp.child && childIds.includes(sp.child) ? sp.child : (childIds[0] ?? null);
     if (!picked) {
+      const notif = await notifP;
       return (
         <Shell notifItems={notif.items} unreadCount={notif.unreadCount}>
           <EmptyState message="연결된 자녀가 없어요." />
@@ -65,12 +67,14 @@ export default async function StudentPlannerPage({
       );
     }
     targetStudentId = picked;
-    const { data: child } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", picked)
-      .maybeSingle();
-    childName = child?.full_name ?? null;
+    // 자녀 확인(picked) 뒤에만 띄운다. 이름은 주간 조회와 겹쳐 받는다.
+    childNameP = Promise.resolve(
+      supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", picked)
+        .maybeSingle(),
+    ).then(({ data: child }) => child?.full_name ?? null);
   }
 
   // RLS가 published + 본인/자녀만 통과시키므로 여기서 추가 조건이 필요 없다
@@ -154,6 +158,8 @@ export default async function StudentPlannerPage({
       };
     });
   }
+
+  const [notif, childName] = await Promise.all([notifP, childNameP]);
 
   return (
     <Shell notifItems={notif.items} unreadCount={notif.unreadCount}>

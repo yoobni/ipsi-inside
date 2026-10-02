@@ -46,11 +46,28 @@ export default async function TakePage({
     redirect(`/dashboard/tests/${id}/result?attempt=${attemptId}`);
   }
 
-  const { data: sheet } = await supabase
-    .from("test_sheets")
-    .select("id, title, due_at")
-    .eq("id", id)
-    .maybeSingle();
+  // 본인 응시 세션 확인(위) 뒤에만 띄운다. 시험지·문항·기존 답안은 서로
+  // 독립이라 한 번에 보내고, 마감으로 자동 제출되면 문항·답안은 그냥 버려진다.
+  const [{ data: sheet }, { data: tsq }, { data: answers }] = await Promise.all([
+    supabase
+      .from("test_sheets")
+      .select("id, title, due_at")
+      .eq("id", id)
+      .maybeSingle(),
+    // 시험지 → 문항 (지문 포함)
+    supabase
+      .from("test_sheet_questions")
+      .select(
+        "position, question_id, questions(id, passage_id, position_in_passage, stem, supplementary, choices, points, passages(id, title, content))",
+      )
+      .eq("test_sheet_id", id)
+      .order("position"),
+    // 기존 답안
+    supabase
+      .from("student_answers")
+      .select("question_id, selected")
+      .eq("attempt_id", attemptId),
+  ]);
   if (!sheet) notFound();
 
   // 마감 지났는데 아직 진행 중이면 자동 제출하고 결과로
@@ -58,15 +75,6 @@ export default async function TakePage({
     await submitAttemptAction(attemptId);
     redirect(`/dashboard/tests/${id}/result?attempt=${attemptId}`);
   }
-
-  // 시험지 → 문항 (지문 포함)
-  const { data: tsq } = await supabase
-    .from("test_sheet_questions")
-    .select(
-      "position, question_id, questions(id, passage_id, position_in_passage, stem, supplementary, choices, points, passages(id, title, content))",
-    )
-    .eq("test_sheet_id", id)
-    .order("position");
 
   type ChoiceJson = QuestionChoice[];
   const questions: ExamQuestion[] = (tsq ?? [])
@@ -88,12 +96,6 @@ export default async function TakePage({
       };
     })
     .filter((x): x is ExamQuestion => x !== null);
-
-  // 기존 답안
-  const { data: answers } = await supabase
-    .from("student_answers")
-    .select("question_id, selected")
-    .eq("attempt_id", attemptId);
 
   const existingAnswers: Record<string, number | null> = {};
   (answers ?? []).forEach((a) => {

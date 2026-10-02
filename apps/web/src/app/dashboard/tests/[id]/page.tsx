@@ -23,28 +23,32 @@ export default async function TestDetailPage({
   if (state.kind !== "ok" || state.status !== "approved") redirect("/pending");
   if (state.role !== "student") redirect("/dashboard");
 
-  const { data: sheet } = await supabase
-    .from("test_sheets")
-    .select(
-      "id, title, description, open_at, due_at, allow_retake, max_attempts",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  // 시험지·배정·문항 수는 서로 독립 — 한 번에 보낸다. 시험지나 배정이 없으면
+  // 404로 끝나 문항 수(개수뿐, RLS 적용)는 그냥 버려진다.
+  const [{ data: sheet }, { data: assignment }, { count: qCount }] =
+    await Promise.all([
+      supabase
+        .from("test_sheets")
+        .select(
+          "id, title, description, open_at, due_at, allow_retake, max_attempts",
+        )
+        .eq("id", id)
+        .maybeSingle(),
+      supabase
+        .from("test_assignments")
+        .select("id")
+        .eq("test_sheet_id", id)
+        .eq("student_id", state.userId)
+        .maybeSingle(),
+      supabase
+        .from("test_sheet_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("test_sheet_id", id),
+    ]);
   if (!sheet) notFound();
-
-  const { data: assignment } = await supabase
-    .from("test_assignments")
-    .select("id")
-    .eq("test_sheet_id", id)
-    .eq("student_id", state.userId)
-    .maybeSingle();
   if (!assignment) notFound();
 
-  const { count: qCount } = await supabase
-    .from("test_sheet_questions")
-    .select("id", { count: "exact", head: true })
-    .eq("test_sheet_id", id);
-
+  // 응시 이력은 배정 id에 기대므로 순차
   const { data: attempts } = await supabase
     .from("test_attempts")
     .select("id, attempt_no, status, score, total_points, submitted_at, started_at")
