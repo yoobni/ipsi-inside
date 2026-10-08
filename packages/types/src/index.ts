@@ -12,3 +12,4 @@ export * from './stats';
 export * from './taxonomy';
 export * from './analysis';
 export * from './dashboard';
+export * from './drills';

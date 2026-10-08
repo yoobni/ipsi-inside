@@ -145,6 +145,37 @@ export type Database = {
         Update: { snapshot_date?: string; student_id?: string; flags?: Json };
         Relationships: [];
       };
+      // ─── OX·인터랙티브 훈련 (20261008090000) ──────────────────────────────
+      drills: {
+        Row: { id: string; title: string; description: string | null; kind: "ox" | "choice" | "classify"; area: PassageSource | null; work_id: string | null; time_limit_sec: number | null; is_published: boolean; published_at: string | null; created_by: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; title: string; description?: string | null; kind: "ox" | "choice" | "classify"; area?: PassageSource | null; work_id?: string | null; time_limit_sec?: number | null; is_published?: boolean; published_at?: string | null; created_by?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; title?: string; description?: string | null; kind?: "ox" | "choice" | "classify"; area?: PassageSource | null; work_id?: string | null; time_limit_sec?: number | null; is_published?: boolean; published_at?: string | null; created_by?: string | null; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      drill_concepts: {
+        Row: { drill_id: string; concept_id: string };
+        Insert: { drill_id: string; concept_id: string };
+        Update: { drill_id?: string; concept_id?: string };
+        Relationships: [];
+      };
+      drill_items: {
+        Row: { id: string; drill_id: string; position: number; prompt: string; payload: Json; answer: Json; explanation: string | null; created_at: string };
+        Insert: { id?: string; drill_id: string; position: number; prompt: string; payload?: Json; answer: Json; explanation?: string | null; created_at?: string };
+        Update: { id?: string; drill_id?: string; position?: number; prompt?: string; payload?: Json; answer?: Json; explanation?: string | null; created_at?: string };
+        Relationships: [];
+      };
+      drill_attempts: {
+        Row: { id: string; student_id: string; drill_id: string; started_at: string; finished_at: string | null; correct: number | null; total: number | null };
+        Insert: { id?: string; student_id: string; drill_id: string; started_at?: string; finished_at?: string | null; correct?: number | null; total?: number | null };
+        Update: { id?: string; student_id?: string; drill_id?: string; started_at?: string; finished_at?: string | null; correct?: number | null; total?: number | null };
+        Relationships: [];
+      };
+      drill_item_results: {
+        Row: { id: string; attempt_id: string; item_id: string; retry_no: number; correct: boolean; elapsed_ms: number | null; answered_at: string };
+        Insert: { id?: string; attempt_id: string; item_id: string; retry_no?: number; correct: boolean; elapsed_ms?: number | null; answered_at?: string };
+        Update: { id?: string; attempt_id?: string; item_id?: string; retry_no?: number; correct?: boolean; elapsed_ms?: number | null; answered_at?: string };
+        Relationships: [];
+      };
       // ─── TOP3 랭킹 설정 (싱글턴 id=1, 원장만) ──────────────────────────────
       ranking_settings: {
         Row: {
@@ -1431,6 +1462,14 @@ export type Database = {
       attempt_analysis: { Args: { p_attempt_id: string }; Returns: Json };
       // 조교 대시보드·관리 필요 — @ipsi/types staffDashboardSchema / riskFlagsSchema
       staff_dashboard: { Args: Record<string, never>; Returns: Json };
+      // 훈련 — @ipsi/types drillPlaySchema / drillAnswerResultSchema / drillFinishSchema
+      drill_play: { Args: { p_drill_id: string }; Returns: Json };
+      start_drill_attempt: { Args: { p_drill_id: string }; Returns: string };
+      submit_drill_answer: {
+        Args: { p_attempt_id: string; p_item_id: string; p_answer: Json; p_elapsed_ms?: number | null };
+        Returns: Json;
+      };
+      finish_drill_attempt: { Args: { p_attempt_id: string }; Returns: Json };
       student_risk_flags: {
         Args: { p_student_ids?: string[] | null; p_include_acked?: boolean };
         Returns: Json;
