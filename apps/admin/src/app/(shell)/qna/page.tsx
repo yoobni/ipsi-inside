@@ -17,6 +17,7 @@ type QuestionRow = {
   body: string;
   status: string;
   created_at: string;
+  starred: boolean;
 };
 
 export default async function QnaAdminPage({
@@ -31,23 +32,36 @@ export default async function QnaAdminPage({
       : "all";
   const supabase = await createServerSupabaseClient();
 
-  // 좋은 질문은 별도 테이블 — 행마다 ★ 표시도 해야 하니 전부 먼저 가져온다.
-  const { data: stars } = await supabase.from("qna_question_stars").select("question_id");
-  const starredIds = (stars ?? []).map((s) => s.question_id);
-  const starredSet = new Set(starredIds);
-
-  let questions: QuestionRow[] = [];
-  if (filter !== "starred" || starredIds.length > 0) {
-    let query = supabase
-      .from("qna_questions")
-      .select("id, student_id, category_id, reference_label, question_no, body, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (filter === "starred") query = query.in("id", starredIds);
-    else if (filter !== "all") query = query.eq("status", filter);
-    const { data } = await query;
-    questions = data ?? [];
-  }
+  // 좋은 질문은 별도 테이블 — 행마다 ★ 표시는 임베드로, '좋은 질문' 탭은 inner join으로.
+  // (id 목록을 .in()으로 넘기면 선정이 수백 개 쌓였을 때 URL이 터진다)
+  const starEmbed = filter === "starred" ? "qna_question_stars!inner(question_id)" : "qna_question_stars(question_id)";
+  let query = supabase
+    .from("qna_questions")
+    .select(
+      `id, student_id, category_id, reference_label, question_no, body, status, created_at, ${starEmbed}`,
+    )
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (filter === "open" || filter === "answered") query = query.eq("status", filter);
+  const [{ data }, { count: starredCount }] = await Promise.all([
+    query,
+    supabase.from("qna_question_stars").select("question_id", { count: "exact", head: true }),
+  ]);
+  const questions: QuestionRow[] = (data ?? []).map((q) => ({
+    id: q.id,
+    student_id: q.student_id,
+    category_id: q.category_id,
+    reference_label: q.reference_label,
+    question_no: q.question_no,
+    body: q.body,
+    status: q.status,
+    created_at: q.created_at,
+    // 1:1 임베드는 객체 또는 null, 혹시 배열로 와도 처리
+    starred: Array.isArray(q.qna_question_stars)
+      ? q.qna_question_stars.length > 0
+      : q.qna_question_stars != null,
+  }));
+  const starredIds = { length: starredCount ?? 0 };
 
   const studentIds = [...new Set(questions.map((q) => q.student_id))];
   const catIds = [...new Set(questions.map((q) => q.category_id).filter(Boolean))] as string[];
@@ -112,7 +126,7 @@ export default async function QnaAdminPage({
                 className="hover:border-primary/40 block rounded-md border bg-card px-4 py-3 transition-colors"
               >
                 <div className="mb-1 flex items-center gap-2">
-                  {starredSet.has(q.id) && (
+                  {q.starred && (
                     <Star
                       className="size-3.5 fill-amber-400 text-amber-400"
                       aria-label="좋은 질문"

@@ -154,9 +154,12 @@ export async function ensureStaff(
   if (staff.level === "assistant") {
     const studentIds = [...new Set(opts.studentIds ?? [])];
     if (studentIds.length > 0) {
+      // role='student' 로 좁힌다 — 조교의 profiles 읽기 정책은 본인 행과 담당 학생의
+      // 학부모도 돌려주므로, 그 id로 마킹·플래너를 쓰는 걸 여기서 막는다.
       const { data } = await supabase
         .from("profiles")
         .select("id")
+        .eq("role", "student")
         .in("id", studentIds);
       const visible = new Set((data ?? []).map((r) => r.id));
       if (studentIds.some((id) => !visible.has(id))) {

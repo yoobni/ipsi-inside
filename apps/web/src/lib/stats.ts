@@ -140,7 +140,11 @@ export function deriveStats(s: StudentStats): DerivedStats {
   );
   const jCur = cur ? journalRate(cur) : { rate: null, basis: "class_days" as const };
   const jPrev = prev ? journalRate(prev) : { rate: null, basis: "class_days" as const };
-  const journal = { ...withDelta(jCur.rate, jPrev.rate), basis: jCur.basis };
+  // 두 주의 분모 기준(출석일 / 평일)이 다르면 비교가 성립하지 않는다 — 델타 없음
+  const journal = {
+    ...withDelta(jCur.rate, jCur.basis === jPrev.basis ? jPrev.rate : null),
+    basis: jCur.basis,
+  };
 
   const mPrev = s.months[0];
   const mCur = s.months[1];

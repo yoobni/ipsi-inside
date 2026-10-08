@@ -1117,7 +1117,17 @@ export type Database = {
           starred_by?: string | null;
           created_at?: string;
         };
-        Relationships: [];
+        // 어드민 Q&A 목록이 qna_questions 쪽에서 `qna_question_stars(question_id)`로
+        // 임베드한다 — 수백 개 id를 .in()으로 넘기지 않기 위해.
+        Relationships: [
+          {
+            foreignKeyName: "qna_question_stars_question_id_fkey";
+            columns: ["question_id"];
+            isOneToOne: true;
+            referencedRelation: "qna_questions";
+            referencedColumns: ["id"];
+          },
+        ];
       };
 
       planner_weeks: {

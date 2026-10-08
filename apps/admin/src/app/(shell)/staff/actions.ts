@@ -57,19 +57,33 @@ async function replaceScope(
   groupIds: string[],
 ) {
   const db = createAdminSupabaseClient();
-  // 통째로 교체 — 체크박스 UI와 1:1, 벌크 우선.
-  await db.from("staff_student_scope").delete().eq("staff_id", staffId);
-  await db.from("staff_group_scope").delete().eq("staff_id", staffId);
+  // 결과는 "통째로 교체"지만(체크박스 UI와 1:1), 순서는 **추가 → 제거**. 트랜잭션이
+  // 없는 두 번의 호출이라, 먼저 지우고 넣다가 실패하면 조교 범위가 통째로 비어
+  // 담당 학생 데이터가 전부 닫힌다. 넣고 나서 지우면 실패해도 넓은 쪽에 멈춘다.
   if (studentIds.length > 0) {
-    const { error } = await db.from("staff_student_scope").insert(
+    const { error } = await db.from("staff_student_scope").upsert(
       studentIds.map((student_id) => ({ staff_id: staffId, student_id, added_by: ownerId })),
+      { onConflict: "staff_id,student_id", ignoreDuplicates: true },
     );
     if (error) return error;
   }
   if (groupIds.length > 0) {
-    const { error } = await db.from("staff_group_scope").insert(
+    const { error } = await db.from("staff_group_scope").upsert(
       groupIds.map((group_id) => ({ staff_id: staffId, group_id, added_by: ownerId })),
+      { onConflict: "staff_id,group_id", ignoreDuplicates: true },
     );
+    if (error) return error;
+  }
+  {
+    let q = db.from("staff_student_scope").delete().eq("staff_id", staffId);
+    if (studentIds.length > 0) q = q.not("student_id", "in", `(${studentIds.join(",")})`);
+    const { error } = await q;
+    if (error) return error;
+  }
+  {
+    let q = db.from("staff_group_scope").delete().eq("staff_id", staffId);
+    if (groupIds.length > 0) q = q.not("group_id", "in", `(${groupIds.join(",")})`);
+    const { error } = await q;
     if (error) return error;
   }
   return null;
@@ -127,11 +141,19 @@ export async function createStaffAction(
     scope_mode: data.scopeMode,
     updated_by: check.adminId,
   });
-  if (settingsErr) return { ok: false, message: friendlyDbError(settingsErr) };
+  if (settingsErr) {
+    // 설정 없는 반쪽 계정을 남기지 않는다(auth 삭제 → profiles cascade). 같은 이메일로
+    // 다시 시도할 수 있어야 한다.
+    await db.auth.admin.deleteUser(staffId);
+    return { ok: false, message: friendlyDbError(settingsErr) };
+  }
 
   const scope = await validateScopeIds(data.studentIds, data.groupIds);
   const scopeErr = await replaceScope(staffId, check.adminId, scope.studentIds, scope.groupIds);
-  if (scopeErr) return { ok: false, message: friendlyDbError(scopeErr) };
+  if (scopeErr) {
+    await db.auth.admin.deleteUser(staffId);
+    return { ok: false, message: friendlyDbError(scopeErr) };
+  }
 
   const h = await headers();
   await logAdminAccess({
