@@ -10,6 +10,7 @@ import {
   MessagesSquare,
   NotebookPen,
   ShieldCheck,
+  Trophy,
   UserCheck,
   UserCog,
   Users,
@@ -34,6 +35,7 @@ const ICONS: Record<string, LucideIcon> = {
   "/announcements": Megaphone,
   "/columns": BookMarked,
   "/qna": MessagesSquare,
+  "/ranking": Trophy,
   "/staff": UserCog,
   "/access-logs": ShieldCheck,
 };

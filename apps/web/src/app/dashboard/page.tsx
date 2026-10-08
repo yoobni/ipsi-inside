@@ -14,7 +14,7 @@ import { AnnouncementBanner } from "@/components/announcement-banner";
 import { WrongAccountNotice } from "@/components/wrong-account-notice";
 import { getMyNotifications } from "@/lib/notifications";
 import { getActiveAnnouncements } from "@/lib/announcements";
-import { getStudentStats } from "@/lib/stats";
+import { getStudentStats, getTop3Boards } from "@/lib/stats";
 import { JournalSubmit } from "./journal-submit";
 import { TodayReportCard } from "./today-report";
 import { WeeklySummary, type DailyRecord } from "./weekly-summary";
@@ -60,6 +60,7 @@ export default async function DashboardPage() {
   let plannerToday: { total: number; checked: number } | null = null;
   // 이번 주 요약 카드(리포트 입구) — 첫 자녀 기준
   let stats: Awaited<ReturnType<typeof getStudentStats>> = null;
+  let top3: Awaited<ReturnType<typeof getTop3Boards>> = null;
   let notif: Awaited<ReturnType<typeof getMyNotifications>> = {
     items: [],
     unreadCount: 0,
@@ -95,6 +96,7 @@ export default async function DashboardPage() {
       records,
       plannerRes,
       statsRes,
+      top3Res,
       notifRes,
       announcementsRes,
     ] = await Promise.all([
@@ -216,8 +218,9 @@ export default async function DashboardPage() {
         return { total: taskIds.length, checked: count ?? 0 };
       })(),
 
-      // 학습 리포트 요약 (RPC 한 번)
+      // 학습 리포트 요약 + TOP3 (RPC 각 한 번)
       targetStudentId ? getStudentStats(supabase, targetStudentId) : Promise.resolve(null),
+      targetStudentId ? getTop3Boards(supabase, targetStudentId) : Promise.resolve(null),
 
       // 알림 + 공지
       notifP,
@@ -275,6 +278,7 @@ export default async function DashboardPage() {
 
     plannerToday = plannerRes;
     stats = statsRes;
+    top3 = top3Res;
     notif = notifRes;
     announcements = announcementsRes;
   }
@@ -364,9 +368,10 @@ export default async function DashboardPage() {
             )}
 
             {/* 이번 주 요약 + 리포트 입구 (모바일엔 내비가 없어 여기가 유일한 길) */}
-            {stats && (
+            {(stats || top3) && (
               <WeeklyPulse
                 stats={stats}
+                top3={top3}
                 studentName={state.role === "parent" ? weeklyStudentName : undefined}
               />
             )}

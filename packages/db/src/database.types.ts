@@ -126,6 +126,46 @@ export type Database = {
         Update: { staff_id?: string; group_id?: string; added_by?: string | null; added_at?: string };
         Relationships: [];
       };
+      // ─── TOP3 랭킹 설정 (싱글턴 id=1, 원장만) ──────────────────────────────
+      ranking_settings: {
+        Row: {
+          id: number;
+          name_display: "masked" | "full";
+          scope: "all" | "group";
+          show_homework: boolean;
+          show_attendance: boolean;
+          show_growth: boolean;
+          show_test: boolean;
+          featured_test_sheet_id: string | null;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          name_display?: "masked" | "full";
+          scope?: "all" | "group";
+          show_homework?: boolean;
+          show_attendance?: boolean;
+          show_growth?: boolean;
+          show_test?: boolean;
+          featured_test_sheet_id?: string | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          name_display?: "masked" | "full";
+          scope?: "all" | "group";
+          show_homework?: boolean;
+          show_attendance?: boolean;
+          show_growth?: boolean;
+          show_test?: boolean;
+          featured_test_sheet_id?: string | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       parent_student_links: {
         Row: { parent_id: string; student_id: string; created_at: string };
         Insert: { parent_id: string; student_id: string; created_at?: string };
@@ -1305,6 +1345,13 @@ export type Database = {
       // 학생 학습 리포트 집계 — @ipsi/types studentStatsSchema로 파싱.
       // 본인·연결 학부모·교직원이 아니면 null.
       student_stats: { Args: { p_student: string }; Returns: Json };
+      // TOP3 보드 — @ipsi/types top3BoardsSchema로 파싱. p_student 없으면 호출자 본인,
+      // p_group은 교직원 미리보기 전용.
+      top3_boards: {
+        Args: { p_student?: string | null; p_group?: string | null };
+        Returns: Json;
+      };
+      ranking_mask_name: { Args: { p_name: string }; Returns: string };
       attempt_total_score: {
         Args: { p_attempt_id: string };
         Returns: {

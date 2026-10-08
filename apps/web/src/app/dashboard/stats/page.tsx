@@ -5,7 +5,13 @@ import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { STATS_AREA_WINDOW_DAYS, STATS_WEEKS } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
 import { getMyNotifications, type NotificationItem } from "@/lib/notifications";
-import { attendanceRate, deriveStats, getStudentStats, homeworkRate } from "@/lib/stats";
+import {
+  attendanceRate,
+  deriveStats,
+  getStudentStats,
+  getTop3Boards,
+  homeworkRate,
+} from "@/lib/stats";
 import { LogoutButton } from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -17,6 +23,7 @@ import { InsightCard } from "./insight-card";
 import { TestTrendChart, type TrendPoint } from "./test-trend-chart";
 import { WeeklyBarsChart, type WeekBar } from "./weekly-bars-chart";
 import { AreaChart } from "./area-chart";
+import { Top3Boards } from "./top3-boards";
 
 export const dynamic = "force-dynamic";
 
@@ -62,9 +69,10 @@ export default async function StatsPage({
       null;
   }
 
-  const [notif, stats] = await Promise.all([
+  const [notif, stats, top3] = await Promise.all([
     getMyNotifications(supabase, state.userId),
     targetId ? getStudentStats(supabase, targetId) : Promise.resolve(null),
+    targetId ? getTop3Boards(supabase, targetId) : Promise.resolve(null),
   ]);
 
   const derived = stats ? deriveStats(stats) : null;
@@ -114,14 +122,20 @@ export default async function StatsPage({
           }
         />
       ) : !derived.hasAnyData ? (
-        <EmptyCard
-          title="아직 쌓인 기록이 없어요"
-          body="플래너를 체크하고, 일지를 쓰고, 시험을 보면 여기에 변화가 그래프로 보여요."
-        />
+        <>
+          <EmptyCard
+            title="아직 쌓인 기록이 없어요"
+            body="플래너를 체크하고, 일지를 쓰고, 시험을 보면 여기에 변화가 그래프로 보여요."
+          />
+          {/* 기록이 없어도 다른 친구들의 TOP3는 자극이 된다 */}
+          {top3 && <Top3Boards data={top3} viewerIsStudent={state.role === "student"} />}
+        </>
       ) : (
         <>
           <InsightCard d={derived} />
           <StatTiles d={derived} />
+
+          {top3 && <Top3Boards data={top3} viewerIsStudent={state.role === "student"} />}
 
           {/* 시험 추이 */}
           <Section

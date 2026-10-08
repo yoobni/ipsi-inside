@@ -106,6 +106,7 @@ export const ADMIN_MENU: AdminMenuItem[] = [
   { href: '/announcements', label: '공지사항', access: 'announcements', matchPrefix: '/announcements' },
   { href: '/columns', label: '칼럼', access: 'columns', matchPrefix: '/columns' },
   { href: '/qna', label: 'Q&A', access: 'qna', matchPrefix: '/qna' },
+  { href: '/ranking', label: 'TOP3 랭킹', access: 'owner', matchPrefix: '/ranking' },
   { href: '/staff', label: '조교 관리', access: 'owner', matchPrefix: '/staff' },
   { href: '/access-logs', label: '접속기록', access: 'owner', matchPrefix: '/access-logs' },
 ];

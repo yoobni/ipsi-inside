@@ -1,28 +1,40 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import type { StudentStats } from "@ipsi/types";
+import { ArrowRight, Trophy } from "lucide-react";
+import type { StudentStats, Top3Boards } from "@ipsi/types";
 import { DeltaBadge } from "@/components/delta-badge";
 import { buildInsight, deriveStats } from "@/lib/stats";
+import { cn } from "@/lib/utils";
 
 /**
- * 홈 카드 — 이번 주 요약(과제·출석·일지, 지난주 대비) + 한 줄 인사이트 + 리포트 링크.
- * 모바일엔 상단 내비가 없어서 이 카드가 /dashboard/stats 로 가는 유일한 입구다.
+ * 홈 카드 — 이번 주 요약(과제·출석·일지, 지난주 대비) + 한 줄 인사이트 + TOP3 한 줄
+ * + 리포트 링크. 모바일엔 상단 내비가 없어서 이 카드가 /dashboard/stats 로 가는
+ * 유일한 입구다.
  */
 export function WeeklyPulse({
   stats,
+  top3,
   studentName,
 }: {
-  stats: StudentStats;
+  stats: StudentStats | null;
+  top3: Top3Boards | null;
   studentName?: string;
 }) {
-  const d = deriveStats(stats);
-  if (!d.hasAnyData) return null;
+  const d = stats ? deriveStats(stats) : null;
+  // 보여줄 TOP3 한 줄 — 내가 든 보드 우선, 없으면 항목 있는 첫 보드
+  const strip =
+    top3?.boards.find((b) => b.entries.some((e) => e.is_me)) ??
+    top3?.boards.find((b) => b.entries.length > 0) ??
+    null;
 
-  const tiles = [
-    { label: "과제", v: d.homework },
-    { label: "출석", v: d.attendance },
-    { label: "일지", v: d.journal },
-  ];
+  if ((!d || !d.hasAnyData) && !strip) return null;
+
+  const tiles = d
+    ? [
+        { label: "과제", v: d.homework },
+        { label: "출석", v: d.attendance },
+        { label: "일지", v: d.journal },
+      ]
+    : [];
 
   return (
     <Link
@@ -34,23 +46,48 @@ export function WeeklyPulse({
           <p className="text-sm font-bold">
             {studentName ? `${studentName}의 이번 주` : "이번 주 나는"}
           </p>
-          <p className="text-muted-foreground mt-0.5 truncate text-xs">{buildInsight(d)}</p>
+          {d && d.hasAnyData && (
+            <p className="text-muted-foreground mt-0.5 truncate text-xs">{buildInsight(d)}</p>
+          )}
         </div>
         <span className="text-primary inline-flex shrink-0 items-center gap-1 text-xs font-bold">
           리포트 보기 <ArrowRight className="size-3.5" />
         </span>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        {tiles.map((t) => (
-          <div key={t.label} className="border-hairline rounded-[10px] border p-2.5">
-            <p className="text-muted-foreground text-[11px]">{t.label}</p>
-            <p className="mt-0.5 text-lg font-extrabold tabular-nums">
-              {t.v.rate === null ? "–" : `${t.v.rate}%`}
-            </p>
-            {t.v.rate !== null && <DeltaBadge delta={t.v.delta} className="mt-0.5" />}
-          </div>
-        ))}
-      </div>
+
+      {d && d.hasAnyData && (
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {tiles.map((t) => (
+            <div key={t.label} className="border-hairline rounded-[10px] border p-2.5">
+              <p className="text-muted-foreground text-[11px]">{t.label}</p>
+              <p className="mt-0.5 text-lg font-extrabold tabular-nums">
+                {t.v.rate === null ? "–" : `${t.v.rate}%`}
+              </p>
+              {t.v.rate !== null && <DeltaBadge delta={t.v.delta} className="mt-0.5" />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {strip && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span className="inline-flex items-center gap-1 font-bold">
+            <Trophy className="text-primary size-3.5" />
+            {strip.title}
+          </span>
+          {strip.entries.map((e, i) => (
+            <span
+              key={`${e.rank}-${i}`}
+              className={cn(
+                "rounded-full border px-2 py-0.5",
+                e.is_me ? "border-primary bg-primary/10 font-bold" : "border-hairline text-muted-foreground",
+              )}
+            >
+              {e.rank}위 {e.is_me ? (studentName ? "자녀" : "나") : e.name}
+            </span>
+          ))}
+        </div>
+      )}
     </Link>
   );
 }

@@ -6,9 +6,11 @@ import {
   TEST_DELTA_WINDOW,
   plannerRate,
   studentStatsSchema,
+  top3BoardsSchema,
   type PassageSource,
   type StatsWeek,
   type StudentStats,
+  type Top3Boards,
 } from "@ipsi/types";
 
 /**
@@ -22,6 +24,23 @@ export async function getStudentStats(
   const { data, error } = await supabase.rpc("student_stats", { p_student: studentId });
   if (error || data == null) return null;
   const parsed = studentStatsSchema.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * TOP3 보드. 학생은 본인 기준, 학부모는 자녀 id를 넘긴다(연결 안 된 자녀면 RPC가
+ * raise → null). 원장이 보드를 다 꺼두면 boards가 빈 배열.
+ */
+export async function getTop3Boards(
+  supabase: SupabaseClient<Database>,
+  studentId?: string,
+): Promise<Top3Boards | null> {
+  const { data, error } = await supabase.rpc("top3_boards", {
+    p_student: studentId ?? null,
+    p_group: null,
+  });
+  if (error || data == null) return null;
+  const parsed = top3BoardsSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
 }
 
