@@ -15,6 +15,7 @@ const ITEMS = [
   { key: "stats", href: "/dashboard/stats", label: "리포트" },
   { key: "drills", href: "/dashboard/drills", label: "훈련" },
   { key: "library", href: "/dashboard/library", label: "작품·개념" },
+  { key: "guides", href: "/dashboard/guides", label: "가이드" },
   { key: "journal", href: "/dashboard/journal", label: "일지" },
   { key: "qna", href: "/dashboard/qna", label: "Q&A" },
   { key: "columns", href: "/dashboard/columns", label: "칼럼" },

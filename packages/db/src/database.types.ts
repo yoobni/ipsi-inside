@@ -183,6 +183,25 @@ export type Database = {
         Update: { id?: string; student_id?: string; sheet_id?: string; tag_kind?: "type" | "work" | "concept" | "area"; tag_id?: string | null; tag_label?: string; created_by?: "student" | "staff"; created_at?: string };
         Relationships: [];
       };
+      // ─── 학습 가이드 (20261008120000) ─────────────────────────────────────
+      guides: {
+        Row: { id: string; title: string; summary: string | null; work_id: string | null; status: "draft" | "published"; published_at: string | null; created_by: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; title: string; summary?: string | null; work_id?: string | null; status?: "draft" | "published"; published_at?: string | null; created_by?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; title?: string; summary?: string | null; work_id?: string | null; status?: "draft" | "published"; published_at?: string | null; created_by?: string | null; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      guide_steps: {
+        Row: { id: string; guide_id: string; position: number; kind: string; title: string; payload: Json; created_at: string };
+        Insert: { id?: string; guide_id: string; position: number; kind: string; title: string; payload?: Json; created_at?: string };
+        Update: { id?: string; guide_id?: string; position?: number; kind?: string; title?: string; payload?: Json; created_at?: string };
+        Relationships: [];
+      };
+      guide_progress: {
+        Row: { guide_id: string; step_id: string; student_id: string; completed_at: string };
+        Insert: { guide_id: string; step_id: string; student_id: string; completed_at?: string };
+        Update: { guide_id?: string; step_id?: string; student_id?: string; completed_at?: string };
+        Relationships: [];
+      };
       // ─── TOP3 랭킹 설정 (싱글턴 id=1, 원장만) ──────────────────────────────
       ranking_settings: {
         Row: {
@@ -1486,6 +1505,8 @@ export type Database = {
       // 라이브러리(허브) — @ipsi/types libraryIndexSchema / libraryDetailSchema
       library_index: { Args: Record<string, never>; Returns: Json };
       library_detail: { Args: { p_kind: string; p_id: string }; Returns: Json };
+      // 학습 가이드 — 발행된 가이드의 read 단계 지문 본문만(@ipsi/types guidePassageSchema)
+      guide_passage: { Args: { p_guide_id: string; p_passage_id: string }; Returns: Json };
       create_practice_set: {
         Args: { p_tag_kind: string; p_tag_id: string; p_size?: number; p_for_student?: string | null };
         Returns: string;

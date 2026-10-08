@@ -15,3 +15,4 @@ export * from './dashboard';
 export * from './drills';
 export * from './mastery';
 export * from './library';
+export * from './guides';

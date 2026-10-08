@@ -45,10 +45,14 @@ export default async function LibraryDetailPage({ params }: { params: Promise<{ 
     targetId = links?.[0]?.student_id ?? null;
   }
 
-  const [notif, { data }, mastery] = await Promise.all([
+  const [notif, { data }, mastery, { data: guides }] = await Promise.all([
     getMyNotifications(supabase, state.userId),
     supabase.rpc("library_detail", { p_kind: k, p_id: id }),
     targetId ? getStudentMastery(supabase, targetId) : Promise.resolve(null),
+    // 발행된 학습 가이드(RLS) — 작품 페이지에서만
+    k === "work"
+      ? supabase.from("guides").select("id, title, summary").eq("work_id", id).eq("status", "published").order("published_at", { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; title: string; summary: string | null }[] }),
   ]);
   const parsed = data == null ? null : libraryDetailSchema.safeParse(data);
   if (!parsed || !parsed.success) notFound();
@@ -108,6 +112,23 @@ export default async function LibraryDetailPage({ params }: { params: Promise<{ 
               {k === "source" ? "기출 출처 단위로는 성취도를 따로 집계하지 않아요." : "아직 이 태그의 문항을 푼 기록이 없어요."}
             </p>
           )}
+        </section>
+      )}
+
+      {/* 학습 가이드 */}
+      {(guides ?? []).length > 0 && (
+        <section className="border-hairline bg-surface rounded-[14px] border p-5">
+          <h2 className="text-sm font-extrabold">학습 가이드</h2>
+          <ul className="mt-2 space-y-1.5">
+            {(guides ?? []).map((g) => (
+              <li key={g.id}>
+                <Link href={`/dashboard/guides/${g.id}`} className="hover:border-primary/40 border-hairline block rounded-md border px-3 py-2 text-sm transition-colors">
+                  <span className="font-medium">{g.title}</span>
+                  {g.summary && <span className="text-muted-foreground ml-2 text-xs">{g.summary}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

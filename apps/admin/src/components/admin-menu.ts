@@ -1,6 +1,7 @@
 import {
   BookMarked,
   BookOpen,
+  BookOpenCheck,
   CalendarCheck,
   CalendarRange,
   FileDown,
@@ -32,6 +33,7 @@ const ICONS: Record<string, LucideIcon> = {
   "/passages": BookOpen,
   "/tests": FileText,
   "/drills": Puzzle,
+  "/guides": BookOpenCheck,
   "/materials": FileDown,
   "/planner": CalendarRange,
   "/journals": NotebookPen,
