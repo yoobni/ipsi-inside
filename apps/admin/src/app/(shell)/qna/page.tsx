@@ -1,10 +1,23 @@
 import Link from "next/link";
-import { Settings } from "lucide-react";
+import { Settings, Star } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
+
+type Filter = "all" | "open" | "answered" | "starred";
+
+type QuestionRow = {
+  id: string;
+  student_id: string;
+  category_id: string | null;
+  reference_label: string | null;
+  question_no: string | null;
+  body: string;
+  status: string;
+  created_at: string;
+};
 
 export default async function QnaAdminPage({
   searchParams,
@@ -12,19 +25,32 @@ export default async function QnaAdminPage({
   searchParams: Promise<{ filter?: string }>;
 }) {
   const sp = await searchParams;
-  const filter = sp.filter === "answered" ? "answered" : sp.filter === "open" ? "open" : "all";
+  const filter: Filter =
+    sp.filter === "answered" || sp.filter === "open" || sp.filter === "starred"
+      ? sp.filter
+      : "all";
   const supabase = await createServerSupabaseClient();
 
-  let query = supabase
-    .from("qna_questions")
-    .select("id, student_id, category_id, reference_label, question_no, body, status, created_at")
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (filter !== "all") query = query.eq("status", filter);
-  const { data: questions } = await query;
+  // 좋은 질문은 별도 테이블 — 행마다 ★ 표시도 해야 하니 전부 먼저 가져온다.
+  const { data: stars } = await supabase.from("qna_question_stars").select("question_id");
+  const starredIds = (stars ?? []).map((s) => s.question_id);
+  const starredSet = new Set(starredIds);
 
-  const studentIds = [...new Set((questions ?? []).map((q) => q.student_id))];
-  const catIds = [...new Set((questions ?? []).map((q) => q.category_id).filter(Boolean))] as string[];
+  let questions: QuestionRow[] = [];
+  if (filter !== "starred" || starredIds.length > 0) {
+    let query = supabase
+      .from("qna_questions")
+      .select("id, student_id, category_id, reference_label, question_no, body, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (filter === "starred") query = query.in("id", starredIds);
+    else if (filter !== "all") query = query.eq("status", filter);
+    const { data } = await query;
+    questions = data ?? [];
+  }
+
+  const studentIds = [...new Set(questions.map((q) => q.student_id))];
+  const catIds = [...new Set(questions.map((q) => q.category_id).filter(Boolean))] as string[];
   const [{ data: students }, { data: cats }] = await Promise.all([
     studentIds.length
       ? supabase.from("profiles").select("id, full_name").in("id", studentIds)
@@ -58,6 +84,7 @@ export default async function QnaAdminPage({
           { k: "all", label: "전체" },
           { k: "open", label: "답변 대기" },
           { k: "answered", label: "답변 완료" },
+          { k: "starred", label: `좋은 질문 ${starredIds.length}` },
         ].map((f) => (
           <Button
             key={f.k}
@@ -70,19 +97,27 @@ export default async function QnaAdminPage({
         ))}
       </div>
 
-      {(questions ?? []).length === 0 ? (
+      {questions.length === 0 ? (
         <div className="text-muted-foreground rounded-md border border-dashed py-16 text-center text-sm">
-          해당하는 질문이 없어요.
+          {filter === "starred"
+            ? "아직 선정한 좋은 질문이 없어요. 질문 상세에서 ★로 선정해요."
+            : "해당하는 질문이 없어요."}
         </div>
       ) : (
         <ul className="space-y-2">
-          {(questions ?? []).map((q) => (
+          {questions.map((q) => (
             <li key={q.id}>
               <Link
                 href={`/qna/${q.id}`}
                 className="hover:border-primary/40 block rounded-md border bg-card px-4 py-3 transition-colors"
               >
                 <div className="mb-1 flex items-center gap-2">
+                  {starredSet.has(q.id) && (
+                    <Star
+                      className="size-3.5 fill-amber-400 text-amber-400"
+                      aria-label="좋은 질문"
+                    />
+                  )}
                   <span className="font-medium">{nameOf.get(q.student_id) ?? "학생"}</span>
                   {q.category_id && catOf.get(q.category_id) && (
                     <Badge variant="primary">{catOf.get(q.category_id)}</Badge>

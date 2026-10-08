@@ -990,6 +990,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      qna_question_stars: {
+        Row: {
+          question_id: string;
+          starred_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          question_id: string;
+          starred_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          question_id?: string;
+          starred_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
 
       planner_weeks: {
         Row: {

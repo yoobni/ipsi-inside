@@ -140,6 +140,36 @@ export async function generateDraftAction(
   return { ok: true, draft: res.draft };
 }
 
+/**
+ * 좋은 질문 선정 토글. 별도 테이블(qna_question_stars)에 넣고 빼기만 한다 —
+ * 학생에게는 보이지 않고, 나중에 콘텐츠·수업 자료로 쓰려고 모아 두는 것.
+ */
+export async function toggleQuestionStarAction(
+  questionId: string,
+  starred: boolean,
+): Promise<Result> {
+  const check = await ensureAdmin();
+  if ("error" in check) return check.error;
+  const { supabase, userId } = check;
+
+  const { error } = starred
+    ? await supabase
+        .from("qna_question_stars")
+        .upsert(
+          { question_id: questionId, starred_by: userId },
+          { onConflict: "question_id", ignoreDuplicates: true },
+        )
+    : await supabase
+        .from("qna_question_stars")
+        .delete()
+        .eq("question_id", questionId);
+  if (error) return { ok: false, message: friendlyDbError(error) };
+
+  revalidatePath("/qna");
+  revalidatePath(`/qna/${questionId}`);
+  return { ok: true };
+}
+
 // ── 카테고리(가이드라인) 관리 ────────────────────────────────────────────────
 export async function upsertCategoryAction(
   id: string | null,

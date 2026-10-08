@@ -6,6 +6,7 @@ import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnswerPanel } from "../answer-panel";
+import { StarToggle } from "./star-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +25,13 @@ export default async function QnaDetailPage({
     .maybeSingle();
   if (!q) notFound();
 
-  const [{ data: student }, { data: cat }, { data: answer }] = await Promise.all([
+  const [{ data: student }, { data: cat }, { data: answer }, { data: star }] = await Promise.all([
     supabase.from("profiles").select("full_name, school, grade").eq("id", q.student_id).maybeSingle(),
     q.category_id
       ? supabase.from("qna_categories").select("label").eq("id", q.category_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("qna_answers").select("body, published_at").eq("question_id", id).maybeSingle(),
+    supabase.from("qna_question_stars").select("question_id").eq("question_id", id).maybeSingle(),
   ]);
 
   // 첨부 사진 signed URL (admin은 전체 select 권한)
@@ -62,6 +64,7 @@ export default async function QnaDetailPage({
               {q.reference_label}{q.question_no ? ` · ${q.question_no}` : ""}
             </span>
           )}
+          <StarToggle questionId={q.id} initialStarred={!!star} />
         </div>
         <p className="text-sm whitespace-pre-wrap">{q.body}</p>
         {imageUrl && (
