@@ -18,7 +18,7 @@ import {
   type PlannerBlockInput,
   type PlannerBlockKind,
 } from "@ipsi/types";
-import { ensureAdmin } from "@/lib/auth";
+import { ensureStaff } from "@/lib/auth";
 
 type Fail = { ok: false; message: string };
 type Result = { ok: true } | Fail;
@@ -42,14 +42,15 @@ export async function savePlannerWeekAction(input: {
   week_start: string;
   blocks: PlannerBlockInput[];
 }): Promise<SaveResult> {
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
-
   const parsed = plannerWeekSaveSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
   }
   const { student_id, week_start, blocks } = parsed.data;
+
+  // 아래는 전부 service_role 쓰기라 RLS가 안 본다 — 담당 학생인지 여기서 확인.
+  const check = await ensureStaff({ permission: "planner", studentIds: [student_id] });
+  if ("error" in check) return check.error;
 
   const overlap = findPlannerOverlap(blocks);
   if (overlap) return { ok: false, message: overlap };
@@ -255,12 +256,13 @@ export async function publishPlannerWeekAction(
   weekId: string,
   publish: boolean,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "planner" });
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
 
-  const { data: week } = await db
+  // 주차는 세션(RLS)으로 읽는다 — 담당이 아닌 학생의 주차면 null이라 여기서 끝난다.
+  const { data: week } = await check.supabase
     .from("planner_weeks")
     .select("id, student_id, week_start, status")
     .eq("id", weekId)
@@ -439,7 +441,7 @@ export async function savePlannerWeeklyCommentAction(input: {
   week_id: string;
   weekly_comment: string | null;
 }): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "planner" });
   if ("error" in check) return check.error;
 
   const parsed = plannerWeeklyCommentSchema.safeParse(input);
@@ -449,7 +451,8 @@ export async function savePlannerWeeklyCommentAction(input: {
 
   const db = createAdminSupabaseClient();
 
-  const { data: week } = await db
+  // 주차는 세션(RLS)으로 읽는다 — 담당이 아닌 학생의 주차면 null.
+  const { data: week } = await check.supabase
     .from("planner_weeks")
     .select("id, student_id, week_start, status, weekly_comment")
     .eq("id", parsed.data.week_id)
@@ -540,7 +543,7 @@ export async function savePlannerTemplateAction(input: {
   description?: string | null;
   blocks: PlannerBlockInput[];
 }): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "planner" });
   if ("error" in check) return check.error;
 
   const parsed = plannerTemplateSaveSchema.safeParse({
@@ -581,7 +584,7 @@ export async function renamePlannerTemplateAction(input: {
   name: string;
   description?: string | null;
 }): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "planner" });
   if ("error" in check) return check.error;
 
   const parsed = plannerTemplateRenameSchema.safeParse(input);
@@ -607,7 +610,7 @@ export async function renamePlannerTemplateAction(input: {
 export async function deletePlannerTemplateAction(
   templateId: string,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "planner" });
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
@@ -640,9 +643,6 @@ export async function applyPlannerTemplateAction(input: {
   on_conflict?: "skip" | "overwrite";
   publish?: boolean;
 }): Promise<ApplyResult> {
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
-
   const parsed = plannerTemplateApplySchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
@@ -650,6 +650,14 @@ export async function applyPlannerTemplateAction(input: {
   const { template_id, student_ids, group_ids, on_conflict, publish } =
     parsed.data;
   const weekStart = weekStartOf(parsed.data.week_start);
+
+  // 직접 지정한 학생은 전부 담당이어야 한다(아니면 메시지). 그룹은 아래에서
+  // 세션(RLS)으로 펼쳐서 담당 멤버만 남긴다.
+  const check = await ensureStaff({
+    permission: "planner",
+    studentIds: student_ids ?? [],
+  });
+  if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
 
@@ -672,7 +680,7 @@ export async function applyPlannerTemplateAction(input: {
   // 1) 대상 학생 확정 — 직접 지정 + 그룹의 현재 멤버
   const targetIds = new Set<string>(student_ids ?? []);
   if ((group_ids ?? []).length > 0) {
-    const { data: members } = await db
+    const { data: members } = await check.supabase
       .from("group_members")
       .select("student_id")
       .in("group_id", group_ids ?? []);
@@ -852,8 +860,16 @@ export async function applyPlannerTemplateAction(input: {
 
 /** 주차 삭제 — 블록/과제/체크가 cascade로 함께 사라진다 */
 export async function deletePlannerWeekAction(weekId: string): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "planner" });
   if ("error" in check) return check.error;
+
+  // 세션(RLS)으로 먼저 찾는다 — 담당이 아닌 학생의 주차면 null.
+  const { data: week } = await check.supabase
+    .from("planner_weeks")
+    .select("id")
+    .eq("id", weekId)
+    .maybeSingle();
+  if (!week) return { ok: false, message: "플래너를 찾을 수 없습니다" };
 
   const db = createAdminSupabaseClient();
   const { error } = await db.from("planner_weeks").delete().eq("id", weekId);

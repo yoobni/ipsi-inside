@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { logAdminAccess } from "@ipsi/lib";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { ensureOwner } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -15,23 +15,12 @@ type Result = { ok: true } | { ok: false; message: string };
  * 사실 자체도 같은 테이블에 남긴다(감사받을 때 내놓을 게 이것뿐이다).
  */
 export async function markReviewedAction(note?: string): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "로그인이 필요합니다" };
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, status")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (profile?.role !== "admin" || profile?.status !== "approved") {
-    return { ok: false, message: "권한이 없습니다" };
-  }
+  // 접속기록 점검은 원장의 일이다.
+  const check = await ensureOwner();
+  if ("error" in check) return check.error;
 
   await logAdminAccess({
-    actorId: user.id,
+    actorId: check.adminId,
     action: "audit.review",
     detail: note && note.trim() ? { note: note.trim() } : null,
     headers: await headers(),

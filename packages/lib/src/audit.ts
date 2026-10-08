@@ -26,7 +26,13 @@ export type AdminAccessAction =
   // 열람 라우트뿐). 그 화면이 생기면 이 값을 쓴다.
   | 'proof.view'
   // 접속기록을 점검했다는 사실 자체 — 고시는 보관과 점검을 둘 다 요구한다.
-  | 'audit.review';
+  | 'audit.review'
+  // 조교 계정 수명주기 — 누가 어떤 개인정보 범위를 받았는지가 곧 취급자 지정 기록이다.
+  | 'staff.create'
+  | 'staff.update' // 이름·연락처·권한·범위 변경 (detail에 before/after)
+  | 'staff.deactivate'
+  | 'staff.reactivate'
+  | 'staff.password.issue';
 
 export type AdminAccessLogInput = {
   actorId: string;

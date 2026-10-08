@@ -84,6 +84,7 @@ export async function submitJournalAction(
       .from("profiles")
       .select("id")
       .eq("role", "admin")
+      .eq("admin_level", "owner")
       .eq("status", "approved");
     const notifs = (admins ?? []).map((a) => ({
       user_id: a.id,

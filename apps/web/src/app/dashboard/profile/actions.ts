@@ -243,7 +243,8 @@ export async function withdrawAction(
     const { data: admins } = await admin
       .from("profiles")
       .select("id")
-      .eq("role", "admin");
+      .eq("role", "admin")
+      .eq("admin_level", "owner");
     const recipients = [
       ...(linkedParents ?? []).map((l) => l.parent_id),
       ...(admins ?? []).map((a) => a.id),

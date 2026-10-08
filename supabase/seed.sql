@@ -4,11 +4,14 @@
 -- 실제 어드민 계정은 Supabase Auth Admin API로 별도 생성한 뒤 profile 삽입.
 -- 본 파일은 supabase db reset 등 로컬 초기화 시 재현용 — 실제 운영 적용시
 -- 아래 id 자리에 운영 admin user의 uuid를 넣어 실행.
+--
+-- 원장은 role='admin' + admin_level='owner'. 조교(admin_level='assistant')는
+-- 어드민 앱의 /staff 화면에서 원장이 만든다(staff_settings·scope도 같이).
 -- ============================================================================
 
 -- ravi@ravi.com (auth.users.id = 7f02bc43-d1c7-4f32-9a78-febd1e89b43d) — 2026-06-16 생성
--- insert into public.profiles (id, role, status, full_name, phone, approved_at)
+-- insert into public.profiles (id, role, admin_level, status, full_name, phone, approved_at)
 -- values (
 --   '7f02bc43-d1c7-4f32-9a78-febd1e89b43d'::uuid,
---   'admin', 'approved', '원장 (관리자)', '010-0000-0000', now()
+--   'admin', 'owner', 'approved', '원장 (관리자)', '010-0000-0000', now()
 -- );

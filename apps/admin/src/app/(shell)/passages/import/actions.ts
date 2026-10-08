@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { friendlyDbError, sanitizeRichHtml } from "@ipsi/lib";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { ensureStaff } from "@/lib/auth";
 import {
   PASSAGE_SOURCE,
   passageWithQuestionsSchema,
@@ -92,11 +92,9 @@ export async function importPassagesCsvAction(
     buckets.set(title, cur);
   }
 
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({ permission: "passages" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const errors: string[] = [];
   let passageCount = 0;
@@ -155,7 +153,7 @@ export async function importPassagesCsvAction(
         content: sanitizeRichHtml(parsed.data.passage.content),
         unit_major: parsed.data.passage.unit_major,
         unit_minor: parsed.data.passage.unit_minor ?? null,
-        created_by: user.id,
+        created_by: check.adminId,
       })
       .select("id")
       .single();

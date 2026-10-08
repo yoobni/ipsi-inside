@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { loginSchema } from "@ipsi/types";
+import { firstAllowedHref, loginSchema, type PermissionKey } from "@ipsi/types";
 import {
   checkRateLimit,
   extractClientIp,
@@ -65,14 +65,19 @@ export async function adminLoginAction(
     return { ok: false, message: "이메일 또는 비밀번호가 올바르지 않습니다" };
   }
 
-  // 반드시 admin role + approved 상태여야 함
+  // 반드시 admin role + approved 상태 + 급(owner|assistant)이 있어야 함
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, status")
+    .select("role, status, admin_level")
     .eq("id", signIn.user.id)
     .maybeSingle();
 
-  if (!profile || profile.role !== "admin" || profile.status !== "approved") {
+  if (
+    !profile ||
+    profile.role !== "admin" ||
+    profile.status !== "approved" ||
+    !profile.admin_level
+  ) {
     await supabase.auth.signOut();
     return {
       ok: false,
@@ -80,8 +85,20 @@ export async function adminLoginAction(
     };
   }
 
+  // 원장은 가입 승인으로, 조교는 허용된 첫 메뉴로. (임시 비밀번호면 proxy가
+  // /account/password 로 돌린다)
+  let permissions: PermissionKey[] = [];
+  if (profile.admin_level === "assistant") {
+    const { data: settings } = await supabase
+      .from("staff_settings")
+      .select("permissions")
+      .eq("staff_id", signIn.user.id)
+      .maybeSingle();
+    permissions = (settings?.permissions ?? []) as PermissionKey[];
+  }
+
   revalidatePath("/", "layout");
-  redirect("/members/pending");
+  redirect(firstAllowedHref(profile.admin_level, permissions));
 }
 
 export async function adminLogoutAction() {

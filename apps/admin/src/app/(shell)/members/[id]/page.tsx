@@ -9,6 +9,7 @@ import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { todayKst } from "@/lib/kst";
+import { getStaffContext } from "@/lib/auth";
 import { MemberReport, type ReportData } from "./member-report";
 
 export const dynamic = "force-dynamic";
@@ -22,15 +23,17 @@ export default async function MemberDetailPage({
   const supabase = await createServerSupabaseClient();
 
   // 회원 조회와 열람자 확인은 서로 무관 — 한 번에.
-  const [{ data: member }, { data: { user: viewer } }] = await Promise.all([
+  // (조교는 RLS가 담당 학생만 돌려주므로 범위 밖이면 그냥 notFound)
+  const [{ data: member }, ctx] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, role, status, full_name, phone, school, grade, created_at, approved_at")
       .eq("id", id)
       .maybeSingle(),
-    supabase.auth.getUser(),
+    getStaffContext(),
   ]);
   if (!member) notFound();
+  const viewer = ctx?.staff ?? null;
 
   // 이름·연락처·학교가 화면에 뜨는 순간이 곧 개인정보 열람이다 — 남긴다.
   // (안전성 확보조치 고시 제8조. proxy.ts가 admin+approved만 통과시키므로
@@ -310,10 +313,13 @@ export default async function MemberDetailPage({
             회원 목록
           </Link>
         </Button>
-        <ResetPasswordButton
-          profileId={data.member.id}
-          memberName={data.member.full_name}
-        />
+        {/* 비밀번호 재설정은 원장만 (액션도 ensureOwner로 막혀 있다) */}
+        {viewer?.level === "owner" && (
+          <ResetPasswordButton
+            profileId={data.member.id}
+            memberName={data.member.full_name}
+          />
+        )}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

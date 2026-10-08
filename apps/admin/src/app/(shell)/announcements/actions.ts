@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
+import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { ensureStaff } from "@/lib/auth";
 
 type Result = { ok: true; id?: string } | { ok: false; message: string };
 
@@ -19,11 +20,9 @@ export async function upsertAnnouncementAction(
   _prev: unknown,
   fd: FormData,
 ): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({ permission: "announcements" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const parsed = inputSchema.safeParse({
     title: fd.get("title"),
@@ -56,7 +55,7 @@ export async function upsertAnnouncementAction(
         body: parsed.data.body ?? null,
         audience: parsed.data.audience,
         expires_at: parsed.data.expires_at ?? null,
-        created_by: user.id,
+        created_by: check.adminId,
       })
       .select("id")
       .single();
@@ -71,11 +70,9 @@ export async function togglePublishAction(
   publish: boolean,
   publishAtIso?: string | null,
 ): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({ permission: "announcements" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const { data: ann } = await supabase
     .from("announcements")
@@ -100,8 +97,11 @@ export async function togglePublishAction(
   if (error) return { ok: false, message: friendlyDbError(error) };
 
   // 발행 시 알림 푸시 (audience에 맞춰) — created_at = publish 시각 (예약이면 미래)
+  // 수신자는 service_role로 센다 — 세션(RLS)으로 세면 조교는 담당 학생만 보여서
+  // 공지는 전체에게 열리는데 알림은 일부에게만 가는 어긋남이 생긴다.
   if (publish && effectivePublishedAt) {
-    let userQuery = supabase
+    const db = createAdminSupabaseClient();
+    let userQuery = db
       .from("profiles")
       .select("id")
       .eq("status", "approved");
@@ -120,7 +120,7 @@ export async function togglePublishAction(
       created_at: effectivePublishedAt,
     }));
     if (notifs.length > 0) {
-      await supabase.from("notifications").insert(notifs);
+      await db.from("notifications").insert(notifs);
     }
   }
 
@@ -129,7 +129,9 @@ export async function togglePublishAction(
 }
 
 export async function deleteAnnouncementAction(id: string): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "announcements" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
   const { error } = await supabase
     .from("announcements")
     .delete()

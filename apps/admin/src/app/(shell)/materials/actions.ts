@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import type { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { ensureStaff } from "@/lib/auth";
 import {
   materialAssignmentSchema,
   materialInputSchema,
@@ -30,11 +31,9 @@ export async function createMaterialAction(
   _prev: unknown,
   fd: FormData,
 ): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({ permission: "materials" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   let filesRaw: unknown = [];
   try {
@@ -68,7 +67,7 @@ export async function createMaterialAction(
       description: parsed.data.description ?? null,
       audience: parsed.data.audience,
       expires_at: parsed.data.expires_at ?? null,
-      created_by: user.id,
+      created_by: check.adminId,
     })
     .select("id")
     .single();
@@ -102,7 +101,7 @@ export async function createMaterialAction(
       const rows = groupIds.map((gid) => ({
         material_id: data.id,
         group_id: gid,
-        added_by: user.id,
+        added_by: check.adminId,
       }));
       const { error: gErr } = await supabase
         .from("material_group_targets")
@@ -138,11 +137,9 @@ export async function updateMaterialAction(
     };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({ permission: "materials" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const { error } = await supabase
     .from("materials")
@@ -163,7 +160,7 @@ export async function updateMaterialAction(
       const rows = groupIds.map((gid) => ({
         material_id: id,
         group_id: gid,
-        added_by: user.id,
+        added_by: check.adminId,
       }));
       const { error: gErr } = await supabase
         .from("material_group_targets")
@@ -178,7 +175,9 @@ export async function updateMaterialAction(
 }
 
 export async function deleteMaterialAction(id: string): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "materials" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   // 묶음 파일 경로 수집 (스토리지 정리용) — 단건 컬럼 잔재도 함께
   const { data: files } = await supabase
@@ -212,7 +211,9 @@ export async function togglePublishMaterialAction(
   publish: boolean,
   publishAtIso?: string | null,
 ): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "materials" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const { data: m } = await supabase
     .from("materials")
@@ -273,11 +274,12 @@ export async function assignMaterialAction(
     return { ok: false, message: e instanceof Error ? e.message : "검증 실패" };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({
+    permission: "materials",
+    studentIds: parsed.student_ids ?? [],
+  });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const { data: material } = await supabase
     .from("materials")
@@ -324,7 +326,7 @@ export async function assignMaterialAction(
   const rows = targets.map((t) => ({
     material_id: parsed.material_id,
     student_id: t.student_id,
-    assigned_by: user.id,
+    assigned_by: check.adminId,
     assigned_by_school: t.school,
   }));
 
@@ -398,7 +400,9 @@ export async function unassignMaterialAction(
   materialId: string,
   studentId: string,
 ): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "materials" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
   const { error } = await supabase
     .from("material_assignments")
     .delete()

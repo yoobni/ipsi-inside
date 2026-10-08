@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
-import { ensureAdmin } from "@/lib/auth";
+import { ensureStaff } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -20,7 +20,7 @@ type UpsertFields = {
 };
 
 export async function upsertDailyAction(fields: UpsertFields): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "daily", studentIds: [fields.studentId] });
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
@@ -70,7 +70,7 @@ export async function bulkMarkDailyAction(params: {
   attendance?: Attendance;
   homework_grade?: HomeworkGrade;
 }): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "daily", studentIds: params.studentIds });
   if ("error" in check) return check.error;
 
   if (params.studentIds.length === 0)

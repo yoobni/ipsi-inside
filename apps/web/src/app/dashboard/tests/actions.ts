@@ -175,6 +175,7 @@ export async function submitAttemptAction(
             .from("profiles")
             .select("id")
             .eq("role", "admin")
+            .eq("admin_level", "owner")
             .eq("status", "approved"),
         ]);
 

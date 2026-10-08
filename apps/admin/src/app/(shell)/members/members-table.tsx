@@ -81,10 +81,13 @@ export function MembersTable({
   members,
   links,
   approvedStudents,
+  canManage,
 }: {
   members: Member[];
   links: Link[];
   approvedStudents: Student[];
+  /** 원장만 true — 정지·학부모 연결 변경 UI를 보여줄지 */
+  canManage: boolean;
 }) {
   const [tab, setTab] = useState<TabValue>("all");
   const [query, setQuery] = useState("");
@@ -200,6 +203,7 @@ export function MembersTable({
         links={links}
         approvedStudents={approvedStudents}
         allMembers={members}
+        canManage={canManage}
         onClose={() => setSelected(null)}
       />
     </div>
@@ -218,12 +222,14 @@ function MemberDrawer({
   links,
   approvedStudents,
   allMembers,
+  canManage,
   onClose,
 }: {
   member: Member | null;
   links: Link[];
   approvedStudents: Student[];
   allMembers: Member[];
+  canManage: boolean;
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -346,7 +352,11 @@ function MemberDrawer({
                 {member.role === "parent" && (
                   <Section
                     title="자녀 연결"
-                    description="이 학부모와 연결된 학생을 추가하거나 해제해요."
+                    description={
+                      canManage
+                        ? "이 학부모와 연결된 학생을 추가하거나 해제해요."
+                        : "이 학부모와 연결된 학생이에요. 변경은 원장만 할 수 있어요."
+                    }
                   >
                     <div className="space-y-3">
                       {linkedStudents.length === 0 ? (
@@ -370,6 +380,7 @@ function MemberDrawer({
                                   {s.grade ? ` · ${s.grade}학년` : ""}
                                 </p>
                               </div>
+                              {canManage && (
                               <Button
                                 size="icon"
                                 variant="ghost"
@@ -387,11 +398,13 @@ function MemberDrawer({
                               >
                                 <Trash2 className="text-destructive size-4" />
                               </Button>
+                              )}
                             </li>
                           ))}
                         </ul>
                       )}
 
+                      {canManage && (
                       <div className="space-y-2">
                         <Label htmlFor="add-student">자녀 추가</Label>
                         <div className="flex gap-2">
@@ -435,6 +448,7 @@ function MemberDrawer({
                           </Button>
                         </div>
                       </div>
+                      )}
                     </div>
                   </Section>
                 )}
@@ -457,6 +471,7 @@ function MemberDrawer({
               </div>
             </div>
 
+            {canManage && (
             <SheetFooter className="border-t">
               <div className="flex w-full gap-2">
                 {member.status === "suspended" ? (
@@ -483,6 +498,7 @@ function MemberDrawer({
                 )}
               </div>
             </SheetFooter>
+            )}
           </>
         )}
       </SheetContent>

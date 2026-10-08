@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { friendlyDbError, logAdminAccess } from "@ipsi/lib";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
-import { ensureAdmin } from "@/lib/auth";
+import { ensureOwner } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -12,7 +12,7 @@ export async function approveProfileAction(
   profileId: string,
   matchedStudentId?: string | null,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureOwner();
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
@@ -68,7 +68,7 @@ export async function approveProfileAction(
 }
 
 export async function rejectProfileAction(profileId: string): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureOwner();
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();

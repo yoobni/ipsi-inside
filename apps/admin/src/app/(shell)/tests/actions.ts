@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { ensureStaff } from "@/lib/auth";
 import {
   assignmentInputSchema,
   testSheetCompositionSchema,
@@ -27,11 +27,9 @@ export async function createTestSheetAction(
     return { ok: false, message: e instanceof Error ? e.message : "검증 실패" };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({ permission: "tests" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const { data: sheet, error: sErr } = await supabase
     .from("test_sheets")
@@ -44,7 +42,7 @@ export async function createTestSheetAction(
       due_at: parsed.meta.due_at ?? null,
       allow_retake: parsed.meta.allow_retake,
       max_attempts: parsed.meta.max_attempts ?? null,
-      created_by: user.id,
+      created_by: check.adminId,
     })
     .select("id")
     .single();
@@ -82,7 +80,9 @@ export async function updateTestSheetAction(
     return { ok: false, message: e instanceof Error ? e.message : "검증 실패" };
   }
 
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "tests" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   // 응시 시작된 적 있으면 거부
   const { count } = await supabase
@@ -141,11 +141,9 @@ export async function updateTestSheetAction(
 export async function duplicateTestSheetAction(
   sourceId: string,
 ): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({ permission: "tests" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const { data: source } = await supabase
     .from("test_sheets")
@@ -168,7 +166,7 @@ export async function duplicateTestSheetAction(
       due_at: null,
       allow_retake: source.allow_retake,
       max_attempts: source.max_attempts,
-      created_by: user.id,
+      created_by: check.adminId,
     })
     .select("id")
     .single();
@@ -200,7 +198,9 @@ export async function duplicateTestSheetAction(
 }
 
 export async function deleteTestSheetAction(testSheetId: string): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "tests" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
   const { error } = await supabase
     .from("test_sheets")
     .delete()
@@ -228,11 +228,12 @@ export async function assignAction(
     return { ok: false, message: e instanceof Error ? e.message : "검증 실패" };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({
+    permission: "tests",
+    studentIds: parsed.student_ids ?? [],
+  });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   // 학교 단위 → 그 학교 활성 학생 enum
   const targets: { student_id: string; school: string | null }[] = [];
@@ -291,7 +292,7 @@ export async function assignAction(
   const rows = targets.map((t) => ({
     test_sheet_id: parsed.test_sheet_id,
     student_id: t.student_id,
-    assigned_by: user.id,
+    assigned_by: check.adminId,
     assigned_by_school: t.school,
   }));
 
@@ -355,7 +356,9 @@ export async function resetAttemptsAction(
   testSheetId: string,
   studentId: string,
 ): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "tests" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const { data: asg } = await supabase
     .from("test_assignments")
@@ -379,7 +382,9 @@ export async function unassignAction(
   testSheetId: string,
   studentId: string,
 ): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "tests" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   // 응시 기록 있으면 거부
   const { count } = await supabase

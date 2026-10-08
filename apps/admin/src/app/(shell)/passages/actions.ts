@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { friendlyDbError, sanitizeRichHtml } from "@ipsi/lib";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { ensureStaff } from "@/lib/auth";
 import { passageWithQuestionsSchema, type QuestionChoice } from "@ipsi/types";
 
 type Result = { ok: true; id: string } | { ok: false; message: string };
@@ -26,11 +26,9 @@ export async function createPassageWithQuestionsAction(
     };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "인증 필요" };
+  const check = await ensureStaff({ permission: "passages" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   const { data: passage, error: pErr } = await supabase
     .from("passages")
@@ -40,7 +38,7 @@ export async function createPassageWithQuestionsAction(
       content: sanitizeRichHtml(parsed.passage.content),
       unit_major: parsed.passage.unit_major,
       unit_minor: parsed.passage.unit_minor ?? null,
-      created_by: user.id,
+      created_by: check.adminId,
     })
     .select("id")
     .single();
@@ -91,7 +89,9 @@ export async function updatePassageWithQuestionsAction(
     return { ok: false, message: e instanceof Error ? e.message : "검증 실패" };
   }
 
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "passages" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   // 시험지에 사용 중이고 학생이 응시 시작한 적 있는지 확인
   const { data: existingQs } = await supabase
@@ -165,7 +165,9 @@ export async function updatePassageWithQuestionsAction(
 }
 
 export async function deletePassageAction(passageId: string): Promise<Result> {
-  const supabase = await createServerSupabaseClient();
+  const check = await ensureStaff({ permission: "passages" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
 
   // 시험지에 들어가 있는지 확인
   const { count } = await supabase

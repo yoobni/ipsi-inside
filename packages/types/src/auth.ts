@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 const phoneRegex = /^01[0-9]-?\d{3,4}-?\d{4}$/;
 
+/** 휴대폰 번호 — 가입·조교 등록이 같이 쓴다. */
+export const phoneSchema = z
+  .string()
+  .regex(phoneRegex, '올바른 휴대폰 번호 형식이 아닙니다 (010-0000-0000)');
+
 /**
  * 비밀번호 규칙 — 가입·재설정·변경 세 경로가 모두 이걸 쓴다.
  *
@@ -23,9 +28,7 @@ const baseSignupSchema = z.object({
   password: passwordSchema,
   passwordConfirm: z.string(),
   fullName: z.string().min(2, '이름을 입력해주세요').max(20),
-  phone: z
-    .string()
-    .regex(phoneRegex, '올바른 휴대폰 번호 형식이 아닙니다 (010-0000-0000)'),
+  phone: phoneSchema,
 });
 
 export const studentSignupSchema = baseSignupSchema

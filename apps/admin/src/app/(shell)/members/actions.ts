@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { friendlyDbError, logAdminAccess } from "@ipsi/lib";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
-import { ensureAdmin } from "@/lib/auth";
+import { ensureOwner } from "@/lib/auth";
+import { generateTempPassword } from "@/lib/temp-password";
 
 type Result = { ok: true } | { ok: false; message: string };
 
 export async function suspendMemberAction(profileId: string): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureOwner();
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
@@ -27,7 +28,7 @@ export async function suspendMemberAction(profileId: string): Promise<Result> {
 export async function unsuspendMemberAction(
   profileId: string,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureOwner();
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
@@ -45,7 +46,7 @@ export async function addParentStudentLinkAction(
   parentId: string,
   studentId: string,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureOwner();
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
@@ -81,7 +82,7 @@ export async function removeParentStudentLinkAction(
   parentId: string,
   studentId: string,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureOwner();
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
@@ -110,9 +111,9 @@ export async function removeParentStudentLinkAction(
 export async function issueTempPasswordAction(
   profileId: string,
 ): Promise<{ ok: true; tempPassword: string } | { ok: false; message: string }> {
-  const check = await ensureAdmin();
+  const check = await ensureOwner();
   if ("error" in check) {
-    // ensureAdmin의 Result는 성공 변형도 포함해서 그대로 반환하면 좁혀지지 않는다
+    // ensureOwner의 Result는 성공 변형도 포함해서 그대로 반환하면 좁혀지지 않는다
     return {
       ok: false,
       message:
@@ -160,15 +161,4 @@ export async function issueTempPasswordAction(
   revalidatePath("/members");
   revalidatePath(`/members/${profileId}`);
   return { ok: true, tempPassword };
-}
-
-/**
- * 임시 비밀번호 생성. 원장이 구두나 문자로 전달하므로 헷갈리는 글자
- * (0/O, 1/l/I)를 빼고, 읽어주기 쉬운 10자로 만든다.
- */
-function generateTempPassword(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  const bytes = new Uint32Array(10);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }

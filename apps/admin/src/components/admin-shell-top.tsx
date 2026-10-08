@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -9,7 +10,7 @@ import { getMyNotifications } from "@/lib/notifications";
 import { adminLogoutAction } from "@/app/login/actions";
 
 /**
- * 사이드바와 함께 쓰는 상단 바 — 모바일 메뉴 + 알림 종 + 테마 토글 + 로그아웃.
+ * 사이드바와 함께 쓰는 상단 바 — 모바일 메뉴 + 로그인한 교직원 + 알림 종 + 테마 토글 + 로그아웃.
  *
  * 이 컴포넌트 자체는 데이터를 기다리지 않는다. 예전엔 여기서 곧바로
  * getUser + 알림 2쿼리를 await 했는데, 이 상단 바는 섹션마다 있는 layout에
@@ -17,11 +18,24 @@ import { adminLogoutAction } from "@/app/login/actions";
  * 자료 배부로 넘어갈 때 체감되던 지연). 알림만 Suspense 뒤로 흘려보내면
  * 셸은 즉시 그려지고 종만 뒤늦게 채워진다.
  */
-export function AdminShellTop() {
+export function AdminShellTop({
+  allowedHrefs,
+  staffLabel,
+}: {
+  allowedHrefs: string[];
+  staffLabel: string;
+}) {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-1 border-b bg-background px-4">
-      <AdminMobileMenu />
+      <AdminMobileMenu allowedHrefs={allowedHrefs} />
       <div className="ml-auto flex items-center gap-1">
+        <Link
+          href="/account/password"
+          className="text-muted-foreground hover:text-foreground hidden px-2 text-xs sm:inline"
+          title="비밀번호 변경"
+        >
+          {staffLabel}
+        </Link>
         <Suspense fallback={<NotificationBellSkeleton />}>
           <NotificationBellSlot />
         </Suspense>

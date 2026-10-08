@@ -2,114 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BookOpen,
-  CalendarCheck,
-  CalendarRange,
-  FileDown,
-  FileText,
-  Layers,
-  BookMarked,
-  Megaphone,
-  MessagesSquare,
-  NotebookPen,
-  ShieldCheck,
-  UserCheck,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isMenuActive, menuEntries } from "@/components/admin-menu";
 
-type MenuItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  matchPrefix?: string;
-};
-
-const MENU: MenuItem[] = [
-  {
-    href: "/members/pending",
-    label: "가입 승인",
-    icon: UserCheck,
-    matchPrefix: "/members/pending",
-  },
-  {
-    href: "/members",
-    label: "회원 관리",
-    icon: Users,
-    matchPrefix: undefined,
-  },
-  {
-    href: "/groups",
-    label: "그룹(반)",
-    icon: Layers,
-    matchPrefix: "/groups",
-  },
-  {
-    href: "/passages",
-    label: "지문/문항",
-    icon: BookOpen,
-    matchPrefix: "/passages",
-  },
-  {
-    href: "/tests",
-    label: "시험 관리",
-    icon: FileText,
-    matchPrefix: "/tests",
-  },
-  {
-    href: "/materials",
-    label: "자료 배부",
-    icon: FileDown,
-    matchPrefix: "/materials",
-  },
-  {
-    href: "/planner",
-    label: "주간 플래너",
-    icon: CalendarRange,
-    matchPrefix: "/planner",
-  },
-  {
-    href: "/journals",
-    label: "학습 일지",
-    icon: NotebookPen,
-    matchPrefix: "/journals",
-  },
-  {
-    href: "/daily",
-    label: "일일 마킹",
-    icon: CalendarCheck,
-    matchPrefix: "/daily",
-  },
-  {
-    href: "/announcements",
-    label: "공지사항",
-    icon: Megaphone,
-    matchPrefix: "/announcements",
-  },
-  {
-    href: "/columns",
-    label: "칼럼",
-    icon: BookMarked,
-    matchPrefix: "/columns",
-  },
-  {
-    href: "/qna",
-    label: "Q&A",
-    icon: MessagesSquare,
-    matchPrefix: "/qna",
-  },
-  {
-    href: "/access-logs",
-    label: "접속기록",
-    icon: ShieldCheck,
-    matchPrefix: "/access-logs",
-  },
-];
-
-export function AdminSidebar() {
+/**
+ * 좌측 사이드바. layout이 교직원 권한으로 거른 href 목록만 넘긴다(아이콘 같은
+ * 함수는 서버→클라이언트 경계를 못 넘으니 여기서 붙인다) —
+ * 조교에게는 허용된 메뉴만 보인다(직접 URL은 proxy가 막는다).
+ */
+export function AdminSidebar({ allowedHrefs }: { allowedHrefs: string[] }) {
   const pathname = usePathname();
+  const items = menuEntries(allowedHrefs);
 
   return (
     <aside className="hidden w-60 shrink-0 border-r bg-card md:flex md:flex-col">
@@ -128,11 +31,9 @@ export function AdminSidebar() {
 
       <nav className="flex-1 px-2 py-4">
         <ul className="space-y-0.5">
-          {MENU.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
-            const active = item.matchPrefix
-              ? pathname.startsWith(item.matchPrefix)
-              : pathname === item.href;
+            const active = isMenuActive(item, pathname);
             return (
               <li key={item.href}>
                 <Link

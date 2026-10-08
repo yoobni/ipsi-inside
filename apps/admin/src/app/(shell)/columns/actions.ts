@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { columnCategoryInputSchema, columnInputSchema } from "@ipsi/types";
 import { friendlyDbError, sanitizeRichHtml } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
-import { ensureAdmin as ensureAdminBase } from "@/lib/auth";
+import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
+import { ensureStaff } from "@/lib/auth";
 
 type Result = { ok: true; id?: string } | { ok: false; message: string };
 
@@ -15,13 +16,13 @@ type AdminOk = {
 type AdminErr = { error: { ok: false; message: string } };
 
 /**
- * 관리자 확인 — 공용 ensureAdmin(@/lib/auth)에 이 화면 문구만 얹는다.
+ * 교직원 확인 — 공용 ensureStaff(@/lib/auth)에 '칼럼' 권한과 이 화면 문구를 얹는다.
  * RLS만 믿지 않고 앱단에서도 막는 방어심층화.
  */
 async function ensureAdmin(): Promise<AdminOk | AdminErr> {
-  const check = await ensureAdminBase({
-    unauthenticated: "인증 필요",
-    forbidden: "권한이 없어요",
+  const check = await ensureStaff({
+    permission: "columns",
+    messages: { unauthenticated: "인증 필요", forbidden: "권한이 없어요" },
   });
   if ("error" in check) return check;
   return { supabase: check.supabase, userId: check.adminId };
@@ -106,7 +107,10 @@ export async function toggleColumnPublishAction(
   if (error) return { ok: false, message: friendlyDbError(error) };
 
   if (publish && effectiveAt && !alreadyNotified) {
-    const { data: users } = await supabase
+    // 수신자는 service_role로 센다 — 세션(RLS)으로 세면 조교는 담당 학생만 보여서
+    // 칼럼은 전체에게 열리는데 알림은 일부에게만 가는 어긋남이 생긴다.
+    // (권한 확인은 위 ensureAdmin에서 끝났다)
+    const { data: users } = await createAdminSupabaseClient()
       .from("profiles")
       .select("id")
       .eq("status", "approved")

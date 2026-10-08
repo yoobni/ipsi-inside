@@ -3,55 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import {
-  BookOpen,
-  CalendarCheck,
-  CalendarRange,
-  FileDown,
-  FileText,
-  Layers,
-  BookMarked,
-  Megaphone,
-  Menu,
-  MessagesSquare,
-  NotebookPen,
-  ShieldCheck,
-  UserCheck,
-  Users,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-type MenuItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  matchPrefix?: string;
-};
-
-const MENU: MenuItem[] = [
-  { href: "/members/pending", label: "가입 승인", icon: UserCheck, matchPrefix: "/members/pending" },
-  { href: "/members", label: "회원 관리", icon: Users },
-  { href: "/groups", label: "그룹(반)", icon: Layers, matchPrefix: "/groups" },
-  { href: "/passages", label: "지문/문항", icon: BookOpen, matchPrefix: "/passages" },
-  { href: "/tests", label: "시험 관리", icon: FileText, matchPrefix: "/tests" },
-  { href: "/materials", label: "자료 배부", icon: FileDown, matchPrefix: "/materials" },
-  { href: "/planner", label: "주간 플래너", icon: CalendarRange, matchPrefix: "/planner" },
-  { href: "/journals", label: "학습 일지", icon: NotebookPen, matchPrefix: "/journals" },
-  { href: "/daily", label: "일일 마킹", icon: CalendarCheck, matchPrefix: "/daily" },
-  { href: "/announcements", label: "공지사항", icon: Megaphone, matchPrefix: "/announcements" },
-  { href: "/columns", label: "칼럼", icon: BookMarked, matchPrefix: "/columns" },
-  { href: "/qna", label: "Q&A", icon: MessagesSquare, matchPrefix: "/qna" },
-  { href: "/access-logs", label: "접속기록", icon: ShieldCheck, matchPrefix: "/access-logs" },
-];
+import { isMenuActive, menuEntries } from "@/components/admin-menu";
 
 /**
  * 모바일 전용 햄버거 메뉴 — md 이상에선 사이드바, md 미만에선 이거.
+ * 사이드바와 같은 href 목록(layout이 권한으로 거른 것)을 받아 아이콘을 붙인다.
  */
-export function AdminMobileMenu() {
+export function AdminMobileMenu({ allowedHrefs }: { allowedHrefs: string[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const items = menuEntries(allowedHrefs);
 
   return (
     <>
@@ -96,11 +59,9 @@ export function AdminMobileMenu() {
             </div>
             <nav className="px-2 py-4">
               <ul className="space-y-0.5">
-                {MENU.map((item) => {
+                {items.map((item) => {
                   const Icon = item.icon;
-                  const active = item.matchPrefix
-                    ? pathname.startsWith(item.matchPrefix)
-                    : pathname === item.href;
+                  const active = isMenuActive(item, pathname);
                   return (
                     <li key={item.href}>
                       <Link

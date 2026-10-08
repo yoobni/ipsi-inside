@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { friendlyDbError } from "@ipsi/lib";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
-import { ensureAdmin } from "@/lib/auth";
+import { ensureStaff } from "@/lib/auth";
 
 type Fail = { ok: false; message: string };
 type Result = { ok: true } | Fail;
@@ -12,12 +12,17 @@ type CreateResult = { ok: true; id: string } | Fail;
 
 const nameSchema = z.string().trim().min(1, "그룹 이름을 입력해주세요").max(40);
 
+// 아래 액션은 전부 service_role로 쓴다(RLS 우회). 그래서 'groups' 권한과
+// 담당 그룹·담당 학생 여부를 ensureStaff에서 먼저 확인한다 — 특히
+// addGroupMembersAction의 studentIds 검사는 "범위 밖 학생을 내 그룹에 넣어 담당으로
+// 만드는" 범위 확장을 막는 핵심이다(DB 정책도 같은 조건으로 막는다).
+
 export async function createGroupAction(input: {
   name: string;
   color?: string | null;
   description?: string | null;
 }): Promise<CreateResult> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "groups" });
   if ("error" in check) return check.error;
 
   const parsed = nameSchema.safeParse(input.name);
@@ -48,7 +53,7 @@ export async function updateGroupAction(
   id: string,
   input: { name?: string; color?: string | null; description?: string | null },
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "groups", groupIds: [id] });
   if ("error" in check) return check.error;
 
   const patch: {
@@ -79,7 +84,7 @@ export async function archiveGroupAction(
   id: string,
   archived: boolean,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "groups", groupIds: [id] });
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
@@ -93,7 +98,7 @@ export async function archiveGroupAction(
 }
 
 export async function deleteGroupAction(id: string): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({ permission: "groups", groupIds: [id] });
   if ("error" in check) return check.error;
 
   // group_members는 on delete cascade로 함께 삭제됨.
@@ -108,7 +113,11 @@ export async function addGroupMembersAction(
   groupId: string,
   studentIds: string[],
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({
+    permission: "groups",
+    groupIds: [groupId],
+    studentIds,
+  });
   if ("error" in check) return check.error;
   if (studentIds.length === 0) return { ok: true };
 
@@ -144,7 +153,11 @@ export async function removeGroupMemberAction(
   groupId: string,
   studentId: string,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureStaff({
+    permission: "groups",
+    groupIds: [groupId],
+    studentIds: [studentId],
+  });
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();

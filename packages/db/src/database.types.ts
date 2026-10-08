@@ -50,6 +50,8 @@ export type Database = {
           privacy_agreed_at: string | null;
           marketing_agreed_at: string | null;
           must_change_password: boolean;
+          // role='admin'일 때만 값이 있다(owner|assistant). 학생·학부모는 null.
+          admin_level: "owner" | "assistant" | null;
         };
         Insert: {
           id: string;
@@ -66,6 +68,7 @@ export type Database = {
           privacy_agreed_at?: string | null;
           marketing_agreed_at?: string | null;
           must_change_password?: boolean;
+          admin_level?: "owner" | "assistant" | null;
         };
         Update: {
           id?: string;
@@ -82,7 +85,45 @@ export type Database = {
           privacy_agreed_at?: string | null;
           marketing_agreed_at?: string | null;
           must_change_password?: boolean;
+          admin_level?: "owner" | "assistant" | null;
         };
+        Relationships: [];
+      };
+      // ─── 조교 권한·범위 (원장만 쓴다, 조교는 본인 행 읽기만) ─────────────────
+      staff_settings: {
+        Row: {
+          staff_id: string;
+          permissions: string[];
+          scope_mode: "all" | "scoped";
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          staff_id: string;
+          permissions?: string[];
+          scope_mode?: "all" | "scoped";
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          staff_id?: string;
+          permissions?: string[];
+          scope_mode?: "all" | "scoped";
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      staff_student_scope: {
+        Row: { staff_id: string; student_id: string; added_by: string | null; added_at: string };
+        Insert: { staff_id: string; student_id: string; added_by?: string | null; added_at?: string };
+        Update: { staff_id?: string; student_id?: string; added_by?: string | null; added_at?: string };
+        Relationships: [];
+      };
+      staff_group_scope: {
+        Row: { staff_id: string; group_id: string; added_by: string | null; added_at: string };
+        Insert: { staff_id: string; group_id: string; added_by?: string | null; added_at?: string };
+        Update: { staff_id?: string; group_id?: string; added_by?: string | null; added_at?: string };
         Relationships: [];
       };
       parent_student_links: {
@@ -1249,6 +1290,13 @@ export type Database = {
       current_profile_role: { Args: Record<string, never>; Returns: string };
       current_profile_status: { Args: Record<string, never>; Returns: string };
       is_admin: { Args: Record<string, never>; Returns: boolean };
+      // 원장/조교 분리 — is_admin()은 "승인된 교직원 전체"로 남겨두고 아래로 좁힌다.
+      is_owner: { Args: Record<string, never>; Returns: boolean };
+      is_assistant: { Args: Record<string, never>; Returns: boolean };
+      staff_has_permission: { Args: { p_permission: string }; Returns: boolean };
+      staff_can_access_student: { Args: { p_student_id: string }; Returns: boolean };
+      staff_can_access_profile: { Args: { p_profile_id: string }; Returns: boolean };
+      staff_can_access_group: { Args: { p_group_id: string }; Returns: boolean };
       planner_task_date: { Args: { p_task_id: string }; Returns: string };
       planner_task_student: { Args: { p_task_id: string }; Returns: string };
       // 주간 이행 통계 — jsonb 한 덩어리. 형태는 @ipsi/types의

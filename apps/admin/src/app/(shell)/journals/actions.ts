@@ -4,9 +4,27 @@ import { revalidatePath } from "next/cache";
 import { friendlyDbError } from "@ipsi/lib";
 import { journalFeedbackSchema } from "@ipsi/types";
 import { createAdminSupabaseClient } from "@ipsi/lib/supabase/admin";
-import { ensureAdmin } from "@/lib/auth";
+import { ensureStaff } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; message: string };
+
+/**
+ * 'journals' 권한 확인 + 일지를 **세션(RLS)으로** 찾는다. 아래 쓰기는 전부
+ * service_role이라, 담당이 아닌 학생의 일지면 여기서 null이 나와 끝나야 한다.
+ */
+async function ensureJournal(journalId: string) {
+  const check = await ensureStaff({ permission: "journals" });
+  if ("error" in check) return check;
+  const { data: journal } = await check.supabase
+    .from("study_journals")
+    .select("id")
+    .eq("id", journalId)
+    .maybeSingle();
+  if (!journal) {
+    return { error: { ok: false as const, message: "일지를 찾을 수 없습니다" } };
+  }
+  return check;
+}
 
 /**
  * 피드백 저장 (초안 — publish_at 변경 안 함)
@@ -16,7 +34,7 @@ export async function saveFeedbackDraftAction(
   _prev: Result | null,
   formData: FormData,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureJournal(journalId);
   if ("error" in check) return check.error;
 
   const parsed = journalFeedbackSchema.safeParse({
@@ -58,12 +76,9 @@ export async function publishFeedbackAction(
   _prev: Result | null,
   formData: FormData,
 ): Promise<Result> {
-  // 먼저 저장
+  // 먼저 저장 (권한·범위 확인 포함)
   const saveResult = await saveFeedbackDraftAction(journalId, null, formData);
   if (!saveResult.ok) return saveResult;
-
-  const check = await ensureAdmin();
-  if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();
   const publishAt = new Date();
@@ -120,7 +135,7 @@ export async function publishFeedbackAction(
 export async function unpublishFeedbackAction(
   journalId: string,
 ): Promise<Result> {
-  const check = await ensureAdmin();
+  const check = await ensureJournal(journalId);
   if ("error" in check) return check.error;
 
   const db = createAdminSupabaseClient();

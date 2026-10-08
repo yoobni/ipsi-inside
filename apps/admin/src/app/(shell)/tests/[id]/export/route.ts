@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { logAdminAccess } from "@ipsi/lib";
-import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { requireStaffRoute } from "@/lib/auth";
 import { csvResponse, toCsv } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
@@ -11,19 +11,10 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
-  const supabase = await createServerSupabaseClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return new NextResponse("Unauthorized", { status: 401 });
-  const { data: prof } = await supabase
-    .from("profiles")
-    .select("role, status")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (prof?.role !== "admin" || prof?.status !== "approved")
-    return new NextResponse("Forbidden", { status: 403 });
+  // CSV 반출은 이름이 통째로 나가는 PII 반출 — 원장만.
+  const auth = await requireStaffRoute("owner");
+  if ("response" in auth) return auth.response;
+  const { supabase, staff: user } = auth;
 
   const { data: sheet } = await supabase
     .from("test_sheets")
