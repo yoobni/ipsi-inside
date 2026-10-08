@@ -80,7 +80,8 @@ export async function saveGuideAction(id: string | null, input: GuideSaveInput):
     const { error } = await supabase
       .from("guide_steps")
       .update({ position: r.position, kind: r.kind, title: r.title, payload: r.payload })
-      .eq("id", r.id!);
+      .eq("id", r.id!)
+      .eq("guide_id", guideId); // 다른 가이드의 단계 id 를 끼워 넣어도 건드리지 않게
     if (error) return { ok: false, message: friendlyDbError(error) };
   }
   const inserts = rows

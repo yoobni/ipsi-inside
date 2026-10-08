@@ -131,7 +131,7 @@ function StepBody({ step, workId, canComplete }: { step: RunnerStep; workId: str
           {p.images.map((im) => (
             <figure key={im.path} className="border-hairline bg-surface overflow-hidden rounded-[14px] border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={im.url} alt={im.caption ?? ""} className="w-full" loading="lazy" />
+              <img src={im.url} alt={im.caption ?? ""} className="mx-auto h-auto max-w-full" loading="lazy" />
               {im.caption && <figcaption className="text-muted-foreground px-3 py-2 text-xs">{im.caption}</figcaption>}
             </figure>
           ))}
