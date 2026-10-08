@@ -126,6 +126,25 @@ export type Database = {
         Update: { staff_id?: string; group_id?: string; added_by?: string | null; added_at?: string };
         Relationships: [];
       };
+      // ─── 관리 필요 감지 (20261008080000) ──────────────────────────────────
+      risk_rules: {
+        Row: { key: string; label: string; description: string; enabled: boolean; threshold: number; lookback_days: number; position: number; updated_by: string | null; updated_at: string };
+        Insert: { key: string; label: string; description: string; enabled?: boolean; threshold: number; lookback_days: number; position?: number; updated_by?: string | null; updated_at?: string };
+        Update: { key?: string; label?: string; description?: string; enabled?: boolean; threshold?: number; lookback_days?: number; position?: number; updated_by?: string | null; updated_at?: string };
+        Relationships: [];
+      };
+      risk_acknowledgements: {
+        Row: { id: string; student_id: string; rule_key: string; acked_by: string | null; note: string | null; until: string; created_at: string };
+        Insert: { id?: string; student_id: string; rule_key: string; acked_by?: string | null; note?: string | null; until: string; created_at?: string };
+        Update: { id?: string; student_id?: string; rule_key?: string; acked_by?: string | null; note?: string | null; until?: string; created_at?: string };
+        Relationships: [];
+      };
+      risk_snapshots: {
+        Row: { snapshot_date: string; student_id: string; flags: Json };
+        Insert: { snapshot_date: string; student_id: string; flags: Json };
+        Update: { snapshot_date?: string; student_id?: string; flags?: Json };
+        Relationships: [];
+      };
       // ─── TOP3 랭킹 설정 (싱글턴 id=1, 원장만) ──────────────────────────────
       ranking_settings: {
         Row: {
@@ -1410,6 +1429,12 @@ export type Database = {
       ranking_mask_name: { Args: { p_name: string }; Returns: string };
       // 시험 분석 — @ipsi/types attemptAnalysisSchema / choiceDistributionSchema 로 파싱.
       attempt_analysis: { Args: { p_attempt_id: string }; Returns: Json };
+      // 조교 대시보드·관리 필요 — @ipsi/types staffDashboardSchema / riskFlagsSchema
+      staff_dashboard: { Args: Record<string, never>; Returns: Json };
+      student_risk_flags: {
+        Args: { p_student_ids?: string[] | null; p_include_acked?: boolean };
+        Returns: Json;
+      };
       sheet_choice_distribution: { Args: { p_sheet_id: string }; Returns: Json };
       attempt_total_score: {
         Args: { p_attempt_id: string };

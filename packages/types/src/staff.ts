@@ -87,13 +87,15 @@ export type RouteAccess = PermissionKey | 'owner' | 'staff';
 export type AdminMenuItem = {
   href: string;
   label: string;
-  access: PermissionKey | 'owner';
+  /** 'staff' = 교직원 누구나(업무 현황 등) */
+  access: RouteAccess;
   /** 활성 표시 기준 prefix. 없으면 href와 정확히 일치할 때만 활성 */
   matchPrefix?: string;
 };
 
 /** 사이드바·모바일 메뉴 순서. 아이콘은 apps/admin 쪽에서 href로 붙인다. */
 export const ADMIN_MENU: AdminMenuItem[] = [
+  { href: '/dashboard', label: '업무 현황', access: 'staff', matchPrefix: '/dashboard' },
   { href: '/members/pending', label: '가입 승인', access: 'owner', matchPrefix: '/members/pending' },
   { href: '/members', label: '회원 관리', access: 'members' },
   { href: '/groups', label: '그룹(반)', access: 'groups', matchPrefix: '/groups' },
@@ -116,6 +118,8 @@ export const ADMIN_MENU: AdminMenuItem[] = [
  * /members/pending(원장)이 /members(회원 열람)보다 앞에 있는 식.
  */
 export const ADMIN_ROUTE_RULES: ReadonlyArray<{ pattern: RegExp; access: RouteAccess }> = [
+  { pattern: /^\/dashboard\/risk-rules(\/|$)/, access: 'owner' },
+  { pattern: /^\/dashboard(\/|$)/, access: 'staff' },
   { pattern: /^\/members\/pending(\/|$)/, access: 'owner' },
   { pattern: /^\/daily\/export(\/|$)/, access: 'owner' },
   { pattern: /^\/tests\/[^/]+\/export(\/|$)/, access: 'owner' },

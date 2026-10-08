@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { todayKst } from "@/lib/kst";
 import { getStaffContext } from "@/lib/auth";
 import { MemberReport, type ReportData } from "./member-report";
+import { riskFlagsSchema } from "@ipsi/types";
+import { AlertTriangle } from "lucide-react";
+import { RiskList } from "../../dashboard/risk-list";
 
 export const dynamic = "force-dynamic";
 
@@ -254,6 +257,11 @@ export default async function MemberDetailPage({
     (last14.filter((d) => journalDates.has(d)).length / 14) * 100,
   );
 
+  // 관리 필요 감지(이 학생만)
+  const { data: riskRaw } = await supabase.rpc("student_risk_flags", { p_student_ids: [id], p_include_acked: false });
+  const riskParsed = riskFlagsSchema.safeParse(riskRaw);
+  const riskStudent = riskParsed.success ? (riskParsed.data[0] ?? null) : null;
+
   const data: ReportData = {
     member: {
       id: member.id,
@@ -365,6 +373,18 @@ export default async function MemberDetailPage({
           />
         </div>
       </div>
+
+      {/* 관리 필요 — 자동 감지 + 조치 기록 */}
+      {riskStudent && riskStudent.flags.length > 0 && (
+        <section className="rounded-md border border-amber-300 bg-card dark:border-amber-700">
+          <div className="flex items-center gap-2 border-b px-4 py-3">
+            <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
+            <h2 className="text-sm font-semibold">관리 필요</h2>
+            <span className="text-muted-foreground text-xs">자동 감지 — 조치하면 일정 기간 숨겨져요</span>
+          </div>
+          <RiskList students={[riskStudent]} compact />
+        </section>
+      )}
 
       <MemberReport data={data} />
     </div>

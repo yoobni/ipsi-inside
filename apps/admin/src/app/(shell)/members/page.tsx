@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { riskFlagsSchema } from "@ipsi/types";
 import { getStaffContext } from "@/lib/auth";
 import { MembersTable } from "./members-table";
 
@@ -11,8 +12,8 @@ export default async function MembersPage() {
   // 정지·학부모 연결 변경은 원장만. 조교는 담당 학생·학부모 열람만(RLS가 목록을 거른다).
   const canManage = staff.level === "owner";
 
-  // 회원 목록과 학부모-학생 링크는 서로 독립 — 한 번에
-  const [{ data: members }, { data: links }] = await Promise.all([
+  // 회원 목록·학부모-학생 링크·관리 필요 감지는 서로 독립 — 한 번에
+  const [{ data: members }, { data: links }, { data: riskRaw }] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -22,7 +23,15 @@ export default async function MembersPage() {
       .neq("role", "admin")
       .order("full_name"),
     supabase.from("parent_student_links").select("parent_id, student_id"),
+    supabase.rpc("student_risk_flags", { p_student_ids: null, p_include_acked: false }),
   ]);
+  const riskParsed = riskFlagsSchema.safeParse(riskRaw);
+  const riskByStudent: Record<string, string[]> = {};
+  if (riskParsed.success) {
+    riskParsed.data.forEach((r) => {
+      riskByStudent[r.student_id] = r.flags.map((f) => f.label);
+    });
+  }
 
   const approvedStudents = (members ?? []).filter(
     (m) => m.role === "student" && m.status === "approved",
@@ -44,6 +53,7 @@ export default async function MembersPage() {
         links={links ?? []}
         approvedStudents={approvedStudents}
         canManage={canManage}
+        riskByStudent={riskByStudent}
       />
     </div>
   );

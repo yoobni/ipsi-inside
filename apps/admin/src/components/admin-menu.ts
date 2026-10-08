@@ -6,6 +6,7 @@ import {
   FileDown,
   FileText,
   Layers,
+  LayoutDashboard,
   Megaphone,
   MessagesSquare,
   NotebookPen,
@@ -23,6 +24,7 @@ import { ADMIN_MENU, type AdminMenuItem } from "@ipsi/types";
  * 여기서는 href에 아이콘만 붙인다. 사이드바와 모바일 메뉴가 이걸 공유한다.
  */
 const ICONS: Record<string, LucideIcon> = {
+  "/dashboard": LayoutDashboard,
   "/members/pending": UserCheck,
   "/members": Users,
   "/groups": Layers,

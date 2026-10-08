@@ -23,6 +23,8 @@ const ALLOW_THROUGH_PREFIXES = [
   "/robots.txt",
   "/api/signout",
   "/api/health",
+  // Vercel Cron — 세션 없이 들어오고 라우트 안에서 CRON_SECRET 검증
+  "/api/cron",
 ];
 
 export async function proxy(request: NextRequest) {

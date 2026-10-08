@@ -82,12 +82,15 @@ export function MembersTable({
   links,
   approvedStudents,
   canManage,
+  riskByStudent,
 }: {
   members: Member[];
   links: Link[];
   approvedStudents: Student[];
   /** 원장만 true — 정지·학부모 연결 변경 UI를 보여줄지 */
   canManage: boolean;
+  /** 관리 필요 감지 라벨(학생 id → 규칙 라벨들) — 이름 옆 ⚠ 배지 */
+  riskByStudent?: Record<string, string[]>;
 }) {
   const [tab, setTab] = useState<TabValue>("all");
   const [query, setQuery] = useState("");
@@ -176,7 +179,16 @@ export function MembersTable({
                       {m.role === "student" ? "학생" : "학부모"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-medium">{m.full_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex items-center gap-1.5">
+                      {m.full_name}
+                      {riskByStudent?.[m.id] && riskByStudent[m.id]!.length > 0 && (
+                        <Badge variant="warning" title={riskByStudent[m.id]!.join(", ")}>
+                          ⚠ {riskByStudent[m.id]!.length}
+                        </Badge>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatPhone(m.phone)}
                   </TableCell>
