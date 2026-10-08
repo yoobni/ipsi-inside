@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { Wordmark } from "@/components/wordmark";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ReadButton } from "./read-button";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export default async function ColumnDetailPage({
   const [{ data: col }, { data: read }, notif] = await Promise.all([
     supabase
       .from("columns")
-      .select("id, title, body, published_at")
+      .select("id, title, body, category_id, published_at")
       .eq("id", id)
       .maybeSingle(),
     state.role === "student"
@@ -45,6 +46,15 @@ export default async function ColumnDetailPage({
   ]);
   if (!col) notFound();
 
+  // 카테고리 라벨 — 보관된 카테고리면 RLS가 안 돌려주므로 배지만 생략된다
+  const { data: cat } = col.category_id
+    ? await supabase
+        .from("column_categories")
+        .select("id, label")
+        .eq("id", col.category_id)
+        .maybeSingle()
+    : { data: null };
+
   return (
     <Shell notifItems={notif.items} unreadCount={notif.unreadCount}>
       <Button asChild variant="ghost" size="sm">
@@ -55,7 +65,12 @@ export default async function ColumnDetailPage({
       </Button>
 
       <article className="space-y-4">
-        <header className="space-y-1">
+        <header className="space-y-2">
+          {cat && (
+            <Link href={`/dashboard/columns?category=${cat.id}`}>
+              <Badge variant="primary">{cat.label}</Badge>
+            </Link>
+          )}
           <h1 className="font-display text-[30px] leading-tight">{col.title}</h1>
           {col.published_at && (
             <p className="text-muted-foreground text-xs">

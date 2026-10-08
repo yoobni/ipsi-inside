@@ -14,17 +14,21 @@ export default async function EditColumnPage({
 
   const { data: col } = await supabase
     .from("columns")
-    .select("id, title, body")
+    .select("id, title, body, category_id")
     .eq("id", id)
     .maybeSingle();
   if (!col) notFound();
 
-  // 읽음 현황 — 누가 읽었는지
-  const { data: reads } = await supabase
-    .from("column_reads")
-    .select("student_id, read_at")
-    .eq("column_id", id)
-    .order("read_at", { ascending: false });
+  // 읽음 현황(누가 읽었는지)과 카테고리 목록은 독립 — 한 번에
+  const [{ data: reads }, { data: categories }] = await Promise.all([
+    supabase
+      .from("column_reads")
+      .select("student_id, read_at")
+      .eq("column_id", id)
+      .order("read_at", { ascending: false }),
+    // 보관된 것도 가져온다 — 이 칼럼이 보관된 카테고리를 달고 있으면 에디터가 보여줘야 함
+    supabase.from("column_categories").select("id, label, archived").order("position"),
+  ]);
 
   const readerIds = (reads ?? []).map((r) => r.student_id);
   const { data: readers } =
@@ -44,7 +48,13 @@ export default async function EditColumnPage({
         <h1 className="text-2xl font-bold tracking-tight">칼럼 편집</h1>
       </div>
 
-      <ColumnEditor columnId={col.id} initialTitle={col.title} initialBody={col.body} />
+      <ColumnEditor
+        columnId={col.id}
+        initialTitle={col.title}
+        initialBody={col.body}
+        initialCategoryId={col.category_id}
+        categories={categories ?? []}
+      />
 
       <section className="space-y-3">
         <h2 className="text-base font-bold">

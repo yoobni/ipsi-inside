@@ -14,6 +14,7 @@ import {
 export type ColumnRow = {
   id: string;
   title: string;
+  category_label: string | null;
   is_published: boolean;
   published_at: string | null;
   created_at: string;
@@ -23,9 +24,12 @@ export type ColumnRow = {
 export function ColumnsList({
   rows,
   studentTotal,
+  filtered = false,
 }: {
   rows: ColumnRow[];
   studentTotal: number;
+  /** 카테고리 필터가 걸려 있으면 빈 상태 문구가 다르다 */
+  filtered?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -49,7 +53,9 @@ export function ColumnsList({
   if (rows.length === 0) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed py-16 text-center text-sm">
-        아직 칼럼이 없어요. [새 칼럼]으로 첫 글을 올려보세요.
+        {filtered
+          ? "이 카테고리에는 칼럼이 없어요."
+          : "아직 칼럼이 없어요. [새 칼럼]으로 첫 글을 올려보세요."}
       </div>
     );
   }
@@ -81,6 +87,11 @@ export function ColumnsList({
             </div>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
+            {row.category_label ? (
+              <Badge variant="primary">{row.category_label}</Badge>
+            ) : (
+              <Badge variant="outline">미분류</Badge>
+            )}
             {row.is_published ? (
               <Badge variant="success">발행됨</Badge>
             ) : (

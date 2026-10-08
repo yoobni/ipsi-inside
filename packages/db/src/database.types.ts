@@ -849,6 +849,7 @@ export type Database = {
           id: string;
           title: string;
           body: string;
+          category_id: string | null;
           is_published: boolean;
           published_at: string | null;
           created_by: string;
@@ -859,6 +860,7 @@ export type Database = {
           id?: string;
           title: string;
           body: string;
+          category_id?: string | null;
           is_published?: boolean;
           published_at?: string | null;
           created_by: string;
@@ -869,9 +871,37 @@ export type Database = {
           id?: string;
           title?: string;
           body?: string;
+          category_id?: string | null;
           is_published?: boolean;
           published_at?: string | null;
           created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      column_categories: {
+        Row: {
+          id: string;
+          label: string;
+          position: number;
+          archived: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          label: string;
+          position?: number;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          label?: string;
+          position?: number;
+          archived?: boolean;
           created_at?: string;
           updated_at?: string;
         };

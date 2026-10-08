@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { columnInputSchema } from "@ipsi/types";
+import { columnCategoryInputSchema, columnInputSchema } from "@ipsi/types";
 import { friendlyDbError, sanitizeRichHtml } from "@ipsi/lib";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { ensureAdmin as ensureAdminBase } from "@/lib/auth";
@@ -40,16 +40,19 @@ export async function upsertColumnAction(
   const parsed = columnInputSchema.safeParse({
     title: fd.get("title"),
     body: fd.get("body"),
+    // 빈 문자열 = 미분류
+    categoryId: (fd.get("categoryId") as string) || null,
   });
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "검증 실패" };
   }
   const body = sanitizeRichHtml(parsed.data.body);
+  const category_id = parsed.data.categoryId ?? null;
 
   if (id) {
     const { error } = await supabase
       .from("columns")
-      .update({ title: parsed.data.title, body })
+      .update({ title: parsed.data.title, body, category_id })
       .eq("id", id);
     if (error) return { ok: false, message: friendlyDbError(error) };
     revalidatePath("/columns");
@@ -59,7 +62,7 @@ export async function upsertColumnAction(
 
   const { data, error } = await supabase
     .from("columns")
-    .insert({ title: parsed.data.title, body, created_by: user_id })
+    .insert({ title: parsed.data.title, body, category_id, created_by: user_id })
     .select("id")
     .single();
   if (error || !data) return { ok: false, message: friendlyDbError(error) };
@@ -131,6 +134,58 @@ export async function deleteColumnAction(id: string): Promise<Result> {
   if ("error" in check) return check.error;
   const { error } = await check.supabase.from("columns").delete().eq("id", id);
   if (error) return { ok: false, message: friendlyDbError(error) };
+  revalidatePath("/columns");
+  return { ok: true };
+}
+
+// ── 카테고리 관리 (qna_categories와 같은 꼴) ─────────────────────────────────
+export async function upsertColumnCategoryAction(
+  id: string | null,
+  _prev: Result | null,
+  fd: FormData,
+): Promise<Result> {
+  const check = await ensureAdmin();
+  if ("error" in check) return check.error;
+  const { supabase } = check;
+
+  const parsed = columnCategoryInputSchema.safeParse({ label: fd.get("label") });
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "검증 실패" };
+  }
+
+  if (id) {
+    const { error } = await supabase
+      .from("column_categories")
+      .update({ label: parsed.data.label })
+      .eq("id", id);
+    if (error) return { ok: false, message: friendlyDbError(error) };
+  } else {
+    const { count } = await supabase
+      .from("column_categories")
+      .select("id", { count: "exact", head: true });
+    const { error } = await supabase
+      .from("column_categories")
+      .insert({ label: parsed.data.label, position: count ?? 0 });
+    if (error) return { ok: false, message: friendlyDbError(error) };
+  }
+  revalidatePath("/columns/categories");
+  revalidatePath("/columns");
+  return { ok: true };
+}
+
+/** 보관(soft delete) — 기존 칼럼의 category_id는 그대로 남는다(set null은 삭제 때만). */
+export async function archiveColumnCategoryAction(
+  id: string,
+  archived: boolean,
+): Promise<Result> {
+  const check = await ensureAdmin();
+  if ("error" in check) return check.error;
+  const { error } = await check.supabase
+    .from("column_categories")
+    .update({ archived })
+    .eq("id", id);
+  if (error) return { ok: false, message: friendlyDbError(error) };
+  revalidatePath("/columns/categories");
   revalidatePath("/columns");
   return { ok: true };
 }
