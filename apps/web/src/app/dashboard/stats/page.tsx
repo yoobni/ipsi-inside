@@ -24,6 +24,8 @@ import { TestTrendChart, type TrendPoint } from "./test-trend-chart";
 import { WeeklyBarsChart, type WeekBar } from "./weekly-bars-chart";
 import { AreaChart } from "./area-chart";
 import { Top3Boards } from "./top3-boards";
+import { WeakSpots, type PracticeSetRow } from "./weak-spots";
+import { getStudentMastery } from "@/lib/mastery";
 
 export const dynamic = "force-dynamic";
 
@@ -69,11 +71,43 @@ export default async function StatsPage({
       null;
   }
 
-  const [notif, stats, top3] = await Promise.all([
+  const [notif, stats, top3, mastery, practiceRaw] = await Promise.all([
     getMyNotifications(supabase, state.userId),
     targetId ? getStudentStats(supabase, targetId) : Promise.resolve(null),
     targetId ? getTop3Boards(supabase, targetId) : Promise.resolve(null),
+    targetId ? getStudentMastery(supabase, targetId) : Promise.resolve(null),
+    targetId
+      ? supabase
+          .from("practice_sets")
+          .select("id, sheet_id, tag_label, tag_kind, created_at")
+          .eq("student_id", targetId)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: [] as { id: string; sheet_id: string; tag_label: string; tag_kind: string; created_at: string }[] }),
   ]);
+  // 보충 세트별 최고 점수율 — 시트 id 로 응시를 한 번에
+  const practiceSheetIds = (practiceRaw.data ?? []).map((p) => p.sheet_id);
+  const { data: practiceAttempts } =
+    practiceSheetIds.length > 0 && targetId
+      ? await supabase
+          .from("test_attempts")
+          .select("score, total_points, test_assignments!inner(test_sheet_id, student_id)")
+          .eq("status", "submitted")
+          .in("test_assignments.test_sheet_id", practiceSheetIds)
+          .eq("test_assignments.student_id", targetId)
+      : { data: [] };
+  const bestBySheet = new Map<string, number>();
+  (practiceAttempts ?? []).forEach((a) => {
+    const asg = Array.isArray(a.test_assignments) ? a.test_assignments[0] : a.test_assignments;
+    if (!asg || !a.total_points) return;
+    const pct = Math.round(((a.score ?? 0) / a.total_points) * 100);
+    const cur = bestBySheet.get(asg.test_sheet_id);
+    if (cur === undefined || pct > cur) bestBySheet.set(asg.test_sheet_id, pct);
+  });
+  const practiceSets: PracticeSetRow[] = (practiceRaw.data ?? []).map((p) => ({
+    ...p,
+    best: bestBySheet.get(p.sheet_id) ?? null,
+  }));
 
   const derived = stats ? deriveStats(stats) : null;
   const targetName = state.role === "parent" ? children.find((c) => c.id === targetId)?.full_name : null;
@@ -134,6 +168,10 @@ export default async function StatsPage({
         <>
           <InsightCard d={derived} />
           <StatTiles d={derived} />
+
+          {mastery && (
+            <WeakSpots mastery={mastery} practiceSets={practiceSets} canPractice={state.role === "student"} />
+          )}
 
           {top3 && <Top3Boards data={top3} viewerIsStudent={state.role === "student"} />}
 

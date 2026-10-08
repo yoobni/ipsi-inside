@@ -24,6 +24,8 @@ import {
 export type SheetRow = {
   id: string;
   title: string;
+  /** practice = 학생 취약점 보충 세트(자동 생성). 기본 목록에선 숨긴다 */
+  kind: "regular" | "practice";
   target_school: string | null;
   target_grade: number | null;
   open_at: string | null;
@@ -44,14 +46,17 @@ type SortKey =
 export function TestsTableClient({ sheets }: { sheets: SheetRow[] }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("created_desc");
+  const [showPractice, setShowPractice] = useState(false);
+  const practiceCount = sheets.filter((s) => s.kind === "practice").length;
 
   const filtered = useMemo(() => {
     const q = query.trim();
+    const base = showPractice ? sheets : sheets.filter((s) => s.kind !== "practice");
     const arr = q
-      ? sheets.filter((s) =>
+      ? base.filter((s) =>
           [s.title, s.target_school ?? ""].some((v) => v.includes(q)),
         )
-      : [...sheets];
+      : [...base];
 
     arr.sort((a, b) => {
       switch (sort) {
@@ -73,7 +78,7 @@ export function TestsTableClient({ sheets }: { sheets: SheetRow[] }) {
       }
     });
     return arr;
-  }, [sheets, query, sort]);
+  }, [sheets, query, sort, showPractice]);
 
   return (
     <div className="space-y-3">
@@ -100,6 +105,12 @@ export function TestsTableClient({ sheets }: { sheets: SheetRow[] }) {
             <SelectItem value="title_desc">제목 역순</SelectItem>
           </SelectContent>
         </Select>
+        {practiceCount > 0 && (
+          <label className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs">
+            <input type="checkbox" checked={showPractice} onChange={(e) => setShowPractice(e.target.checked)} />
+            학생 보충 세트 {practiceCount}개 포함
+          </label>
+        )}
       </div>
 
       <p className="text-muted-foreground text-xs">
@@ -135,6 +146,7 @@ export function TestsTableClient({ sheets }: { sheets: SheetRow[] }) {
                 <TableRow key={s.id} className="cursor-pointer">
                   <TableCell className="pl-4 font-medium">
                     <Link href={`/tests/${s.id}`} className="hover:underline">
+                      {s.kind === "practice" && <Badge variant="primary">보충</Badge>}{" "}
                       {s.title}
                     </Link>
                   </TableCell>

@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 type Sheet = {
   id: string;
   title: string;
+  kind?: "regular" | "practice";
   description: string | null;
   open_at: string | null;
   due_at: string | null;
@@ -80,7 +81,7 @@ export default async function TestsPage() {
     const { data: assignments } = await supabase
       .from("test_assignments")
       .select(
-        "id, test_sheet_id, student_id, assigned_at, test_sheets(id, title, description, open_at, due_at, allow_retake, max_attempts)",
+        "id, test_sheet_id, student_id, assigned_at, test_sheets(id, title, kind, description, open_at, due_at, allow_retake, max_attempts)",
       )
       .in("student_id", studentIds)
       .order("assigned_at", { ascending: false });
@@ -194,6 +195,9 @@ export default async function TestsPage() {
                       </p>
                     )}
                     <h2 className="font-display text-lg text-foreground">
+                      {it.sheet.kind === "practice" && (
+                        <span className="bg-primary/10 text-primary mr-2 rounded px-1.5 py-0.5 align-middle text-[11px] font-bold">보충</span>
+                      )}
                       {it.sheet.title}
                     </h2>
                     {it.sheet.description && (

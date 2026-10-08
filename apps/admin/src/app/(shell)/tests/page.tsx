@@ -12,7 +12,7 @@ export default async function TestsListPage() {
   const { data: sheets } = await supabase
     .from("test_sheets")
     .select(
-      "id, title, target_school, target_grade, open_at, due_at, allow_retake, created_at",
+      "id, title, kind, target_school, target_grade, open_at, due_at, allow_retake, created_at",
     )
     .order("created_at", { ascending: false });
 
@@ -42,6 +42,7 @@ export default async function TestsListPage() {
   const rows: SheetRow[] = (sheets ?? []).map((s) => ({
     id: s.id,
     title: s.title,
+    kind: s.kind as "regular" | "practice",
     target_school: s.target_school,
     target_grade: s.target_grade,
     open_at: s.open_at,

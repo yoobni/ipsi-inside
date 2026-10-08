@@ -176,6 +176,13 @@ export type Database = {
         Update: { id?: string; attempt_id?: string; item_id?: string; retry_no?: number; correct?: boolean; elapsed_ms?: number | null; answered_at?: string };
         Relationships: [];
       };
+      // ─── 취약점 보충 세트 (20261008100000) ────────────────────────────────
+      practice_sets: {
+        Row: { id: string; student_id: string; sheet_id: string; tag_kind: "type" | "work" | "concept" | "area"; tag_id: string | null; tag_label: string; created_by: "student" | "staff"; created_at: string };
+        Insert: { id?: string; student_id: string; sheet_id: string; tag_kind: "type" | "work" | "concept" | "area"; tag_id?: string | null; tag_label: string; created_by: "student" | "staff"; created_at?: string };
+        Update: { id?: string; student_id?: string; sheet_id?: string; tag_kind?: "type" | "work" | "concept" | "area"; tag_id?: string | null; tag_label?: string; created_by?: "student" | "staff"; created_at?: string };
+        Relationships: [];
+      };
       // ─── TOP3 랭킹 설정 (싱글턴 id=1, 원장만) ──────────────────────────────
       ranking_settings: {
         Row: {
@@ -537,6 +544,8 @@ export type Database = {
           due_at: string | null;
           allow_retake: boolean;
           max_attempts: number | null;
+          // regular=원장 시험, practice=취약점 보충 세트(자동 생성)
+          kind: "regular" | "practice";
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -551,6 +560,7 @@ export type Database = {
           due_at?: string | null;
           allow_retake?: boolean;
           max_attempts?: number | null;
+          kind?: "regular" | "practice";
           created_by: string;
           created_at?: string;
           updated_at?: string;
@@ -565,6 +575,7 @@ export type Database = {
           due_at?: string | null;
           allow_retake?: boolean;
           max_attempts?: number | null;
+          kind?: "regular" | "practice";
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -1470,6 +1481,12 @@ export type Database = {
         Returns: Json;
       };
       finish_drill_attempt: { Args: { p_attempt_id: string }; Returns: Json };
+      // 누적 취약점·보충 — @ipsi/types studentMasterySchema
+      student_mastery: { Args: { p_student: string }; Returns: Json };
+      create_practice_set: {
+        Args: { p_tag_kind: string; p_tag_id: string; p_size?: number; p_for_student?: string | null };
+        Returns: string;
+      };
       student_risk_flags: {
         Args: { p_student_ids?: string[] | null; p_include_acked?: boolean };
         Returns: Json;
