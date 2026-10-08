@@ -1483,6 +1483,9 @@ export type Database = {
       finish_drill_attempt: { Args: { p_attempt_id: string }; Returns: Json };
       // 누적 취약점·보충 — @ipsi/types studentMasterySchema
       student_mastery: { Args: { p_student: string }; Returns: Json };
+      // 라이브러리(허브) — @ipsi/types libraryIndexSchema / libraryDetailSchema
+      library_index: { Args: Record<string, never>; Returns: Json };
+      library_detail: { Args: { p_kind: string; p_id: string }; Returns: Json };
       create_practice_set: {
         Args: { p_tag_kind: string; p_tag_id: string; p_size?: number; p_for_student?: string | null };
         Returns: string;
