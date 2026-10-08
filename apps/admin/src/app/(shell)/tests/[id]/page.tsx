@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Download, Pencil } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
-import type { QuestionChoice } from "@ipsi/types";
+import { choiceDistributionSchema, type QuestionChoice } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TestPreview, type PreviewQuestion } from "@/components/test-preview";
 import { DuplicateButton } from "./duplicate-button";
 import { TestDetailClient, type AssignedRow, type AvailableStudent } from "./test-detail-client";
+import { ChoiceDistributionPanel } from "./choice-distribution";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +105,7 @@ export default async function TestDetailPage({
   const passageIds = Array.from(
     new Set((questions ?? []).map((q) => q.passage_id)),
   );
-  const [{ data: passages }, { data: answers }] = await Promise.all([
+  const [{ data: passages }, { data: answers }, { data: distRaw }] = await Promise.all([
     passageIds.length > 0
       ? supabase
           .from("passages")
@@ -118,7 +119,11 @@ export default async function TestDetailPage({
           .in("attempt_id", submittedAttemptIdsForSheet)
           .in("question_id", questionIds)
       : Promise.resolve({ data: [] }),
+    // 선지별 분포 — 학생별 첫 제출 응시, 조교는 담당 학생만(RPC 안에서 거름)
+    supabase.rpc("sheet_choice_distribution", { p_sheet_id: id }),
   ]);
+  const distParsed = distRaw == null ? null : choiceDistributionSchema.safeParse(distRaw);
+  const distribution = distParsed?.success ? distParsed.data : null;
 
   const passageMap = new Map(
     (passages ?? []).map((p) => [p.id, p] as const),
@@ -411,6 +416,19 @@ export default async function TestDetailPage({
                 </li>
               ))}
           </ul>
+        </section>
+      )}
+
+      {/* 선지별 응답 분석 */}
+      {distribution && distribution.respondents > 0 && (
+        <section className="rounded-md border bg-card">
+          <div className="border-b px-4 py-3">
+            <h2 className="text-sm font-semibold">선지별 응답 분석</h2>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              문항마다 학생들이 ①~⑤ 중 무엇을 골랐는지. 정답 외 선지에 25% 이상 몰리면 &lsquo;오답 집중&rsquo;으로 표시해요.
+            </p>
+          </div>
+          <ChoiceDistributionPanel data={distribution} />
         </section>
       )}
 

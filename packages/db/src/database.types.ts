@@ -1408,6 +1408,9 @@ export type Database = {
         Returns: Json;
       };
       ranking_mask_name: { Args: { p_name: string }; Returns: string };
+      // 시험 분석 — @ipsi/types attemptAnalysisSchema / choiceDistributionSchema 로 파싱.
+      attempt_analysis: { Args: { p_attempt_id: string }; Returns: Json };
+      sheet_choice_distribution: { Args: { p_sheet_id: string }; Returns: Json };
       attempt_total_score: {
         Args: { p_attempt_id: string };
         Returns: {

@@ -10,3 +10,4 @@ export * from './qna';
 export * from './staff';
 export * from './stats';
 export * from './taxonomy';
+export * from './analysis';
