@@ -12,6 +12,7 @@ const ITEMS = [
   { key: "home", href: "/dashboard", label: "홈" },
   { key: "planner", href: "/dashboard/planner", label: "플래너" },
   { key: "tests", href: "/dashboard/tests", label: "시험" },
+  { key: "stats", href: "/dashboard/stats", label: "리포트" },
   { key: "journal", href: "/dashboard/journal", label: "일지" },
   { key: "qna", href: "/dashboard/qna", label: "Q&A" },
   { key: "columns", href: "/dashboard/columns", label: "칼럼" },

@@ -14,9 +14,11 @@ import { AnnouncementBanner } from "@/components/announcement-banner";
 import { WrongAccountNotice } from "@/components/wrong-account-notice";
 import { getMyNotifications } from "@/lib/notifications";
 import { getActiveAnnouncements } from "@/lib/announcements";
+import { getStudentStats } from "@/lib/stats";
 import { JournalSubmit } from "./journal-submit";
 import { TodayReportCard } from "./today-report";
 import { WeeklySummary, type DailyRecord } from "./weekly-summary";
+import { WeeklyPulse } from "./weekly-pulse";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,8 @@ export default async function DashboardPage() {
   let weeklyStudentName: string | undefined;
   // 오늘 국어 플래너 진행률 — 학생/학부모 모두 홈에서 한눈에
   let plannerToday: { total: number; checked: number } | null = null;
+  // 이번 주 요약 카드(리포트 입구) — 첫 자녀 기준
+  let stats: Awaited<ReturnType<typeof getStudentStats>> = null;
   let notif: Awaited<ReturnType<typeof getMyNotifications>> = {
     items: [],
     unreadCount: 0,
@@ -90,6 +94,7 @@ export default async function DashboardPage() {
       childNames,
       records,
       plannerRes,
+      statsRes,
       notifRes,
       announcementsRes,
     ] = await Promise.all([
@@ -211,6 +216,9 @@ export default async function DashboardPage() {
         return { total: taskIds.length, checked: count ?? 0 };
       })(),
 
+      // 학습 리포트 요약 (RPC 한 번)
+      targetStudentId ? getStudentStats(supabase, targetStudentId) : Promise.resolve(null),
+
       // 알림 + 공지
       notifP,
       announcementsP,
@@ -266,6 +274,7 @@ export default async function DashboardPage() {
     }
 
     plannerToday = plannerRes;
+    stats = statsRes;
     notif = notifRes;
     announcements = announcementsRes;
   }
@@ -352,6 +361,14 @@ export default async function DashboardPage() {
                   </span>
                 </span>
               </Link>
+            )}
+
+            {/* 이번 주 요약 + 리포트 입구 (모바일엔 내비가 없어 여기가 유일한 길) */}
+            {stats && (
+              <WeeklyPulse
+                stats={stats}
+                studentName={state.role === "parent" ? weeklyStudentName : undefined}
+              />
             )}
 
             {/* ★ 발행된 오늘의 리포트 — 최상단 */}
@@ -463,20 +480,6 @@ function ParentDashboard({
           </p>
         </section>
       )}
-    </div>
-  );
-}
-
-function StatCard({ label, value, unit }: { label: string; value: string; unit: string }) {
-  return (
-    <div className="rounded-[14px] border border-hairline bg-surface p-6">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-2 flex items-baseline gap-1.5">
-        <span className="font-display text-[40px] leading-none text-primary">
-          {value}
-        </span>
-        <span className="text-sm text-muted-foreground">{unit}</span>
-      </p>
     </div>
   );
 }

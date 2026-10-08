@@ -1302,6 +1302,9 @@ export type Database = {
       // 주간 이행 통계 — jsonb 한 덩어리. 형태는 @ipsi/types의
       // plannerWeekStatsSchema로 파싱해서 쓴다 (보이지 않는 주차는 null).
       planner_week_stats: { Args: { p_week_id: string }; Returns: Json };
+      // 학생 학습 리포트 집계 — @ipsi/types studentStatsSchema로 파싱.
+      // 본인·연결 학부모·교직원이 아니면 null.
+      student_stats: { Args: { p_student: string }; Returns: Json };
       attempt_total_score: {
         Args: { p_attempt_id: string };
         Returns: {

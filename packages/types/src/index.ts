@@ -8,3 +8,4 @@ export * from './consent';
 export * from './column';
 export * from './qna';
 export * from './staff';
+export * from './stats';
