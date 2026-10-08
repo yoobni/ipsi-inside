@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { loadTaxonomyLists } from "../question-extras";
 import { NewPassageClient } from "./new-passage-client";
 
-export default function NewPassagePage() {
+export const dynamic = "force-dynamic";
+
+export default async function NewPassagePage() {
+  const taxonomy = await loadTaxonomyLists(await createServerSupabaseClient());
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex items-center gap-2">
@@ -21,7 +26,7 @@ export default function NewPassagePage() {
         </p>
       </div>
 
-      <NewPassageClient />
+      <NewPassageClient taxonomy={taxonomy} />
     </div>
   );
 }

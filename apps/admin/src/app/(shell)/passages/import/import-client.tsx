@@ -77,6 +77,23 @@ export function ImportClient() {
             </li>
             <li>같은 지문의 두 번째 행부터는 passage_content/unit_major 비워도 됨</li>
           </ul>
+          <p className="text-muted-foreground mt-3">태그 컬럼(전부 선택):</p>
+          <pre className="bg-muted overflow-x-auto rounded p-3 text-[11px]">
+{`work,author,source,type,concepts,explanation`}
+          </pre>
+          <ul className="text-muted-foreground list-disc space-y-0.5 pl-5">
+            <li>
+              <code>work</code>(작품/제재명)·<code>source</code>(기출 출처 표시명): 사전에 없으면 자동 추가.{" "}
+              <code>author</code>는 작품을 새로 만들 때 작가로 들어감
+            </li>
+            <li>
+              <code>type</code>(유형 라벨)·<code>concepts</code>(개념 제목, <code>;</code>로 여러 개):
+              태그 사전에 있어야 함 — 없으면 그 지문은 건너뛰고 오류로 알려줌
+            </li>
+            <li>
+              <code>explanation</code>: 해설. 시험을 제출한 학생에게만 보임
+            </li>
+          </ul>
           <p className="text-muted-foreground mt-3">
             예시 (가운데 줄임):
           </p>

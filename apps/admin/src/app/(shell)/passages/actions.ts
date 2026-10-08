@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { friendlyDbError, sanitizeRichHtml } from "@ipsi/lib";
 import { ensureStaff } from "@/lib/auth";
 import { passageWithQuestionsSchema, type QuestionChoice } from "@ipsi/types";
+import { saveQuestionExtras } from "./question-extras";
 
 type Result = { ok: true; id: string } | { ok: false; message: string };
 
@@ -38,6 +39,8 @@ export async function createPassageWithQuestionsAction(
       content: sanitizeRichHtml(parsed.passage.content),
       unit_major: parsed.passage.unit_major,
       unit_minor: parsed.passage.unit_minor ?? null,
+      work_id: parsed.passage.work_id ?? null,
+      source_id: parsed.passage.source_id ?? null,
       created_by: check.adminId,
     })
     .select("id")
@@ -60,14 +63,20 @@ export async function createPassageWithQuestionsAction(
     points: q.points,
     difficulty: q.difficulty ?? null,
     unit_minor: q.unit_minor ?? null,
+    type_id: q.type_id ?? null,
   }));
 
-  const { error: qErr } = await supabase.from("questions").insert(rows);
-  if (qErr) {
+  const { data: insertedQs, error: qErr } = await supabase
+    .from("questions")
+    .insert(rows)
+    .select("id, position_in_passage");
+  if (qErr || !insertedQs) {
     // rollback 지문 (best-effort)
     await supabase.from("passages").delete().eq("id", passage.id);
-    return { ok: false, message: `문항 저장 실패: ${qErr.message}` };
+    return { ok: false, message: `문항 저장 실패: ${qErr?.message ?? "알 수 없음"}` };
   }
+  const extrasErr = await saveQuestionExtras(supabase, insertedQs, parsed.questions, check.adminId);
+  if (extrasErr) return { ok: false, message: extrasErr };
 
   revalidatePath("/passages");
   return { ok: true, id: passage.id };
@@ -138,6 +147,8 @@ export async function updatePassageWithQuestionsAction(
       content: sanitizeRichHtml(parsed.passage.content),
       unit_major: parsed.passage.unit_major,
       unit_minor: parsed.passage.unit_minor ?? null,
+      work_id: parsed.passage.work_id ?? null,
+      source_id: parsed.passage.source_id ?? null,
     })
     .eq("id", passageId);
   if (pErr) return { ok: false, message: `지문 수정 실패: ${pErr.message}` };
@@ -155,9 +166,16 @@ export async function updatePassageWithQuestionsAction(
     points: q.points,
     difficulty: q.difficulty ?? null,
     unit_minor: q.unit_minor ?? null,
+    type_id: q.type_id ?? null,
   }));
-  const { error: qErr } = await supabase.from("questions").insert(rows);
-  if (qErr) return { ok: false, message: `문항 저장 실패: ${qErr.message}` };
+  const { data: insertedQs, error: qErr } = await supabase
+    .from("questions")
+    .insert(rows)
+    .select("id, position_in_passage");
+  if (qErr || !insertedQs) return { ok: false, message: `문항 저장 실패: ${qErr?.message ?? "알 수 없음"}` };
+  // 해설·개념은 문항 삭제 시 cascade로 같이 지워졌으니 새로 넣는다
+  const extrasErr = await saveQuestionExtras(supabase, insertedQs, parsed.questions, check.adminId);
+  if (extrasErr) return { ok: false, message: extrasErr };
 
   revalidatePath("/passages");
   revalidatePath(`/passages/${passageId}`);

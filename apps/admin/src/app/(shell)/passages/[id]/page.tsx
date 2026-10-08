@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import type { PassageSource, QuestionChoice } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
+import { loadTaxonomyLists } from "../question-extras";
 import { EditPassageClient } from "./edit-passage-client";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function EditPassagePage({
 
   const { data: passage } = await supabase
     .from("passages")
-    .select("id, title, source_type, content, unit_major, unit_minor")
+    .select("id, title, source_type, content, unit_major, unit_minor, work_id, source_id")
     .eq("id", id)
     .maybeSingle();
   if (!passage) notFound();
@@ -26,10 +27,25 @@ export default async function EditPassagePage({
   const { data: questions } = await supabase
     .from("questions")
     .select(
-      "id, position_in_passage, stem, supplementary, choices, correct_answer, points, difficulty, unit_minor",
+      "id, position_in_passage, stem, supplementary, choices, correct_answer, points, difficulty, unit_minor, type_id",
     )
     .eq("passage_id", id)
     .order("position_in_passage");
+
+  // 해설·개념 연결·사전 — 서로 독립, 한 번에
+  const qIds = (questions ?? []).map((q) => q.id);
+  const [{ data: explanations }, { data: conceptLinks }, taxonomy] = await Promise.all([
+    qIds.length > 0
+      ? supabase.from("question_explanations").select("question_id, body").in("question_id", qIds)
+      : Promise.resolve({ data: [] as { question_id: string; body: string }[] }),
+    qIds.length > 0
+      ? supabase.from("question_concepts").select("question_id, concept_id").in("question_id", qIds)
+      : Promise.resolve({ data: [] as { question_id: string; concept_id: string }[] }),
+    loadTaxonomyLists(supabase),
+  ]);
+  const explanationOf = new Map((explanations ?? []).map((e) => [e.question_id, e.body] as const));
+  const conceptsOf = new Map<string, string[]>();
+  (conceptLinks ?? []).forEach((l) => conceptsOf.set(l.question_id, [...(conceptsOf.get(l.question_id) ?? []), l.concept_id]));
 
   // 사용 여부 (시험지 매핑)
   const questionIds = (questions ?? []).map((q) => q.id);
@@ -68,6 +84,8 @@ export default async function EditPassagePage({
           content: passage.content,
           unit_major: passage.unit_major,
           unit_minor: passage.unit_minor,
+          work_id: passage.work_id,
+          source_id: passage.source_id,
         }}
         initialQuestions={(questions ?? []).map((q) => ({
           id: q.id,
@@ -79,8 +97,12 @@ export default async function EditPassagePage({
           points: q.points,
           difficulty: q.difficulty as "상" | "중" | "하" | null,
           unit_minor: q.unit_minor,
+          type_id: q.type_id,
+          explanation: explanationOf.get(q.id) ?? null,
+          concept_ids: conceptsOf.get(q.id) ?? [],
         }))}
         usedCount={usedCount ?? 0}
+        taxonomy={taxonomy}
       />
     </div>
   );

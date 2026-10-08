@@ -13,6 +13,7 @@ import {
   type PassageSource,
   type QuestionInput,
   type QuestionChoice,
+  type TaxonomyLists,
 } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,8 +49,13 @@ export function emptyQuestion(position: number): QuestionInput {
     points: 2,
     difficulty: null,
     unit_minor: null,
+    type_id: null,
+    explanation: null,
+    concept_ids: [],
   };
 }
+
+const NONE = "__none__";
 
 type Mode =
   | { kind: "create" }
@@ -59,10 +65,13 @@ export function PassageForm({
   mode,
   initialPassage,
   initialQuestions,
+  taxonomy,
 }: {
   mode: Mode;
   initialPassage?: PassageInput;
   initialQuestions?: QuestionInput[];
+  /** 유형·작품·출처·개념 사전(보관 제외). 페이지가 읽어 넘긴다 */
+  taxonomy: TaxonomyLists;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +85,8 @@ export function PassageForm({
       content: "",
       unit_major: "",
       unit_minor: null,
+      work_id: null,
+      source_id: null,
     },
   );
   const [questions, setQuestions] = useState<QuestionInput[]>(
@@ -161,6 +172,9 @@ export function PassageForm({
         ...q,
         choices: filled.map((c, i) => ({ no: i + 1, text: c.text })),
         unit_minor: q.unit_minor?.toString().trim() || null,
+        type_id: q.type_id || null,
+        explanation: q.explanation?.trim() || null,
+        concept_ids: q.concept_ids ?? [],
       };
     });
 
@@ -168,6 +182,8 @@ export function PassageForm({
       passage: {
         ...passage,
         unit_minor: passage.unit_minor?.toString().trim() || null,
+        work_id: passage.work_id || null,
+        source_id: passage.source_id || null,
       },
       questions: cleanedQuestions,
     };
@@ -297,6 +313,52 @@ export function PassageForm({
                 placeholder="예) 인식론, 현대시-김소월"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="work">작품 / 제재 (선택)</Label>
+              <Select
+                value={passage.work_id ?? NONE}
+                onValueChange={(v) => updatePassage("work_id", v === NONE ? null : v)}
+              >
+                <SelectTrigger id="work" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>미지정</SelectItem>
+                  {taxonomy.works.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.title}
+                      {w.author ? ` · ${w.author}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exam-source">기출 출처 (선택)</Label>
+              <Select
+                value={passage.source_id ?? NONE}
+                onValueChange={(v) => updatePassage("source_id", v === NONE ? null : v)}
+              >
+                <SelectTrigger id="exam-source" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>미지정</SelectItem>
+                  {taxonomy.sources.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-muted-foreground text-xs md:col-span-2">
+              사전에 없으면{" "}
+              <Link href="/passages/taxonomy" className="underline" target="_blank">
+                태그 사전
+              </Link>
+              에서 먼저 추가해요.
+            </p>
           </div>
         </section>
 
@@ -337,6 +399,8 @@ export function PassageForm({
               <QuestionEditor
                 key={idx}
                 question={q}
+                area={passage.source_type}
+                taxonomy={taxonomy}
                 canRemove={questions.length > 1}
                 onChange={(patch) => updateQuestion(idx, patch)}
                 onChoiceChange={(choiceNo, text) =>
@@ -391,12 +455,16 @@ export function PassageForm({
 
 function QuestionEditor({
   question,
+  area,
+  taxonomy,
   canRemove,
   onChange,
   onChoiceChange,
   onRemove,
 }: {
   question: QuestionInput;
+  area: PassageSource;
+  taxonomy: TaxonomyLists;
   canRemove: boolean;
   onChange: (patch: Partial<QuestionInput>) => void;
   onChoiceChange: (choiceNo: number, text: string) => void;
@@ -441,6 +509,27 @@ function QuestionEditor({
               }
               className="w-16"
             />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground text-xs">유형</span>
+            <Select
+              value={question.type_id ?? NONE}
+              onValueChange={(v) => onChange({ type_id: v === NONE ? null : v })}
+            >
+              <SelectTrigger size="sm" className="w-[160px]">
+                <SelectValue placeholder="-" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>미분류</SelectItem>
+                {taxonomy.types
+                  .filter((t) => t.area === area)
+                  .map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground text-xs">난이도</span>
@@ -530,6 +619,49 @@ function QuestionEditor({
             ))}
           </div>
         </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">해설 (선택) — 시험을 제출한 학생에게만 보여요</Label>
+          <RichEditor
+            size="small"
+            value={question.explanation ?? ""}
+            onChange={(v) => onChange({ explanation: v || null })}
+            placeholder="정답 근거와 오답 선지가 왜 틀렸는지"
+          />
+        </div>
+
+        {taxonomy.concepts.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">개념 (여러 개 선택)</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {taxonomy.concepts
+                .filter((c) => !c.area || c.area === area)
+                .map((c) => {
+                  const on = (question.concept_ids ?? []).includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          concept_ids: on
+                            ? (question.concept_ids ?? []).filter((x) => x !== c.id)
+                            : [...(question.concept_ids ?? []), c.id],
+                        })
+                      }
+                      className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                        on
+                          ? "border-primary bg-primary/10 text-primary font-bold"
+                          : "border-input text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {c.title}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

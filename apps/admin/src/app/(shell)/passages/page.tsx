@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileUp, Plus } from "lucide-react";
+import { FileUp, Plus, Tags } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import type { PassageSource } from "@ipsi/types";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,11 @@ export default async function PassagesListPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/passages/taxonomy">
+              <Tags className="size-4" />태그 사전
+            </Link>
+          </Button>
           <Button asChild variant="outline">
             <Link href="/passages/import">
               <FileUp className="size-4" />CSV 가져오기

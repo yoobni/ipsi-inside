@@ -357,6 +357,8 @@ export type Database = {
           content: string;            // HTML
           unit_major: string;
           unit_minor: string | null;
+          work_id: string | null;
+          source_id: string | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -368,6 +370,8 @@ export type Database = {
           content: string;
           unit_major: string;
           unit_minor?: string | null;
+          work_id?: string | null;
+          source_id?: string | null;
           created_by: string;
           created_at?: string;
           updated_at?: string;
@@ -379,6 +383,8 @@ export type Database = {
           content?: string;
           unit_major?: string;
           unit_minor?: string | null;
+          work_id?: string | null;
+          source_id?: string | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -397,6 +403,7 @@ export type Database = {
           points: number;
           difficulty: Difficulty | null;
           unit_minor: string | null;
+          type_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -411,6 +418,7 @@ export type Database = {
           points?: number;
           difficulty?: Difficulty | null;
           unit_minor?: string | null;
+          type_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -425,9 +433,47 @@ export type Database = {
           points?: number;
           difficulty?: Difficulty | null;
           unit_minor?: string | null;
+          type_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
+      };
+      // ─── 문항 태그 체계 (20261008060000) ──────────────────────────────────
+      question_types: {
+        Row: { id: string; area: PassageSource; label: string; position: number; archived: boolean; created_at: string; updated_at: string };
+        Insert: { id?: string; area: PassageSource; label: string; position?: number; archived?: boolean; created_at?: string; updated_at?: string };
+        Update: { id?: string; area?: PassageSource; label?: string; position?: number; archived?: boolean; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      works: {
+        Row: { id: string; title: string; author: string | null; genre: string | null; era: string | null; archived: boolean; created_at: string; updated_at: string };
+        Insert: { id?: string; title: string; author?: string | null; genre?: string | null; era?: string | null; archived?: boolean; created_at?: string; updated_at?: string };
+        Update: { id?: string; title?: string; author?: string | null; genre?: string | null; era?: string | null; archived?: boolean; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      exam_sources: {
+        Row: { id: string; label: string; year: number | null; month: number | null; exam_kind: string | null; grade: number | null; archived: boolean; created_at: string; updated_at: string };
+        Insert: { id?: string; label: string; year?: number | null; month?: number | null; exam_kind?: string | null; grade?: number | null; archived?: boolean; created_at?: string; updated_at?: string };
+        Update: { id?: string; label?: string; year?: number | null; month?: number | null; exam_kind?: string | null; grade?: number | null; archived?: boolean; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      concepts: {
+        Row: { id: string; title: string; area: PassageSource | null; parent_id: string | null; body_html: string | null; position: number; archived: boolean; created_at: string; updated_at: string };
+        Insert: { id?: string; title: string; area?: PassageSource | null; parent_id?: string | null; body_html?: string | null; position?: number; archived?: boolean; created_at?: string; updated_at?: string };
+        Update: { id?: string; title?: string; area?: PassageSource | null; parent_id?: string | null; body_html?: string | null; position?: number; archived?: boolean; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      question_concepts: {
+        Row: { question_id: string; concept_id: string };
+        Insert: { question_id: string; concept_id: string };
+        Update: { question_id?: string; concept_id?: string };
+        Relationships: [];
+      };
+      question_explanations: {
+        Row: { question_id: string; body: string; updated_by: string | null; updated_at: string };
+        Insert: { question_id: string; body: string; updated_by?: string | null; updated_at?: string };
+        Update: { question_id?: string; body?: string; updated_by?: string | null; updated_at?: string };
         Relationships: [];
       };
       test_sheets: {

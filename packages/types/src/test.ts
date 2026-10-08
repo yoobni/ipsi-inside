@@ -59,6 +59,10 @@ export const questionInputSchema = z.object({
   points: z.coerce.number().int().min(1).max(10).default(2),
   difficulty: z.enum(DIFFICULTY).nullable().optional(),
   unit_minor: z.string().max(50).nullable().optional(),
+  // 태그 체계(20261008060000) — 전부 선택. 없으면 집계에서 '미분류'
+  type_id: z.string().uuid().nullable().optional(),
+  explanation: z.string().nullable().optional(),
+  concept_ids: z.array(z.string().uuid()).max(20).optional().default([]),
 });
 
 export const passageInputSchema = z.object({
@@ -67,6 +71,8 @@ export const passageInputSchema = z.object({
   content: z.string().min(1, "지문 본문을 입력해주세요"),
   unit_major: z.string().min(1, "대단원을 선택/입력해주세요").max(30),
   unit_minor: z.string().max(50).nullable().optional(),
+  work_id: z.string().uuid().nullable().optional(),
+  source_id: z.string().uuid().nullable().optional(),
 });
 
 export const passageWithQuestionsSchema = z.object({
