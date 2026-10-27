@@ -60,7 +60,7 @@ function Tile({
   return (
     <div className="border-hairline bg-surface rounded-[14px] border p-4">
       <p className="text-muted-foreground text-xs">{label}</p>
-      <div className="mt-1.5 flex items-end justify-between gap-2">
+      <div className="mt-1.5 flex flex-wrap items-end justify-between gap-2">
         <p className="flex items-baseline gap-1">
           <span className="font-display text-primary text-[32px] leading-none">
             {value === null ? "–" : value}

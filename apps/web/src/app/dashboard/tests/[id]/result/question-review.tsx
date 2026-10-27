@@ -42,14 +42,14 @@ export function QuestionReview({ questions }: { questions: AnalysisQuestion[] })
                   </summary>
                   <div className="border-hairline space-y-3 border-t px-4 py-4">
                     <div
-                      className="prose prose-sm dark:prose-invert max-w-none"
+                      className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none"
                       dangerouslySetInnerHTML={{ __html: q.stem }}
                     />
                     {q.supplementary && (
                       <div className="border-hairline rounded-md border p-3">
                         <p className="text-muted-foreground mb-1 text-[11px] font-bold">〈보기〉</p>
                         <div
-                          className="prose prose-sm dark:prose-invert max-w-none"
+                          className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none"
                           dangerouslySetInnerHTML={{ __html: q.supplementary }}
                         />
                       </div>
@@ -70,7 +70,7 @@ export function QuestionReview({ questions }: { questions: AnalysisQuestion[] })
                           >
                             <span className="shrink-0 font-bold">{CIRCLED[c.no]}</span>
                             <span
-                              className="prose prose-sm dark:prose-invert min-w-0 max-w-none flex-1"
+                              className="prose prose-sm dark:prose-invert overflow-x-auto break-words min-w-0 max-w-none flex-1"
                               dangerouslySetInnerHTML={{ __html: c.text }}
                             />
                             {isCorrect && <span className="shrink-0 text-xs font-bold text-emerald-700 dark:text-emerald-300">정답</span>}
@@ -83,7 +83,7 @@ export function QuestionReview({ questions }: { questions: AnalysisQuestion[] })
                       <div className="bg-primary/5 border-primary/30 rounded-md border p-3">
                         <p className="text-primary mb-1 text-[11px] font-bold">해설</p>
                         <div
-                          className="prose prose-sm dark:prose-invert max-w-none"
+                          className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none"
                           dangerouslySetInnerHTML={{ __html: q.explanation }}
                         />
                       </div>

@@ -230,7 +230,7 @@ function PendingDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="sm:max-w-md">
+      <SheetContent className="w-full sm:w-3/4 sm:max-w-md">
         {profile && (
           <>
             {/* 헤더: 아바타 + 이름 + 메타 */}

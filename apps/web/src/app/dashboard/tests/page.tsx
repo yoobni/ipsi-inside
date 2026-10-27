@@ -146,8 +146,8 @@ export default async function TestsPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-6 py-4 backdrop-blur">
-        <div className="flex items-center gap-6">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+        <div className="flex items-center gap-3 lg:gap-6">
           <Wordmark size="md" />
           <DashboardNav active="tests" />
         </div>
@@ -160,7 +160,7 @@ export default async function TestsPage() {
         </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-10">
+      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="space-y-1">
           <p className="font-accent text-2xl text-muted-foreground">
             {isParent

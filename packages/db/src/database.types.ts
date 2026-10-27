@@ -183,6 +183,43 @@ export type Database = {
         Update: { id?: string; student_id?: string; sheet_id?: string; tag_kind?: "type" | "work" | "concept" | "area"; tag_id?: string | null; tag_label?: string; created_by?: "student" | "staff"; created_at?: string };
         Relationships: [];
       };
+      // ─── 코스·회차·배부 (20261027000000) ──────────────────────────────────
+      courses: {
+        Row: { id: string; title: string; description: string | null; archived: boolean; created_by: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; title: string; description?: string | null; archived?: boolean; created_by?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; title?: string; description?: string | null; archived?: boolean; created_by?: string | null; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      course_groups: {
+        Row: { course_id: string; group_id: string };
+        Insert: { course_id: string; group_id: string };
+        Update: { course_id?: string; group_id?: string };
+        Relationships: [];
+      };
+      course_sessions: {
+        Row: { id: string; course_id: string; position: number; title: string; summary: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; course_id: string; position: number; title: string; summary?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; course_id?: string; position?: number; title?: string; summary?: string | null; created_at?: string; updated_at?: string };
+        Relationships: [];
+      };
+      course_session_items: {
+        Row: { id: string; session_id: string; position: number; kind: "material" | "test" | "drill" | "guide" | "homework"; material_id: string | null; test_sheet_id: string | null; drill_id: string | null; guide_id: string | null; title: string | null; due_days: number | null; created_at: string };
+        Insert: { id?: string; session_id: string; position: number; kind: "material" | "test" | "drill" | "guide" | "homework"; material_id?: string | null; test_sheet_id?: string | null; drill_id?: string | null; guide_id?: string | null; title?: string | null; due_days?: number | null; created_at?: string };
+        Update: { id?: string; session_id?: string; position?: number; kind?: "material" | "test" | "drill" | "guide" | "homework"; material_id?: string | null; test_sheet_id?: string | null; drill_id?: string | null; guide_id?: string | null; title?: string | null; due_days?: number | null; created_at?: string };
+        Relationships: [];
+      };
+      course_session_deliveries: {
+        Row: { session_id: string; student_id: string; kind: "regular" | "makeup"; delivered_by: string | null; delivered_at: string };
+        Insert: { session_id: string; student_id: string; kind?: "regular" | "makeup"; delivered_by?: string | null; delivered_at?: string };
+        Update: { session_id?: string; student_id?: string; kind?: "regular" | "makeup"; delivered_by?: string | null; delivered_at?: string };
+        Relationships: [];
+      };
+      course_homework_checks: {
+        Row: { item_id: string; student_id: string; done_at: string };
+        Insert: { item_id: string; student_id: string; done_at?: string };
+        Update: { item_id?: string; student_id?: string; done_at?: string };
+        Relationships: [];
+      };
       // ─── 학습 가이드 (20261008120000) ─────────────────────────────────────
       guides: {
         Row: { id: string; title: string; summary: string | null; work_id: string | null; status: "draft" | "published"; published_at: string | null; created_by: string | null; created_at: string; updated_at: string };
@@ -1507,6 +1544,11 @@ export type Database = {
       library_detail: { Args: { p_kind: string; p_id: string }; Returns: Json };
       // 학습 가이드 — 발행된 가이드의 read 단계 지문 본문만(@ipsi/types guidePassageSchema)
       guide_passage: { Args: { p_guide_id: string; p_passage_id: string }; Returns: Json };
+      course_session_visible: { Args: { p_session_id: string }; Returns: boolean };
+      deliver_course_session: {
+        Args: { p_session_id: string; p_student_ids: string[]; p_kind?: "regular" | "makeup" };
+        Returns: number;
+      };
       create_practice_set: {
         Args: { p_tag_kind: string; p_tag_id: string; p_size?: number; p_for_student?: string | null };
         Returns: string;

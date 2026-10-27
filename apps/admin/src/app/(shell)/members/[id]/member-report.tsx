@@ -212,7 +212,7 @@ export function MemberReport({ data }: { data: ReportData }) {
                     key={u.unit_major}
                     className="flex items-center gap-3 text-sm"
                   >
-                    <span className="w-28 shrink-0 truncate font-medium">
+                    <span className="w-20 shrink-0 truncate font-medium sm:w-28">
                       {u.unit_major}
                     </span>
                     <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">

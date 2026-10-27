@@ -27,7 +27,7 @@ export function MobilePreview({ passage, questions }: Props) {
       </div>
 
       {/* iPhone-ish frame */}
-      <div className="mx-auto w-[375px] rounded-[28px] border-[10px] border-zinc-900 bg-white shadow-2xl">
+      <div className="mx-auto w-full max-w-[375px] sm:w-[375px] rounded-[28px] border-[10px] border-zinc-900 bg-white shadow-2xl">
         {/* 상태바 (장식) */}
         <div className="flex items-center justify-between px-6 pt-3 pb-1 text-[10px] font-semibold text-zinc-900">
           <span>9:41</span>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { User as UserIcon } from "lucide-react";
+import { ChevronRight, GraduationCap, User as UserIcon } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { weekStartOf } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
@@ -15,6 +15,7 @@ import { WrongAccountNotice } from "@/components/wrong-account-notice";
 import { getMyNotifications } from "@/lib/notifications";
 import { getActiveAnnouncements } from "@/lib/announcements";
 import { getStudentStats, getTop3Boards } from "@/lib/stats";
+import { getRecentClassSessions } from "@/lib/courses";
 import { JournalSubmit } from "./journal-submit";
 import { TodayReportCard } from "./today-report";
 import { WeeklySummary, type DailyRecord } from "./weekly-summary";
@@ -66,6 +67,8 @@ export default async function DashboardPage() {
     unreadCount: 0,
   };
   let announcements: Awaited<ReturnType<typeof getActiveAnnouncements>> = [];
+  // 내 강의실 — 최근 배부 회차(학생만)
+  let recentClass: Awaited<ReturnType<typeof getRecentClassSessions>> = [];
 
   if (state.kind === "ok") {
     // 알림·공지는 대상 학생과 무관 — 자녀 링크 조회를 기다리지 않고 먼저 띄운다
@@ -99,6 +102,7 @@ export default async function DashboardPage() {
       top3Res,
       notifRes,
       announcementsRes,
+      recentClassRes,
     ] = await Promise.all([
       // 학생: 오늘 일지 조회
       state.role === "student"
@@ -225,6 +229,11 @@ export default async function DashboardPage() {
       // 알림 + 공지
       notifP,
       announcementsP,
+
+      // 내 강의실 최근 회차(학생만)
+      state.role === "student"
+        ? getRecentClassSessions(supabase, state.userId, 3)
+        : Promise.resolve([]),
     ]);
 
     const j = journalRes;
@@ -281,12 +290,13 @@ export default async function DashboardPage() {
     top3 = top3Res;
     notif = notifRes;
     announcements = announcementsRes;
+    recentClass = recentClassRes;
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-6 py-4 backdrop-blur">
-        <div className="flex items-center gap-6">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+        <div className="flex items-center gap-3 lg:gap-6">
           <Wordmark size="md" />
           <DashboardNav active="home" />
         </div>
@@ -306,7 +316,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-10">
+      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
         {state.kind === "admin-on-web" && (
           <WrongAccountNotice
             title="관리자 계정으로 로그인되어 있어요"
@@ -365,6 +375,46 @@ export default async function DashboardPage() {
                   </span>
                 </span>
               </Link>
+            )}
+
+            {/* 내 강의실 — 최근 열린 회차 */}
+            {recentClass.length > 0 && (
+              <section className="border-hairline bg-surface rounded-[14px] border p-4">
+                <Link
+                  href="/dashboard/class"
+                  className="-my-1 flex min-h-9 items-center justify-between gap-3"
+                >
+                  <span className="inline-flex items-center gap-2 text-sm font-bold">
+                    <GraduationCap className="text-primary size-4" />
+                    내 강의실
+                  </span>
+                  <span className="text-muted-foreground inline-flex items-center text-xs">
+                    전체 보기 <ChevronRight className="size-3.5" />
+                  </span>
+                </Link>
+                <ul className="mt-2 space-y-1">
+                  {recentClass.map((s) => (
+                    <li key={s.sessionId}>
+                      <Link
+                        href="/dashboard/class"
+                        className="hover:bg-muted/30 -mx-2 flex min-h-9 items-center gap-2 rounded-md px-2 text-sm"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {s.courseTitle && (
+                            <span className="text-muted-foreground">{s.courseTitle} · </span>
+                          )}
+                          {s.title}
+                        </span>
+                        {s.isNew && (
+                          <span className="bg-primary/10 text-primary shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold">
+                            NEW
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
 
             {/* 이번 주 요약 + 리포트 입구 (모바일엔 내비가 없어 여기가 유일한 길) */}
@@ -478,7 +528,7 @@ function ParentDashboard({
       {weeklyDays.length > 0 ? (
         <WeeklySummary days={weeklyDays} studentName={studentName} />
       ) : (
-        <section className="rounded-[16px] border border-hairline bg-surface p-7">
+        <section className="rounded-[16px] border border-hairline bg-surface p-5 sm:p-7">
           <h2 className="text-base font-extrabold">자녀 학습 리포트</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             자녀가 매일 작성한 학습 일지와 원장님 피드백이 발행되면 상단 카드에 표시돼요.

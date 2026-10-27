@@ -69,7 +69,7 @@ export function NotificationBell({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[320px] rounded-[14px] border border-hairline bg-background shadow-lg">
+        <div className="fixed inset-x-4 top-16 z-50 rounded-[14px] sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[320px] border border-hairline bg-background shadow-lg">
           <div className="flex items-center justify-between border-b border-hairline px-4 py-2.5">
             <h3 className="text-sm font-bold">알림</h3>
             {unreadCount > 0 && (
@@ -84,7 +84,7 @@ export function NotificationBell({
             )}
           </div>
 
-          <ul className="max-h-[440px] overflow-y-auto">
+          <ul className="max-h-[60vh] sm:max-h-[440px] overflow-y-auto">
             {items.length === 0 ? (
               <li className="text-muted-foreground px-4 py-12 text-center text-sm">
                 알림이 없어요.
@@ -112,7 +112,7 @@ export function NotificationBell({
                         <div className="min-w-0 flex-1">
                           <p
                             className={cn(
-                              "text-sm",
+                              "text-sm break-words",
                               unread ? "font-bold" : "font-medium text-muted-foreground",
                             )}
                           >

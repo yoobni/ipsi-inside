@@ -284,7 +284,7 @@ function MemberDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="sm:max-w-md">
+      <SheetContent className="w-full sm:w-3/4 sm:max-w-md">
         {member && (
           <>
             <SheetHeader className="border-b">

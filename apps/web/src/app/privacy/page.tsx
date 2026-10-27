@@ -37,7 +37,7 @@ export default function PrivacyPage() {
           </Link>
         </Button>
       </header>
-      <main className="mx-auto max-w-3xl px-6 py-10 space-y-8 text-sm leading-relaxed">
+      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10 space-y-8 text-sm leading-relaxed">
         <header className="space-y-1">
           <h1 className="font-display text-[28px] leading-tight">
             개인정보처리방침
@@ -417,7 +417,7 @@ function Row({
   return (
     <div className="flex gap-2">
       <dt className="text-faint w-[100px] shrink-0">{label}</dt>
-      <dd>{children}</dd>
+      <dd className="min-w-0 break-words">{children}</dd>
     </div>
   );
 }

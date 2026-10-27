@@ -78,7 +78,7 @@ export default async function QnaAdminPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">Q&amp;A</h1>
           <p className="text-muted-foreground text-sm">
@@ -93,7 +93,7 @@ export default async function QnaAdminPage({
         </Button>
       </div>
 
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         {[
           { k: "all", label: "전체" },
           { k: "open", label: "답변 대기" },
@@ -125,7 +125,7 @@ export default async function QnaAdminPage({
                 href={`/qna/${q.id}`}
                 className="hover:border-primary/40 block rounded-md border bg-card px-4 py-3 transition-colors"
               >
-                <div className="mb-1 flex items-center gap-2">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
                   {q.starred && (
                     <Star
                       className="size-3.5 fill-amber-400 text-amber-400"
@@ -148,7 +148,7 @@ export default async function QnaAdminPage({
                     <Badge variant="warning">대기</Badge>
                   )}
                 </div>
-                <p className="text-muted-foreground line-clamp-2 text-sm">{q.body}</p>
+                <p className="text-muted-foreground line-clamp-2 text-sm break-words">{q.body}</p>
               </Link>
             </li>
           ))}

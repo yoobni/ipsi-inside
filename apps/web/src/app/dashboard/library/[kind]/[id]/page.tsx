@@ -89,7 +89,7 @@ export default async function LibraryDetailPage({ params }: { params: Promise<{ 
       {k === "concept" && head.body_html && (
         <section className="border-hairline bg-surface rounded-[14px] border p-5">
           <h2 className="mb-2 text-sm font-extrabold">개념 설명</h2>
-          <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: String(head.body_html) }} />
+          <div className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none" dangerouslySetInnerHTML={{ __html: String(head.body_html) }} />
         </section>
       )}
 
@@ -197,9 +197,9 @@ export default async function LibraryDetailPage({ params }: { params: Promise<{ 
             {d.drills.map((dr) => (
               <li key={dr.id}>
                 <Link href={`/dashboard/drills/${dr.id}`} className="hover:border-primary/40 border-hairline flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors">
-                  <Puzzle className="text-primary size-4" />
+                  <Puzzle className="text-primary size-4 shrink-0" />
                   <Badge variant="outline">{DRILL_KIND_LABEL[dr.kind as DrillKind] ?? dr.kind}</Badge>
-                  <span className="truncate">{dr.title}</span>
+                  <span className="min-w-0 truncate">{dr.title}</span>
                 </Link>
               </li>
             ))}

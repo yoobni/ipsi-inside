@@ -58,6 +58,7 @@ export function PassagesTableClient({ rows }: { rows: PassageRow[] }) {
           />
         </div>
         <Tabs
+          className="max-w-full overflow-x-auto"
           value={source}
           onValueChange={(v) => setSource(v as PassageSource | "all")}
         >

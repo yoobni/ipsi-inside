@@ -25,7 +25,7 @@ export default function TermsPage() {
           </Link>
         </Button>
       </header>
-      <main className="mx-auto max-w-3xl px-6 py-10 space-y-8 text-sm leading-relaxed">
+      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10 space-y-8 text-sm leading-relaxed">
         <header className="space-y-1">
           <h1 className="font-display text-[28px] leading-tight">이용약관</h1>
           <p className="text-muted-foreground text-xs">

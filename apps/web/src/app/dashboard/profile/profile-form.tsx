@@ -76,7 +76,7 @@ export function ProfileForm({ initial }: { initial: ProfileInitial }) {
                 id="grade"
                 name="grade"
                 defaultValue={initial.grade ? String(initial.grade) : ""}
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-base sm:text-sm"
               >
                 <option value="">-</option>
                 <option value="1">1학년</option>

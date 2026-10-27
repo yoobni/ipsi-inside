@@ -225,10 +225,10 @@ export default async function MaterialDetailPage({
               {notDownloadedAssigned.map((a) => (
                 <li
                   key={a.assignment_id}
-                  className="flex items-center justify-between px-4 py-2 text-sm"
+                  className="flex items-center justify-between gap-3 px-4 py-2 text-sm"
                 >
                   <span className="font-medium">{a.full_name}</span>
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-muted-foreground text-right text-xs">
                     {a.school}
                     {a.grade ? ` · ${a.grade}학년` : ""} · 미수령
                   </span>

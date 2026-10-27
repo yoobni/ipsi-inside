@@ -147,7 +147,7 @@ export function DrillPlayer({ play }: { play: DrillPlay }) {
               {firstTried.has(current.id) && !feedback && (
                 <p className="text-primary mb-2 text-[11px] font-bold">다시 풀기</p>
               )}
-              <p className="text-[17px] leading-relaxed font-medium whitespace-pre-wrap">{current.prompt}</p>
+              <p className="text-[17px] leading-relaxed font-medium whitespace-pre-wrap break-words">{current.prompt}</p>
             </section>
 
             {!feedback ? (
@@ -212,7 +212,7 @@ function ItemInput({ item, kind, disabled, onSubmit }: { item: DrillPlayItem; ki
           <button key={i} type="button" disabled={disabled} onClick={() => onSubmit({ index: i })}
             className="border-hairline bg-surface hover:border-primary flex w-full items-start gap-3 rounded-[12px] border px-4 py-3 text-left text-sm transition-colors disabled:opacity-60">
             <span className="shrink-0 font-bold">{["①", "②", "③", "④", "⑤"][i]}</span>
-            <span>{o}</span>
+            <span className="min-w-0 break-words">{o}</span>
           </button>
         ))}
       </div>
@@ -226,7 +226,7 @@ function ItemInput({ item, kind, disabled, onSubmit }: { item: DrillPlayItem; ki
       <ul className="space-y-2">
         {tokens.map((t, i) => (
           <li key={i} className="border-hairline bg-surface flex flex-wrap items-center gap-2 rounded-[12px] border px-3 py-2">
-            <span className="min-w-[4rem] text-sm font-bold">{t}</span>
+            <span className="min-w-[4rem] break-words text-sm font-bold">{t}</span>
             <div className="ml-auto flex flex-wrap gap-1">
               {buckets.map((b, j) => (
                 <button key={j} type="button" disabled={disabled} onClick={() => setAssign(assign.map((a, k) => (k === i ? j : a)))}
@@ -270,7 +270,7 @@ function Feedback({ fb, kind, onNext, pending, isLast }: { fb: NonNullable<Pendi
         {fb.result.retry_no > 1 && <span className="text-muted-foreground ml-1 text-xs font-normal">({fb.result.retry_no}번째 시도)</span>}
       </p>
       <p className="text-sm"><span className="text-muted-foreground">정답: </span><b>{answerText}</b></p>
-      {fb.result.explanation && <p className="text-sm leading-relaxed whitespace-pre-wrap">{fb.result.explanation}</p>}
+      {fb.result.explanation && <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{fb.result.explanation}</p>}
       {!ok && <p className="text-muted-foreground text-xs">이 항목은 뒤에 다시 나와요.</p>}
       <button type="button" onClick={onNext} disabled={pending} className="bg-primary text-primary-foreground w-full rounded-md px-4 py-3 text-sm font-bold disabled:opacity-60">
         {pending ? "..." : isLast ? "결과 보기" : "다음"}

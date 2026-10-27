@@ -24,7 +24,7 @@ export default async function EditGuidePage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-2xl font-bold tracking-tight">가이드 편집</h1>
         {guide.status === "published" ? <Badge variant="success">발행됨</Badge> : <Badge variant="outline">초안</Badge>}
       </div>

@@ -213,7 +213,7 @@ export function PassageForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-3">
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
         {error && (
           <Alert variant="destructive">
@@ -381,7 +381,7 @@ export function PassageForm({
 
         {/* 문항들 */}
         <section className="rounded-md border bg-card">
-          <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
             <div>
               <h2 className="text-sm font-semibold">
                 문항 ({questions.length}문항)
@@ -412,7 +412,7 @@ export function PassageForm({
           </div>
         </section>
 
-        <div className="flex justify-between gap-2">
+        <div className="flex flex-wrap justify-between gap-2">
           {mode.kind === "edit" ? (
             <Button
               type="button"
@@ -607,7 +607,7 @@ function QuestionEditor({
                 >
                   {["", "①", "②", "③", "④", "⑤"][c.no]}
                 </span>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <RichEditor
                     size="small"
                     value={c.text}

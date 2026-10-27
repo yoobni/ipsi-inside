@@ -53,7 +53,7 @@ export function ChoiceDistributionPanel({ data }: { data: ChoiceDistribution }) 
         <p className="text-muted-foreground text-xs">
           응답 {data.respondents}명 · 학생별 첫 제출 응시 기준(결과를 본 뒤의 재응시는 제외)
         </p>
-        <Tabs value={sort} onValueChange={(v) => setSort(v as Sort)}>
+        <Tabs className="max-w-full overflow-x-auto" value={sort} onValueChange={(v) => setSort(v as Sort)}>
           <TabsList>
             <TabsTrigger value="position">문항 순</TabsTrigger>
             <TabsTrigger value="accuracy">정답률 낮은 순</TabsTrigger>
@@ -90,7 +90,7 @@ export function ChoiceDistributionPanel({ data }: { data: ChoiceDistribution }) 
                 const pct = Math.round(q.shares[i]! * 100);
                 return (
                   <div key={no} className="space-y-1">
-                    <div className="flex items-center justify-between text-[11px]">
+                    <div className="flex flex-wrap items-center justify-between gap-x-1 text-[11px]">
                       <span className={cn("font-bold", isCorrect && "text-emerald-700 dark:text-emerald-300")}>
                         {CIRCLED[i]}
                         {isCorrect && " 정답"}
@@ -111,7 +111,7 @@ export function ChoiceDistributionPanel({ data }: { data: ChoiceDistribution }) 
                 );
               })}
               <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex flex-wrap items-center justify-between gap-x-1 text-[11px]">
                   <span className="text-muted-foreground">미응답</span>
                   <span className="text-muted-foreground tabular-nums">
                     {q.total > 0 ? Math.round((q.unanswered / q.total) * 100) : 0}%

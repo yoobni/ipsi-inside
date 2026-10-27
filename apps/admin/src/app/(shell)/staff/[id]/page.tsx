@@ -95,7 +95,7 @@ export default async function StaffDetailPage({
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">{target.full_name}</h1>
             <Badge variant="outline">조교</Badge>
             {active ? (

@@ -43,7 +43,7 @@ export function DrillsList({ rows }: { rows: DrillRow[] }) {
   return (
     <ul className="space-y-2">
       {rows.map((row) => (
-        <li key={row.id} className="flex items-center justify-between gap-3 rounded-md border bg-card px-4 py-3">
+        <li key={row.id} className="flex flex-col gap-3 rounded-md border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <Link href={`/drills/${row.id}`} className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80">
             <Puzzle className="text-muted-foreground size-4 shrink-0" />
             <div className="min-w-0">

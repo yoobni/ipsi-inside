@@ -256,7 +256,7 @@ function DayDetailPanel({
                 <p className="text-muted-foreground text-[11px] font-bold">
                   {label}
                 </p>
-                <p className="text-foreground mt-1 whitespace-pre-wrap text-sm leading-relaxed">
+                <p className="text-foreground mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed">
                   {v}
                 </p>
               </div>
@@ -327,7 +327,7 @@ function SubBlock({
       >
         {label}
       </p>
-      <p className="text-foreground mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+      <p className="text-foreground mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">
         {body}
       </p>
     </div>

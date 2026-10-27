@@ -141,7 +141,7 @@ export function AskForm({ categories }: { categories: Category[] }) {
           rows={4}
           maxLength={4000}
           placeholder={selected?.placeholder ?? "궁금한 점을 적어주세요."}
-          className="border-hairline bg-background focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+          className="border-hairline bg-background focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-base sm:text-sm focus-visible:ring-2 focus-visible:outline-none"
         />
       </div>
 

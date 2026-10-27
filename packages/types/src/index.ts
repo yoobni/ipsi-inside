@@ -16,3 +16,4 @@ export * from './drills';
 export * from './mastery';
 export * from './library';
 export * from './guides';
+export * from './course';

@@ -7,7 +7,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
       type={type}
       data-slot="input"
       className={cn(
-        "flex h-12 w-full min-w-0 rounded-[10px] border border-input bg-surface px-4 text-[15px] text-foreground transition-colors outline-none",
+        "flex h-12 w-full min-w-0 rounded-[10px] border border-input bg-surface px-4 text-base sm:text-[15px] text-foreground transition-colors outline-none",
         "placeholder:text-faint",
         "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20",
         "aria-invalid:border-destructive aria-invalid:ring-destructive/15",

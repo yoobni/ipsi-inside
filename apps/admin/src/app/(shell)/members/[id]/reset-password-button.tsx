@@ -66,7 +66,7 @@ export function ResetPasswordButton({
               임시 비밀번호예요. <b>이 화면에서만 볼 수 있어요</b> — 학생에게
               전달한 뒤 창을 닫으세요.
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <code className="border-hairline bg-background rounded-md border px-2.5 py-1.5 text-base font-bold tracking-wider">
                 {issued}
               </code>

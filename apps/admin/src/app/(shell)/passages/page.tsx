@@ -42,7 +42,7 @@ export default async function PassagesListPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">지문 / 문항</h1>
           <p className="text-muted-foreground text-sm">

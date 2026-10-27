@@ -66,7 +66,7 @@ export default async function QnaDetailPage({
           )}
           <StarToggle questionId={q.id} initialStarred={!!star} />
         </div>
-        <p className="text-sm whitespace-pre-wrap">{q.body}</p>
+        <p className="text-sm break-words whitespace-pre-wrap">{q.body}</p>
         {imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img

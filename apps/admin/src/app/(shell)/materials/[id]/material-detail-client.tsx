@@ -210,7 +210,7 @@ export function MaterialDetailClient({
 
       {material.audience === "targeted" && (
         <section className="rounded-md border bg-card">
-          <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">배정 학생</h2>
               <Badge variant="primary">{assigned.length}명 배정</Badge>
@@ -251,7 +251,7 @@ export function MaterialDetailClient({
 
       {material.audience === "group" && (
         <section className="rounded-md border bg-card">
-          <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">대상 그룹</h2>
               <Badge variant="primary">{targetGroups.length}개 그룹</Badge>
@@ -827,7 +827,7 @@ function AssignDrawer({
         </div>
 
         <SheetFooter className="border-t">
-          <div className="flex w-full items-center justify-between gap-2">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <span className="text-muted-foreground text-sm">
               학교 {selectedSchools.size} · 학생 {selectedStudents.size}
             </span>

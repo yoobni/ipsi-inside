@@ -93,7 +93,7 @@ export function JournalsTable({
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-        <TabsList>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="unanswered">미답변 {unansweredCount}</TabsTrigger>
           <TabsTrigger value="draft">초안 {draftCount}</TabsTrigger>
           <TabsTrigger value="published">발행 {publishedCount}</TabsTrigger>
@@ -264,11 +264,11 @@ function FeedbackDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="sm:max-w-xl">
+      <SheetContent className="w-full sm:w-3/4 sm:max-w-xl">
         {row && (
           <>
             <SheetHeader className="border-b">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Calendar className="text-muted-foreground size-4" />
                 <SheetTitle className="font-mono tabular-nums">
                   {row.journal.journal_date}
@@ -343,7 +343,7 @@ function FeedbackDrawer({
             </div>
 
             <SheetFooter className="border-t">
-              <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex w-full flex-wrap items-center justify-between gap-2">
                 {row.feedback?.publish_at ? (
                   <Button
                     variant="outline"
@@ -433,7 +433,7 @@ function StudentJournalSections({ journal }: { journal: Journal }) {
   // 옛 레코드 (4갈래 비어있고 content만 있음) → "기타"로 표시
   if (sections.length === 0 && journal.content && journal.content.trim()) {
     return (
-      <div className="bg-muted/40 rounded-md border px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+      <div className="bg-muted/40 rounded-md border px-4 py-3 text-sm leading-relaxed break-words whitespace-pre-wrap">
         {journal.content}
       </div>
     );
@@ -452,7 +452,7 @@ function StudentJournalSections({ journal }: { journal: Journal }) {
           className="bg-muted/40 rounded-md border px-3 py-2.5"
         >
           <p className="text-muted-foreground text-[10px] font-bold">{label}</p>
-          <p className="text-foreground mt-1 whitespace-pre-wrap text-sm leading-relaxed">
+          <p className="text-foreground mt-1 break-words whitespace-pre-wrap text-sm leading-relaxed">
             {v as string}
           </p>
         </div>

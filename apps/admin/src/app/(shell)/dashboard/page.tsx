@@ -33,7 +33,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">업무 현황</h1>
           <p className="text-muted-foreground text-sm">
@@ -139,7 +139,7 @@ export default async function DashboardPage() {
 
           {/* ⚠️ 관리 필요 */}
           <section className="rounded-md border bg-card">
-            <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
                 <h2 className="text-sm font-semibold">관리 필요 학생</h2>

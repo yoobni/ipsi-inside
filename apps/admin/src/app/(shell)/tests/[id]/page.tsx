@@ -329,7 +329,7 @@ export default async function TestDetailPage({
             학생이 보는 모바일 화면 그대로. 정답은 admin에게만 표시돼요.
           </p>
         </div>
-        <div className="grid gap-6 p-4 md:grid-cols-[1fr_auto]">
+        <div className="grid grid-cols-1 gap-6 p-4 md:grid-cols-[1fr_auto]">
           <div>
             <h3 className="text-foreground text-xs font-semibold">정답 요약</h3>
             {orderedQuestions.length === 0 ? (

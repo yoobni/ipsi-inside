@@ -44,6 +44,7 @@ export const STAFF_PERMISSIONS = [
   'announcements',
   'columns',
   'qna',
+  'courses',
 ] as const;
 export type PermissionKey = (typeof STAFF_PERMISSIONS)[number];
 
@@ -59,6 +60,7 @@ export const STAFF_PERMISSION_LABEL: Record<PermissionKey, string> = {
   announcements: '공지사항',
   columns: '칼럼',
   qna: 'Q&A',
+  courses: '코스·진도',
 };
 
 /** 권한 체크박스 옆 한 줄 설명 — 무엇이 열리고 무엇은 여전히 원장만인지 */
@@ -74,6 +76,7 @@ export const STAFF_PERMISSION_HINT: Record<PermissionKey, string> = {
   announcements: '공지 작성·발행(전체 학생·학부모에게 나감)',
   columns: '칼럼 작성·발행·카테고리 관리',
   qna: '질문 열람·답변·좋은 질문 선정(담당 학생)',
+  courses: '코스·회차 구성, 수업 진행 처리로 회차 묶음 배부(담당 학생)',
 };
 
 export const staffPermissionSchema = z.enum(STAFF_PERMISSIONS);
@@ -99,6 +102,7 @@ export const ADMIN_MENU: AdminMenuItem[] = [
   { href: '/members/pending', label: '가입 승인', access: 'owner', matchPrefix: '/members/pending' },
   { href: '/members', label: '회원 관리', access: 'members' },
   { href: '/groups', label: '그룹(반)', access: 'groups', matchPrefix: '/groups' },
+  { href: '/courses', label: '코스·진도', access: 'courses', matchPrefix: '/courses' },
   { href: '/passages', label: '지문/문항', access: 'passages', matchPrefix: '/passages' },
   { href: '/tests', label: '시험 관리', access: 'tests', matchPrefix: '/tests' },
   { href: '/drills', label: 'OX 훈련', access: 'passages', matchPrefix: '/drills' },
@@ -132,6 +136,7 @@ export const ADMIN_ROUTE_RULES: ReadonlyArray<{ pattern: RegExp; access: RouteAc
   { pattern: /^\/forbidden(\/|$)/, access: 'staff' },
   { pattern: /^\/members(\/|$)/, access: 'members' },
   { pattern: /^\/groups(\/|$)/, access: 'groups' },
+  { pattern: /^\/courses(\/|$)/, access: 'courses' },
   { pattern: /^\/passages(\/|$)/, access: 'passages' },
   { pattern: /^\/tests(\/|$)/, access: 'tests' },
   { pattern: /^\/drills(\/|$)/, access: 'passages' },

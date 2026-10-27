@@ -49,7 +49,7 @@ export function AnnouncementBanner({ items }: { items: AnnouncementItem[] }) {
                     </p>
                   )}
                   {hasBody && isOpen && (
-                    <p className="text-foreground mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+                    <p className="text-foreground mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">
                       {a.body}
                     </p>
                   )}

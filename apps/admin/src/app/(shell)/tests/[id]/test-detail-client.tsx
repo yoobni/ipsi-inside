@@ -81,7 +81,7 @@ export function TestDetailClient({
   return (
     <>
       <section className="rounded-md border bg-card">
-        <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold">배정 학생</h2>
             <Badge variant="primary">{assigned.length}명 배정</Badge>
@@ -535,7 +535,7 @@ function AssignDrawer({
         </div>
 
         <SheetFooter className="border-t">
-          <div className="flex w-full items-center justify-between gap-2">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <span className="text-muted-foreground text-sm">
               그룹 {selectedGroups.size} · 학교 {selectedSchools.size} · 학생{" "}
               {selectedStudents.size}

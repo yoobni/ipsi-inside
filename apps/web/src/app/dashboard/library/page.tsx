@@ -111,7 +111,7 @@ function Row({ href, title, sub, badges }: { href: string; title: string; sub: s
             {sub && <p className="text-muted-foreground truncate text-xs">{sub}</p>}
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+        <div className="flex max-w-[45%] shrink-0 flex-wrap justify-end gap-1 sm:max-w-none">
           {badges.map((b) => <Badge key={b} variant="outline">{b}</Badge>)}
         </div>
       </Link>

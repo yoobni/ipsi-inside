@@ -9,7 +9,7 @@
 export default function DashboardLoading() {
   return (
     <div className="bg-background flex min-h-screen flex-col" aria-hidden>
-      <div className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
+      <div className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
         <div className="flex items-center gap-6">
           <div className="bg-muted h-6 w-28 animate-pulse rounded-md" />
           <div className="hidden gap-3 md:flex">
@@ -25,7 +25,7 @@ export default function DashboardLoading() {
         </div>
       </div>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 animate-pulse space-y-6 px-6 py-10">
+      <main className="mx-auto w-full max-w-5xl flex-1 animate-pulse space-y-6 px-4 py-8 sm:px-6 sm:py-10">
         <div className="space-y-2">
           <div className="bg-muted h-8 w-56 rounded-md" />
           <div className="bg-muted/70 h-4 w-80 max-w-full rounded" />

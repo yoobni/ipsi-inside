@@ -60,7 +60,7 @@ export function AnnouncementsClient({ rows }: { rows: AnnouncementRow[] }) {
   return (
     <>
       {/* 자료 배부·시험 관리와 같은 헤더 구성 — 제목 왼쪽, 주 액션 오른쪽 */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">공지사항</h1>
           <p className="text-muted-foreground text-sm">
@@ -153,7 +153,7 @@ function RowItem({
           </Alert>
         )}
       </div>
-      <div className="flex shrink-0 gap-1">
+      <div className="flex shrink-0 flex-wrap gap-1">
         <Button
           variant="outline"
           size="sm"
@@ -242,7 +242,7 @@ function Drawer({
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="sm:max-w-md">
+      <SheetContent className="w-full sm:w-3/4 sm:max-w-md">
         <SheetHeader className="border-b">
           <SheetTitle>{editingId ? "공지 편집" : "새 공지"}</SheetTitle>
           <SheetDescription>

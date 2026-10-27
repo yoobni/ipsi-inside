@@ -66,19 +66,19 @@ export function QuestionList({ items }: { items: QuestionItem[] }) {
                 onClick={() => remove(q.id)}
                 disabled={pending}
                 aria-label="삭제"
-                className="text-muted-foreground hover:text-foreground shrink-0"
+                className="text-muted-foreground hover:text-foreground -m-1.5 shrink-0 p-1.5"
               >
                 <Trash2 className="size-4" />
               </button>
             )}
           </div>
 
-          <p className="text-sm whitespace-pre-wrap">{q.body}</p>
+          <p className="text-sm whitespace-pre-wrap break-words">{q.body}</p>
 
           {q.answer ? (
             <div className="border-primary/30 bg-primary-tint/40 space-y-1 rounded-md border-l-2 py-2 pl-3">
               <p className="text-primary text-xs font-bold">원장님 답변</p>
-              <p className="text-sm whitespace-pre-wrap">{q.answer.body}</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{q.answer.body}</p>
             </div>
           ) : (
             <Badge variant="outline">답변 대기</Badge>

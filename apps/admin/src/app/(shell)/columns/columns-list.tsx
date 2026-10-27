@@ -65,7 +65,7 @@ export function ColumnsList({
       {rows.map((row) => (
         <li
           key={row.id}
-          className="flex items-center justify-between gap-3 rounded-md border bg-card px-4 py-3"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card px-4 py-3 sm:flex-nowrap"
         >
           <Link
             href={`/columns/${row.id}`}
@@ -86,7 +86,7 @@ export function ColumnsList({
               </p>
             </div>
           </Link>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {row.category_label ? (
               <Badge variant="primary">{row.category_label}</Badge>
             ) : (

@@ -21,7 +21,7 @@ export default async function GuidesPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">학습 가이드</h1>
           <p className="text-muted-foreground text-sm">
@@ -43,7 +43,7 @@ export default async function GuidesPage() {
           {(guides ?? []).map((g) => {
             const w = Array.isArray(g.works) ? g.works[0] : g.works;
             return (
-              <li key={g.id} className="flex items-center justify-between gap-3 rounded-md border bg-card px-4 py-3">
+              <li key={g.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card px-4 py-3 sm:flex-nowrap">
                 <Link href={`/guides/${g.id}`} className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80">
                   <BookOpenCheck className="text-muted-foreground size-4 shrink-0" />
                   <div className="min-w-0">
@@ -54,7 +54,7 @@ export default async function GuidesPage() {
                     </p>
                   </div>
                 </Link>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="ml-auto flex shrink-0 items-center gap-2">
                   {g.status === "published" ? <Badge variant="success">발행됨</Badge> : <Badge variant="outline">초안</Badge>}
                   <GuideRowActions id={g.id} title={g.title} published={g.status === "published"} />
                 </div>

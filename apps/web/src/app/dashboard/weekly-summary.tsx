@@ -44,7 +44,7 @@ export function WeeklySummary({
       : null;
 
   return (
-    <section className="border-hairline rounded-[16px] border bg-surface p-7 space-y-5">
+    <section className="border-hairline rounded-[16px] border bg-surface p-5 sm:p-7 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-extrabold">최근 7일 학습 요약</h2>

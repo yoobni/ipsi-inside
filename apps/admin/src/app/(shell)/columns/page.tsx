@@ -57,7 +57,7 @@ export default async function ColumnsPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">칼럼</h1>
           <p className="text-muted-foreground text-sm">
@@ -65,7 +65,7 @@ export default async function ColumnsPage({
             여기서 몇 명이 읽었는지 볼 수 있어요.
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           <Button asChild variant="outline">
             <Link href="/columns/categories">
               <Settings className="size-4" />

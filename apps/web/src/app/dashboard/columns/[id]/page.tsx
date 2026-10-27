@@ -81,7 +81,7 @@ export default async function ColumnDetailPage({
           )}
         </header>
         <div
-          className="prose prose-sm dark:prose-invert max-w-none text-[15px] leading-[1.75]"
+          className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none text-[15px] leading-[1.75]"
           dangerouslySetInnerHTML={{ __html: col.body }}
         />
       </article>
@@ -107,8 +107,8 @@ function Shell({
 }) {
   return (
     <div className="bg-background flex min-h-screen flex-col">
-      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
-        <div className="flex items-center gap-6">
+      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+        <div className="flex items-center gap-3 lg:gap-6">
           <Wordmark size="md" />
           <DashboardNav active="columns" />
         </div>
@@ -120,7 +120,7 @@ function Shell({
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8 space-y-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6 sm:py-8 space-y-6">
         {children}
       </main>
     </div>

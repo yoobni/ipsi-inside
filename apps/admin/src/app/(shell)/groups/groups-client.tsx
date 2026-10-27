@@ -157,7 +157,7 @@ export function GroupsClient({
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {active.map((g) => (
-            <li key={g.id}>
+            <li key={g.id} className="min-w-0">
               <button
                 type="button"
                 onClick={() => {
@@ -230,7 +230,7 @@ export function GroupsClient({
 
       {/* 멤버 관리 Sheet */}
       <Sheet open={activeGroup !== null} onOpenChange={(o) => !o && setActiveId(null)}>
-        <SheetContent className="flex flex-col sm:max-w-md">
+        <SheetContent className="flex w-full flex-col sm:w-3/4 sm:max-w-md">
           {activeGroup && (
             <>
               <SheetHeader className="border-b">

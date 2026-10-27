@@ -55,7 +55,7 @@ export function TaxonomyClient({
 }) {
   return (
     <Tabs defaultValue="types">
-      <TabsList>
+      <TabsList className="max-w-full overflow-x-auto">
         <TabsTrigger value="types">유형 {types.filter((t) => !t.archived).length}</TabsTrigger>
         <TabsTrigger value="works">작품·제재 {works.filter((w) => !w.archived).length}</TabsTrigger>
         <TabsTrigger value="sources">기출 출처 {sources.filter((s) => !s.archived).length}</TabsTrigger>
@@ -125,7 +125,7 @@ function TypesTab({ rows, areaLabel }: { rows: TypeRow[]; areaLabel: Record<Pass
         영역별로 문항 유형을 정해요. 문항 등록 폼에서 그 지문의 영역에 맞는 유형만 고를 수 있어요.
       </p>
       <Tabs value={area} onValueChange={(v) => setArea(v as PassageSource)}>
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto">
           {PASSAGE_SOURCE.map((s) => (
             <TabsTrigger key={s} value={s}>{areaLabel[s]}</TabsTrigger>
           ))}

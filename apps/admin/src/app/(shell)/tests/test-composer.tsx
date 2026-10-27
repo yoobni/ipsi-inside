@@ -326,7 +326,7 @@ export function TestComposer(props: Props) {
       </section>
 
       {/* 좌(picker) / 우(시험지) */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* 좌: 사용 가능 문항 */}
         <section className="rounded-md border bg-card">
           <div className="border-b px-4 py-3">
@@ -347,6 +347,7 @@ export function TestComposer(props: Props) {
                 />
               </div>
               <Tabs
+                className="max-w-full overflow-x-auto"
                 value={sourceFilter}
                 onValueChange={(v) =>
                   setSourceFilter(v as PassageSource | "all")

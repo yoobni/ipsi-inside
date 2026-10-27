@@ -17,8 +17,8 @@ export function LibraryShell({
 }) {
   return (
     <div className="bg-background flex min-h-screen flex-col">
-      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
-        <div className="flex items-center gap-6">
+      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+        <div className="flex items-center gap-3 lg:gap-6">
           <Wordmark size="md" />
           <DashboardNav active="library" />
         </div>
@@ -30,7 +30,7 @@ export function LibraryShell({
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-6 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     </div>
   );
 }

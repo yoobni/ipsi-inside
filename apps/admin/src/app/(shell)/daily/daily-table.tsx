@@ -189,7 +189,7 @@ export function DailyTable({ date, rows }: { date: string; rows: Row[] }) {
               {/* 학생 칸을 고정하지 않으면 이름·학교가 길어질 때 폭을 다 먹고
                   메모 입력칸이 placeholder도 못 담을 만큼(56px) 짜부라진다 */}
               {/* 가로 스크롤 시 이름이 함께 밀리면 누구 행인지 알 수 없다 */}
-              <TableHead className="bg-card sticky left-0 z-20 w-[200px] pl-4">
+              <TableHead className="bg-card sticky left-0 z-20 w-[120px] pl-4 sm:w-[200px]">
                 학생
               </TableHead>
               <TableHead className="w-[180px]">출석</TableHead>
@@ -289,7 +289,7 @@ function StudentDailyRow({ date, row }: { date: string; row: Row }) {
   return (
     <TableRow>
       {/* 헤더와 같이 고정 — 배경이 없으면 스크롤된 열이 뒤로 비쳐 보인다 */}
-      <TableCell className="bg-card sticky left-0 z-10 pl-4">
+      <TableCell className="bg-card sticky left-0 z-10 pl-4 whitespace-normal break-keep sm:whitespace-nowrap">
         <div className="font-medium">{row.student.full_name}</div>
         <div className="text-muted-foreground text-xs">
           {row.student.school ?? ""}

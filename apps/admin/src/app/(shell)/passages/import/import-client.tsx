@@ -116,7 +116,7 @@ export function ImportClient() {
             type="file"
             accept=".csv,text/csv"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="flex-1 text-sm"
+            className="min-w-0 flex-1 text-sm"
           />
         </div>
 

@@ -12,6 +12,7 @@ import {
 } from "@ipsi/types";
 import { readAuthState } from "@/lib/auth-state";
 import { Wordmark } from "@/components/wordmark";
+import { DashboardNav } from "@/components/dashboard-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DeltaBadge, deltaSentence } from "@/components/delta-badge";
 import { AccuracyBars, type AccuracyRow } from "./accuracy-bars";
@@ -110,12 +111,15 @@ export default async function ResultPage({
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-6 py-4 backdrop-blur">
-        <Wordmark size="md" />
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+        <div className="flex items-center gap-3 lg:gap-6">
+          <Wordmark size="md" />
+          <DashboardNav active="tests" />
+        </div>
         <ThemeToggle />
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-3xl space-y-6 px-6 py-10">
+      <main className="flex-1 mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6 sm:py-10">
         <div>
           <Link
             href={`/dashboard/tests/${id}`}
@@ -148,7 +152,7 @@ export default async function ResultPage({
           <p className="text-muted-foreground mt-2 text-sm">
             정답 {correctCount} / {a.questions.length}문항 <span className="ml-1">({pct}%)</span>
           </p>
-          <div className="mt-3 flex items-center justify-center gap-2 text-xs">
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
             {a.previous ? (
               <>
                 <span className="text-muted-foreground">

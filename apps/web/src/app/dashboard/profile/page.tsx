@@ -38,14 +38,14 @@ export default async function ProfilePage() {
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
-      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
-        <div className="flex items-center gap-6">
+      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+        <div className="flex items-center gap-3 lg:gap-6">
           <Wordmark size="md" />
           <DashboardNav />
         </div>
         <ThemeToggle />
       </header>
-      <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10 space-y-6">
+      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6 sm:py-10 space-y-6">
         <Link
           href="/dashboard"
           className="text-muted-foreground inline-flex items-center gap-1 text-sm hover:text-foreground"

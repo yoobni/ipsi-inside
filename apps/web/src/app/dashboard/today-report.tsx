@@ -27,7 +27,7 @@ export function TodayReportCard({ feedback, journalDate, studentName }: Props) {
   });
 
   return (
-    <section className="border-primary/30 bg-primary/5 rounded-[16px] border-2 p-7">
+    <section className="border-primary/30 bg-primary/5 rounded-[16px] border-2 p-5 sm:p-7">
       <div className="flex items-center justify-between gap-3">
         <p className="text-primary inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider">
           <CalendarDays className="size-3.5" />
@@ -38,7 +38,7 @@ export function TodayReportCard({ feedback, journalDate, studentName }: Props) {
         </p>
         <Link
           href="/dashboard/journal"
-          className="text-muted-foreground inline-flex items-center text-xs hover:text-foreground"
+          className="text-muted-foreground inline-flex shrink-0 items-center text-xs hover:text-foreground"
         >
           지난 리포트
           <ChevronRight className="size-3.5" />
@@ -104,7 +104,7 @@ function FeedbackBlock({
       >
         {title}
       </p>
-      <p className="text-foreground mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+      <p className="text-foreground mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">
         {body}
       </p>
     </div>

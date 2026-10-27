@@ -74,7 +74,7 @@ function FlagRow({ studentId, ruleKey, label, detail }: { studentId: string; rul
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="메모 (예: 전화 상담, 다음 주 재점검)"
-            className="h-8 flex-1 text-xs"
+            className="h-8 min-w-40 flex-1 text-xs"
             maxLength={200}
           />
           <select

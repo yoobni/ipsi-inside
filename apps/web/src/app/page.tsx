@@ -55,9 +55,9 @@ export default async function HomePage() {
         }}
       />
       <header className="sticky top-0 z-10 border-b border-hairline bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Wordmark size="md" />
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
+          <Wordmark size="md" className="text-xl sm:text-2xl" />
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <ThemeToggle />
             {showLoginCtas && (
               <>
@@ -86,7 +86,7 @@ export default async function HomePage() {
       {/* 상태별 배너 */}
       {state.kind === "ok" && state.status !== "approved" && (
         <div className="border-b border-primary/30 bg-primary-tint">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-3 text-sm md:flex-row md:items-center md:justify-between">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 sm:px-6 py-3 text-sm md:flex-row md:items-center md:justify-between">
             <p className="text-foreground">
               <span className="font-bold text-primary">{state.fullName}님,</span>{" "}
               {state.status === "pending" &&
@@ -105,7 +105,7 @@ export default async function HomePage() {
 
       {state.kind === "admin-on-web" && (
         <div className="border-b border-primary/30 bg-primary-tint">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-3 text-sm md:flex-row md:items-center md:justify-between">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 sm:px-6 py-3 text-sm md:flex-row md:items-center md:justify-between">
             <p className="text-foreground">
               <span className="font-bold text-primary">관리자 계정</span>으로
               로그인되어 있어요. 학생/학부모 페이지를 보려면 로그아웃 후 다시
@@ -120,7 +120,7 @@ export default async function HomePage() {
 
       {state.kind === "missing-profile" && (
         <div className="border-b border-primary/30 bg-primary-tint">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-3 text-sm md:flex-row md:items-center md:justify-between">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 sm:px-6 py-3 text-sm md:flex-row md:items-center md:justify-between">
             <p className="text-foreground">
               계정 정보가 동기화되지 않았어요. 로그아웃 후 다시 가입해주세요.
             </p>
@@ -151,7 +151,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="relative mx-auto max-w-6xl px-6 py-20 md:py-28">
+          <div className="relative mx-auto max-w-6xl px-4 sm:px-6 py-20 md:py-28">
             <p className="font-accent text-2xl text-background/80 md:text-3xl">
               수능 국어, 안쪽을 본다.
             </p>
@@ -194,7 +194,7 @@ export default async function HomePage() {
         </section>
 
         <section className="border-b border-hairline">
-          <div className="mx-auto max-w-6xl px-6 py-14">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
             <h2 className="font-display text-2xl md:text-3xl">네 영역, 빠짐없이.</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               수능 국어 4영역을 모듈 단위로 다뤄요.
@@ -212,7 +212,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-6 py-14">
+        <section className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
           <h2 className="font-display text-2xl md:text-3xl">
             계획부터 복기까지, 끊기지 않게.
           </h2>
@@ -244,7 +244,7 @@ export default async function HomePage() {
         </section>
 
         <section className="border-t border-hairline bg-surface">
-          <div className="mx-auto max-w-6xl px-6 py-14">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
             <span className="inline-flex items-center rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-bold text-primary">
               학부모
             </span>
@@ -266,7 +266,7 @@ export default async function HomePage() {
         값은 @ipsi/types의 BUSINESS_INFO 한 곳에서 온다.
       */}
       <footer className="border-t border-hairline">
-        <div className="mx-auto max-w-6xl space-y-5 px-6 py-8 text-sm text-muted-foreground">
+        <div className="mx-auto max-w-6xl space-y-5 px-4 sm:px-6 py-8 text-sm text-muted-foreground">
           <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
             <Wordmark size="sm" />
             <nav className="flex items-center gap-4">

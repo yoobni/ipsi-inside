@@ -255,7 +255,7 @@ export function NewMaterialForm({ groups }: { groups: GroupOption[] }) {
                 accept="application/pdf"
                 multiple
                 onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-                className="flex-1 text-sm"
+                className="min-w-0 flex-1 text-sm"
                 required
               />
             </div>

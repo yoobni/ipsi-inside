@@ -189,7 +189,7 @@ export default async function AttemptDetailPage({
                 key={i}
                 className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
               >
-                <span className="font-medium">
+                <span className="min-w-0 font-medium">
                   {u.unit_major}
                   {u.unit_minor && (
                     <span className="text-muted-foreground">
@@ -198,8 +198,8 @@ export default async function AttemptDetailPage({
                     </span>
                   )}
                 </span>
-                <div className="flex items-center gap-2">
-                  <div className="bg-muted relative h-2 w-32 overflow-hidden rounded-full">
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className="bg-muted relative h-2 w-20 overflow-hidden rounded-full sm:w-32">
                     <div
                       className="bg-primary absolute inset-y-0 left-0"
                       style={{ width: `${u.accuracy}%` }}
@@ -291,7 +291,7 @@ export default async function AttemptDetailPage({
                         {["", "①", "②", "③", "④", "⑤"][c.no]}
                       </span>
                       <div
-                        className="prose prose-sm dark:prose-invert max-w-none flex-1"
+                        className="prose prose-sm dark:prose-invert min-w-0 max-w-none flex-1"
                         dangerouslySetInnerHTML={{ __html: c.text }}
                       />
                       {isCorrect && (

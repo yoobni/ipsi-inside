@@ -4,6 +4,7 @@ import { ArrowRight, ChevronLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { readAuthState } from "@/lib/auth-state";
 import { Wordmark } from "@/components/wordmark";
+import { DashboardNav } from "@/components/dashboard-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TestEntry } from "./test-entry";
 import { AttemptsTrend, type TrendPoint } from "./attempts-trend";
@@ -66,12 +67,15 @@ export default async function TestDetailPage({
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-6 py-4 backdrop-blur">
-        <Wordmark size="md" />
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+        <div className="flex items-center gap-3 lg:gap-6">
+          <Wordmark size="md" />
+          <DashboardNav active="tests" />
+        </div>
         <ThemeToggle />
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-10">
+      <main className="flex-1 mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
         <Link
           href="/dashboard/tests"
           className="text-muted-foreground inline-flex items-center gap-1 text-sm hover:text-foreground"

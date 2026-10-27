@@ -309,7 +309,7 @@ function ItemEditor({
                   <select
                     value={item.answer.assignments[i] ?? 0}
                     onChange={(e) => onChange({ ...item, answer: { assignments: item.answer.assignments.map((a, j) => (j === i ? Number(e.target.value) : a)) } })}
-                    className="h-9 rounded-md border bg-background px-2 text-xs"
+                    className="h-9 max-w-[50%] rounded-md border bg-background px-2 text-xs sm:max-w-none"
                     aria-label="정답 바구니"
                   >
                     {item.buckets.map((b, j) => <option key={j} value={j}>{j + 1}. {b || "(이름 없음)"}</option>)}

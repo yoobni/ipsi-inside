@@ -97,7 +97,7 @@ export default async function ColumnsPage({
                     <BookOpen className="text-primary size-5 shrink-0" />
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-2">
-                        {catLabel && <Badge variant="primary">{catLabel}</Badge>}
+                        {catLabel && <Badge variant="primary" className="shrink-0">{catLabel}</Badge>}
                         <p className="truncate font-bold">{c.title}</p>
                       </div>
                       {c.published_at && (
@@ -133,8 +133,8 @@ function Shell({
 }) {
   return (
     <div className="bg-background flex min-h-screen flex-col">
-      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
-        <div className="flex items-center gap-6">
+      <header className="border-hairline sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+        <div className="flex items-center gap-3 lg:gap-6">
           <Wordmark size="md" />
           <DashboardNav active="columns" />
         </div>
@@ -146,7 +146,7 @@ function Shell({
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8 space-y-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6 sm:py-8 space-y-6">
         {children}
       </main>
     </div>

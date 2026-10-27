@@ -177,7 +177,7 @@ export function ExamRunner({
             </p>
             <h2 className="mt-1 text-sm font-bold">{q.passage.title}</h2>
             <div
-              className="prose prose-sm dark:prose-invert max-w-none mt-3 text-[14px] leading-[1.7]"
+              className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none mt-3 text-[14px] leading-[1.7]"
               dangerouslySetInnerHTML={{ __html: q.passage.content }}
             />
           </section>
@@ -188,7 +188,7 @@ export function ExamRunner({
               지문 다시 보기 — {q.passage.title}
             </summary>
             <div
-              className="prose prose-sm dark:prose-invert max-w-none px-5 pb-5 text-[14px] leading-[1.7]"
+              className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none px-5 pb-5 text-[14px] leading-[1.7]"
               dangerouslySetInnerHTML={{ __html: q.passage.content }}
             />
           </details>
@@ -201,7 +201,7 @@ export function ExamRunner({
               〈보기〉
             </p>
             <div
-              className="prose prose-sm dark:prose-invert max-w-none text-[13.5px] leading-[1.65]"
+              className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none text-[13.5px] leading-[1.65]"
               dangerouslySetInnerHTML={{ __html: q.supplementary }}
             />
           </section>
@@ -224,7 +224,7 @@ export function ExamRunner({
             )}
           </div>
           <div
-            className="prose prose-sm dark:prose-invert max-w-none mt-1 text-[15px] font-medium leading-[1.7]"
+            className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none mt-1 text-[15px] font-medium leading-[1.7]"
             dangerouslySetInnerHTML={{ __html: q.stem }}
           />
 
@@ -255,7 +255,7 @@ export function ExamRunner({
                     {["", "①", "②", "③", "④", "⑤"][c.no]}
                   </span>
                   <div
-                    className="prose prose-sm dark:prose-invert max-w-none flex-1 text-[14px] leading-[1.6]"
+                    className="prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none min-w-0 flex-1 text-[14px] leading-[1.6]"
                     dangerouslySetInnerHTML={{ __html: c.text }}
                   />
                 </button>
@@ -372,7 +372,7 @@ function NavPanel({
             <X className="size-5" />
           </button>
         </div>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid max-h-[60vh] grid-cols-6 gap-2 overflow-y-auto sm:max-h-none sm:grid-cols-7">
           {questions.map((qq, i) => {
             const answered = answers[qq.question_id] != null;
             return (

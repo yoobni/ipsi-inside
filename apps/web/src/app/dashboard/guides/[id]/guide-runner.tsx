@@ -184,5 +184,5 @@ function Card({ children }: { children: React.ReactNode }) {
   return <section className="border-hairline bg-surface rounded-[14px] border p-5">{children}</section>;
 }
 function Html({ html, className }: { html: string; className?: string }) {
-  return <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div className={cn("prose prose-sm dark:prose-invert overflow-x-auto break-words max-w-none", className)} dangerouslySetInnerHTML={{ __html: html }} />;
 }

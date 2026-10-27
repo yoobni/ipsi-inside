@@ -330,7 +330,7 @@ export function PlannerWeek({
                 isToday && "border-primary/50",
               )}
             >
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
                 <h2 className="text-sm font-bold">
                   {DAY_LABELS[day.day_of_week]}요일
                 </h2>
@@ -368,7 +368,7 @@ export function PlannerWeek({
                     )}
                   >
                     {/* 블록 머리 — 무슨 시간이고 몇 시부터인지 */}
-                    <div className="flex items-baseline gap-2 px-3 pt-2.5 pb-1.5 text-xs">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-3 pt-2.5 pb-1.5 text-xs">
                       {block.kind === "fixed" && (
                         <span
                           className={cn(
@@ -386,7 +386,7 @@ export function PlannerWeek({
                     </div>
 
                     {block.memo && (
-                      <p className="text-muted-foreground px-3 pb-1.5 text-xs">
+                      <p className="text-muted-foreground px-3 pb-1.5 text-xs break-words">
                         {block.memo}
                       </p>
                     )}
@@ -421,7 +421,7 @@ export function PlannerWeek({
                                   </div>
                                 )}
 
-                                <p className="text-[15px] leading-snug font-semibold">
+                                <p className="text-[15px] leading-snug font-semibold break-words">
                                   {task.title}
                                 </p>
 
@@ -601,7 +601,7 @@ export function PlannerWeek({
           <div className="text-muted-foreground mb-1 text-xs font-bold">
             선생님 주간 총평
           </div>
-          <p className="text-sm whitespace-pre-wrap">{weeklyComment}</p>
+          <p className="text-sm whitespace-pre-wrap break-words">{weeklyComment}</p>
         </div>
       )}
     </div>
