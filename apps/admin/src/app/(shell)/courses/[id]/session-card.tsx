@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Plus, Send, Trash2, UserPlus, X } from "lucide-react";
 import { COURSE_ITEM_KIND, COURSE_ITEM_KIND_LABEL, type CourseItemInput, type CourseItemKind, type DeliveryKind } from "@ipsi/types";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { deleteSessionAction, loadItemRefsAction, moveSessionAction, saveSessionAction } from "../actions";
+import { deleteSessionAction, moveSessionAction, saveSessionAction } from "../actions";
 import type { ItemRefs, SessionData } from "./course-detail-client";
 
 const AUDIENCE_LABEL = { all: "전체", student: "학생 전체", parent: "학부모 전체", targeted: "지정 학생", group: "그룹" } as const;
@@ -60,11 +60,16 @@ function refId(it: CourseItemInput): string | null {
   }
 }
 
+/** 피커 선택지 전체 — 부모가 첫 편집기 열림에 한 번 읽어 모든 카드에 내려준다 */
+export type RefsCatalog = { refs: ItemRefs | null; error: string | null; retry: () => void };
+
 export function SessionCard({
   index,
   total,
   session,
   refs,
+  catalog,
+  onOpenEditor,
   deliveredCount,
   onDeliver,
   onError,
@@ -73,6 +78,9 @@ export function SessionCard({
   total: number;
   session: SessionData;
   refs: ItemRefs;
+  catalog: RefsCatalog;
+  /** 편집기를 열 때 — 부모가 피커 목록을 아직 안 읽었으면 읽는다 */
+  onOpenEditor: () => void;
   deliveredCount: number;
   onDeliver: (mode: DeliveryKind) => void;
   onError: (msg: string | null) => void;
@@ -96,7 +104,14 @@ export function SessionCard({
   return (
     <li className="rounded-md border bg-card">
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
-        <button type="button" onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <button
+          type="button"
+          onClick={() => {
+            if (!open) onOpenEditor();
+            setOpen((o) => !o);
+          }}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
           <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">{index + 1}</span>
           <div className="min-w-0">
             <p className="truncate font-medium">{session.title}</p>
@@ -162,8 +177,14 @@ export function SessionCard({
         <SessionEditor
           session={session}
           refs={refs}
+          catalog={catalog}
           deliveredCount={deliveredCount}
           onSaved={() => router.refresh()}
+          onReset={() => {
+            // 일부만 써진 저장 — 갖고 있던 행(id 없음)으로 다시 저장하면 중복이 생기니 닫고 새로 읽는다
+            setOpen(false);
+            router.refresh();
+          }}
           onError={onError}
         />
       )}
@@ -177,14 +198,18 @@ const nextKey = () => crypto.randomUUID();
 function SessionEditor({
   session,
   refs: pageRefs,
+  catalog,
   deliveredCount,
   onSaved,
+  onReset,
   onError,
 }: {
   session: SessionData;
   refs: ItemRefs;
+  catalog: RefsCatalog;
   deliveredCount: number;
   onSaved: () => void;
+  onReset: () => void;
   onError: (msg: string | null) => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -200,20 +225,7 @@ function SessionEditor({
     items: session.items,
   });
 
-  // 피커 선택지 전체는 편집기를 열 때 한 번만 읽는다(페이지 진입 시엔 안 읽음)
-  const [allRefs, setAllRefs] = useState<ItemRefs | null>(null);
-  const [refsError, setRefsError] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    loadItemRefsAction().then((r) => {
-      if (!alive) return;
-      if (r.ok) setAllRefs(r.refs);
-      else setRefsError(r.message);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const allRefs = catalog.refs;
   // 표시용: 페이지가 준 "이 코스가 쓰는 참조" + 피커 전체(읽힌 뒤)
   const refs = useMemo<ItemRefs>(() => {
     if (!allRefs) return pageRefs;
@@ -255,14 +267,17 @@ function SessionEditor({
         summary: summary.trim() || null,
         items: rows.map((r) => r.input),
       });
-      if (!r.ok) onError(r.message);
-      else {
-        // 서버가 돌려준 행 id를 입혀 둔다 — 다음 저장에서 숙제 문구를 고쳐도 같은 행이 갱신된다
-        setRows(r.items.map((input) => ({ key: nextKey(), input })));
-        setBaseline({ title, summary, items: r.items });
-        setSaved(true);
-        onSaved();
+      if (!r.ok) {
+        onError(r.message);
+        if (r.written) onReset();
+        return;
       }
+      // 서버가 돌려준 행 id를 입혀 둔다 — 다음 저장에서 숙제 문구를 고쳐도 같은 행이 갱신된다
+      setRows(r.items.map((input) => ({ key: nextKey(), input })));
+      setBaseline({ title, summary, items: r.items });
+      setSaved(true);
+      if (r.warning) onError(r.warning);
+      onSaved();
     });
   };
 
@@ -357,8 +372,11 @@ function SessionEditor({
         </div>
         {addKind === "homework" ? (
           <HomeworkAdder onAdd={(input) => update([...rows, { key: nextKey(), input }])} />
-        ) : refsError ? (
-          <p className="text-destructive py-4 text-center text-xs">{refsError}</p>
+        ) : catalog.error ? (
+          <p className="text-destructive flex items-center justify-center gap-2 py-4 text-xs">
+            {catalog.error}
+            <Button type="button" size="sm" variant="outline" onClick={catalog.retry}>다시 시도</Button>
+          </p>
         ) : !allRefs ? (
           <p className="text-muted-foreground py-4 text-center text-xs">목록을 불러오는 중…</p>
         ) : (

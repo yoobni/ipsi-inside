@@ -8,7 +8,7 @@ import { todayKst } from "@/lib/kst";
  *
  * RLS가 "배부받은 회차·그 코스·항목"만 돌려준다. 항목이 가리키는 원본(자료·시험지·훈련·가이드)은
  * 각자 RLS를 따르므로(미발행 훈련 등) 못 읽으면 available=false 로 두고 화면은 "준비 중"으로 그린다.
- * 조회는 단계별 일괄(.in) + 병렬 — 회차 수와 무관하게 왕복 4번 안쪽.
+ * 조회는 단계별 일괄(.in) + 병렬 — 회차 수와 무관하게 왕복 4단계 안쪽.
  */
 
 type Client = SupabaseClient<Database>;
@@ -54,60 +54,40 @@ function isNew(deliveredAt: string, now = Date.now()) {
   return now - new Date(deliveredAt).getTime() < NEW_DAYS * 86400_000;
 }
 
-type DeliveredSession = {
-  sessionId: string;
-  courseId: string;
-  courseTitle: string;
-  title: string;
-  summary: string | null;
-  position: number;
-  deliveredAt: string;
-  deliveryKind: DeliveryKind;
-};
+type DeliveryRow = { session_id: string; kind: DeliveryKind; delivered_at: string };
+type SessionMeta = { id: string; courseId: string; courseTitle: string; title: string; summary: string | null; position: number };
 
-/**
- * 받은 회차 목록(최신 배부순) + 회차·코스 메타. 홈 카드와 강의실 화면이 같이 쓴다 —
- * "받은 회차"의 정의(배부 행 기준)와 코스 제목 조회가 한 곳에만 있게.
- */
-async function loadDeliveredSessions(supabase: Client, studentId: string, limit?: number): Promise<DeliveredSession[]> {
+/** 받은 회차 배부 행(최신 배부순). "받은 회차"의 정의는 이 한 곳 — 홈 카드와 강의실이 같이 쓴다. */
+async function fetchDeliveries(supabase: Client, studentId: string, limit?: number): Promise<DeliveryRow[]> {
   let q = supabase
     .from("course_session_deliveries")
     .select("session_id, kind, delivered_at")
     .eq("student_id", studentId)
     .order("delivered_at", { ascending: false });
   if (limit) q = q.limit(limit);
-  const { data: deliveries } = await q;
-  const ds = deliveries ?? [];
-  if (ds.length === 0) return [];
+  const { data } = await q;
+  return data ?? [];
+}
 
+/** 회차·코스 메타(제목 등). 다른 조회와 나란히 돌릴 수 있게 배부 행과 분리해 둔다. */
+async function fetchSessionMeta(supabase: Client, sessionIds: string[]): Promise<Map<string, SessionMeta>> {
+  if (sessionIds.length === 0) return new Map();
   const { data: sessions } = await supabase
     .from("course_sessions")
     .select("id, course_id, position, title, summary")
-    .in("id", ds.map((d) => d.session_id));
+    .in("id", sessionIds);
   const courseIds = [...new Set((sessions ?? []).map((s) => s.course_id))];
   const { data: courses } =
     courseIds.length > 0
       ? await supabase.from("courses").select("id, title").in("id", courseIds)
       : { data: [] as { id: string; title: string }[] };
-  const sessionById = new Map((sessions ?? []).map((s) => [s.id, s] as const));
   const courseTitle = new Map((courses ?? []).map((c) => [c.id, c.title] as const));
-
-  return ds.flatMap((d) => {
-    const s = sessionById.get(d.session_id);
-    if (!s) return [];
-    return [
-      {
-        sessionId: s.id,
-        courseId: s.course_id,
-        courseTitle: courseTitle.get(s.course_id) ?? "",
-        title: s.title,
-        summary: s.summary,
-        position: s.position,
-        deliveredAt: d.delivered_at,
-        deliveryKind: d.kind,
-      },
-    ];
-  });
+  return new Map(
+    (sessions ?? []).map((s) => [
+      s.id,
+      { id: s.id, courseId: s.course_id, courseTitle: courseTitle.get(s.course_id) ?? "", title: s.title, summary: s.summary, position: s.position },
+    ]),
+  );
 }
 
 /** 홈 카드용 — 최근 배부 회차 몇 개(완료 판정 없이 7일 이내면 NEW) */
@@ -116,14 +96,12 @@ export async function getRecentClassSessions(
   studentId: string,
   limit = 3,
 ): Promise<{ sessionId: string; title: string; courseTitle: string; deliveredAt: string; isNew: boolean }[]> {
-  const rows = await loadDeliveredSessions(supabase, studentId, limit);
-  return rows.map((r) => ({
-    sessionId: r.sessionId,
-    title: r.title,
-    courseTitle: r.courseTitle,
-    deliveredAt: r.deliveredAt,
-    isNew: isNew(r.deliveredAt),
-  }));
+  const ds = await fetchDeliveries(supabase, studentId, limit);
+  const meta = await fetchSessionMeta(supabase, ds.map((d) => d.session_id));
+  return ds.flatMap((d) => {
+    const m = meta.get(d.session_id);
+    return m ? [{ sessionId: m.id, title: m.title, courseTitle: m.courseTitle, deliveredAt: d.delivered_at, isNew: isNew(d.delivered_at) }] : [];
+  });
 }
 
 /**
@@ -135,12 +113,13 @@ export async function loadClassroom(
   studentId: string,
   viewerIsStudent: boolean,
 ): Promise<ClassCourse[]> {
-  const delivered = await loadDeliveredSessions(supabase, studentId);
-  if (delivered.length === 0) return [];
-  const sessionIds = delivered.map((d) => d.sessionId);
+  const ds = await fetchDeliveries(supabase, studentId);
+  if (ds.length === 0) return [];
+  const sessionIds = ds.map((d) => d.session_id);
 
-  // 2단계: 항목 · 숙제 체크
-  const [{ data: itemRows }, { data: checks }] = await Promise.all([
+  // 2단계: 회차·코스 메타 ∥ 항목 ∥ 숙제 체크
+  const [meta, { data: itemRows }, { data: checks }] = await Promise.all([
+    fetchSessionMeta(supabase, sessionIds),
     supabase
       .from("course_session_items")
       .select("id, session_id, position, kind, material_id, test_sheet_id, drill_id, guide_id, title, due_days")
@@ -242,7 +221,7 @@ export async function loadClassroom(
   const stepDone = count(guideProgress);
   const checked = new Set((checks ?? []).map((c) => c.item_id));
 
-  const deliveredAtBySession = new Map(delivered.map((d) => [d.sessionId, d.deliveredAt] as const));
+  const deliveredAtBySession = new Map(ds.map((d) => [d.session_id, d.delivered_at] as const));
   const today = todayKst();
 
   const itemsBySession = new Map<string, ClassItem[]>();
@@ -304,25 +283,27 @@ export async function loadClassroom(
 
   const now = Date.now();
   const byCourse = new Map<string, ClassCourse>();
-  // delivered 가 최신 배부순이라 코스·회차도 그 순서로 쌓인다
-  for (const d of delivered) {
-    const sItems = itemsBySession.get(d.sessionId) ?? [];
+  // ds 가 최신 배부순이라 코스·회차도 그 순서로 쌓인다
+  for (const d of ds) {
+    const m = meta.get(d.session_id);
+    if (!m) continue;
+    const sItems = itemsBySession.get(m.id) ?? [];
     // 완료 판정은 읽을 수 있고 추적 가능한 항목만
     const trackable = sItems.filter((x) => x.available && x.done !== null);
     const complete = trackable.length > 0 && trackable.every((x) => x.done);
-    const status: ClassSessionStatus = complete ? "done" : isNew(d.deliveredAt, now) ? "new" : "active";
-    const course = byCourse.get(d.courseId) ?? { id: d.courseId, title: d.courseTitle || "강의", sessions: [] };
+    const status: ClassSessionStatus = complete ? "done" : isNew(d.delivered_at, now) ? "new" : "active";
+    const course = byCourse.get(m.courseId) ?? { id: m.courseId, title: m.courseTitle || "강의", sessions: [] };
     course.sessions.push({
-      id: d.sessionId,
-      title: d.title,
-      summary: d.summary,
-      position: d.position,
-      deliveredAt: d.deliveredAt,
-      deliveryKind: d.deliveryKind,
+      id: m.id,
+      title: m.title,
+      summary: m.summary,
+      position: m.position,
+      deliveredAt: d.delivered_at,
+      deliveryKind: d.kind,
       status,
       items: sItems,
     });
-    byCourse.set(d.courseId, course);
+    byCourse.set(m.courseId, course);
   }
   return [...byCourse.values()];
 }

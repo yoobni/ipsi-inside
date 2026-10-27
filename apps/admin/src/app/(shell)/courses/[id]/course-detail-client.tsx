@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
 import type { CourseItemInput, DeliveryKind } from "@ipsi/types";
@@ -8,9 +8,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { addSessionAction, archiveCourseAction, deleteCourseAction, updateCourseAction } from "../actions";
+import { addSessionAction, archiveCourseAction, deleteCourseAction, loadItemRefsAction, updateCourseAction } from "../actions";
 import { CourseFields, type CourseFieldsValue } from "../course-fields";
-import { SessionCard } from "./session-card";
+import { SessionCard, type RefsCatalog } from "./session-card";
 import { DeliverSheet } from "./deliver-sheet";
 
 export type StudentLite = { id: string; name: string; school: string | null; grade: number | null };
@@ -86,6 +86,23 @@ export function CourseDetailClient({
     linkedGroupIds.some((g) => !meta.groupIds.has(g));
 
   const sheetSession = sheet ? sessions.find((s) => s.id === sheet.sessionId) ?? null : null;
+
+  // 피커 선택지 전체(자료·시험지·훈련·가이드) — 첫 편집기를 열 때 한 번만 읽어 모든 카드가 같이 쓴다
+  const [catalogRefs, setCatalogRefs] = useState<ItemRefs | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const loadCatalog = useCallback(() => {
+    if (catalogRefs || catalogLoading) return;
+    setCatalogLoading(true);
+    setCatalogError(null);
+    loadItemRefsAction()
+      .then((r) => {
+        if (r.ok) setCatalogRefs(r.refs);
+        else setCatalogError(r.message);
+      })
+      .finally(() => setCatalogLoading(false));
+  }, [catalogRefs, catalogLoading]);
+  const catalog: RefsCatalog = { refs: catalogRefs, error: catalogError, retry: loadCatalog };
 
   return (
     <div className="space-y-6">
@@ -179,6 +196,8 @@ export function CourseDetailClient({
                 total={sessions.length}
                 session={s}
                 refs={refs}
+                catalog={catalog}
+                onOpenEditor={loadCatalog}
                 deliveredCount={deliveredBySession.get(s.id)?.size ?? 0}
                 onDeliver={(mode) => setSheet({ sessionId: s.id, mode })}
                 onError={setError}

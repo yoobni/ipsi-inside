@@ -137,35 +137,15 @@ export async function addSessionAction(courseId: string, title: string): Promise
   return { ok: true, id: data.id };
 }
 
-/**
- * 같은 코스 안에서 바로 위/아래 회차와 자리를 바꾼다.
- * (course_id, position) 유니크라 바로 맞바꿀 수 없다 — 현재 회차를 임시 자리(0 이하)로 비켜 둔 뒤 바꾼다.
- */
+/** 같은 코스 안에서 바로 위/아래 회차와 자리를 바꾼다 — DB 함수 한 트랜잭션(중간 상태가 남지 않게). */
 export async function moveSessionAction(sessionId: string, dir: "up" | "down"): Promise<Result> {
   const check = await ensureStaff({ permission: "courses" });
   if ("error" in check) return check.error;
   const { supabase } = check;
-  const { data: cur } = await supabase.from("course_sessions").select("id, course_id, position").eq("id", sessionId).maybeSingle();
+  const { data: cur } = await supabase.from("course_sessions").select("course_id").eq("id", sessionId).maybeSingle();
   if (!cur) return { ok: false, message: "회차를 찾을 수 없어요" };
-
-  const base = supabase.from("course_sessions").select("id, position").eq("course_id", cur.course_id);
-  const { data: other } = await (dir === "up"
-    ? base.lt("position", cur.position).order("position", { ascending: false })
-    : base.gt("position", cur.position).order("position", { ascending: true })
-  )
-    .limit(1)
-    .maybeSingle();
-  if (!other) return { ok: true, id: sessionId };
-
-  const steps: [string, number][] = [
-    [cur.id, -cur.position],
-    [other.id, cur.position],
-    [cur.id, other.position],
-  ];
-  for (const [id, position] of steps) {
-    const { error } = await supabase.from("course_sessions").update({ position }).eq("id", id).eq("course_id", cur.course_id);
-    if (error) return { ok: false, message: friendlyDbError(error) };
-  }
+  const { error } = await supabase.rpc("move_course_session", { p_session_id: sessionId, p_dir: dir });
+  if (error) return { ok: false, message: /[가-힣]/.test(error.message ?? "") ? error.message : friendlyDbError(error) };
   revalidateCourse(cur.course_id);
   return { ok: true, id: sessionId };
 }
@@ -183,12 +163,20 @@ export async function deleteSessionAction(sessionId: string): Promise<Result> {
   return { ok: true, id: sessionId };
 }
 
-type SaveSessionResult = { ok: true; id: string; items: CourseItemInput[] } | { ok: false; message: string };
+/**
+ * written=true 면 항목은 이미 저장됐는데 그 뒤 단계(다시 읽기)가 실패한 것 — 편집기는 화면을 새로 읽어야
+ * 한다(갖고 있던 id 없는 행으로 다시 저장하면 중복이 생긴다). warning 은 저장은 됐고 배정 동기화만 실패.
+ */
+type SaveSessionResult =
+  | { ok: true; id: string; items: CourseItemInput[]; warning?: string }
+  | { ok: false; message: string; written?: boolean };
 
 /**
  * 항목이 가리키는 자료·시험지·훈련·가이드가 **이 교직원 세션으로 읽히는지** 확인한다.
  * 배부는 definer RPC가 하므로, 못 보는 시험지 id를 직접 넣어 배정을 만드는 길을 여기서 막는다.
  * 시험지는 정규(kind='regular')만 — 보충 세트는 학생별 자동 생성물이라 회차에 못 담는다.
+ * 검사 대상은 **새로 담거나 참조가 바뀐 항목만** — 'courses' 권한만 있는 조교는 자료·시험지를 못 읽으므로,
+ * 원장이 담아 둔 항목까지 검사하면 제목만 고치는 저장도 막혀 버린다.
  */
 async function checkItemRefs(supabase: ServerSupabase, items: CourseItemInput[]): Promise<string | null> {
   const pick = <K extends CourseItemInput["kind"]>(kind: K) =>
@@ -229,9 +217,6 @@ export async function saveSessionAction(sessionId: string, input: CourseSessionS
   const s = parsed.data;
   const { supabase } = check;
 
-  const refErr = await checkItemRefs(supabase, s.items);
-  if (refErr) return { ok: false, message: refErr };
-
   const { data: cur, error: sErr } = await supabase
     .from("course_sessions")
     .update({ title: s.title, summary: s.summary || null })
@@ -241,9 +226,18 @@ export async function saveSessionAction(sessionId: string, input: CourseSessionS
   if (sErr) return { ok: false, message: friendlyDbError(sErr) };
   if (!cur) return { ok: false, message: "회차를 찾을 수 없어요" };
 
-  const { data: existing, error: eErr } = await supabase.from("course_session_items").select("id").eq("session_id", sessionId);
+  const { data: existing, error: eErr } = await supabase
+    .from("course_session_items")
+    .select("id, material_id, test_sheet_id, drill_id, guide_id")
+    .eq("session_id", sessionId);
   if (eErr) return { ok: false, message: friendlyDbError(eErr) };
   const existingIds = new Set((existing ?? []).map((r) => r.id));
+  const existingRef = new Map((existing ?? []).map((r) => [r.id, r.material_id ?? r.test_sheet_id ?? r.drill_id ?? r.guide_id ?? null]));
+  const refOf = (it: CourseItemInput) =>
+    it.kind === "material" ? it.materialId : it.kind === "test" ? it.testSheetId : it.kind === "drill" ? it.drillId : it.kind === "guide" ? it.guideId : null;
+  const changed = s.items.filter((it) => it.kind !== "homework" && !(it.id && existingIds.has(it.id) && existingRef.get(it.id) === refOf(it)));
+  const refErr = await checkItemRefs(supabase, changed);
+  if (refErr) return { ok: false, message: refErr };
 
   const toRow = (it: CourseItemInput, position: number) => ({
     session_id: sessionId,
@@ -272,31 +266,38 @@ export async function saveSessionAction(sessionId: string, input: CourseSessionS
   });
   const drop = [...existingIds].filter((id) => !keepIds.has(id));
 
+  // 여기부터는 일부가 써진 뒤 실패할 수 있다 → written 으로 알려 편집기가 새로 읽게 한다
+  let written = false;
   if (drop.length > 0) {
     const { error } = await supabase.from("course_session_items").delete().eq("session_id", sessionId).in("id", drop);
-    if (error) return { ok: false, message: friendlyDbError(error) };
+    if (error) return { ok: false, message: friendlyDbError(error), written };
+    written = true;
   }
   for (const u of updates) {
     const { error } = await supabase.from("course_session_items").update(u.row).eq("id", u.id).eq("session_id", sessionId);
-    if (error) return { ok: false, message: friendlyDbError(error) };
+    if (error) return { ok: false, message: friendlyDbError(error), written };
+    written = true;
   }
   if (inserts.length > 0) {
     const { error } = await supabase.from("course_session_items").insert(inserts);
-    if (error) return { ok: false, message: friendlyDbError(error) };
+    if (error) return { ok: false, message: friendlyDbError(error), written };
+    written = true;
   }
 
+  // 배정 동기화 실패는 경고로 — 항목 저장은 끝났고, 다음 저장이나 배부 때 다시 채워진다
   const { error: syncErr } = await supabase.rpc("sync_course_session_assignments", { p_session_id: sessionId });
-  if (syncErr) return { ok: false, message: friendlyDbError(syncErr) };
+  const warning = syncErr ? "저장은 됐지만 이미 받은 학생의 자료·시험 배정을 채우지 못했어요. 다시 저장하면 재시도해요." : undefined;
 
-  // 저장된 행 id를 돌려줘 편집기가 다음 저장부터 id로 맞추게 한다
-  const { data: saved } = await supabase
+  // 저장된 행 id를 돌려줘 편집기가 다음 저장부터 id로 맞추게 한다. 못 읽으면 빈 목록을 돌려주면 안 된다 —
+  // 편집기가 그걸 기준으로 삼아 다음 저장에서 항목을 전부 지운다.
+  const { data: saved, error: rErr } = await supabase
     .from("course_session_items")
     .select("id, kind, material_id, test_sheet_id, drill_id, guide_id, title, due_days")
     .eq("session_id", sessionId)
     .order("position");
-
   revalidateCourse(cur.course_id);
-  return { ok: true, id: sessionId, items: (saved ?? []).flatMap(itemRowToInput) };
+  if (rErr || !saved) return { ok: false, message: "저장은 됐지만 다시 읽지 못했어요. 화면을 새로 불러와요.", written: true };
+  return { ok: true, id: sessionId, items: saved.flatMap(itemRowToInput), warning };
 }
 
 export async function deliverSessionAction(

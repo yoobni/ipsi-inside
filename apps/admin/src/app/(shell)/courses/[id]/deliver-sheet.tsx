@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { DELIVERY_KIND_LABEL, type DeliveryKind } from "@ipsi/types";
@@ -69,28 +69,34 @@ export function DeliverSheet({
   // 명단은 시트가 열릴 때 읽는다(페이지 진입 시 학생 전체를 안 읽게). key 로 리마운트되니 한 번이면 된다
   const [groupId, setGroupId] = useState(groups[0]?.id ?? "");
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  // 명단이 도착하는 사이 반을 바꿨을 수 있다 — 기본 체크는 그때의 반이 아니라 **지금 고른 반**으로 채운다
+  const groupIdRef = useRef(groupId);
 
   // 명단은 시트가 열릴 때 읽는다(페이지 진입 시 학생 전체를 안 읽게). key 로 리마운트되니 한 번이면 된다.
   // 도착하면 기본 체크(반 전원 − 받은 학생 − 오늘 결석)도 같이 채운다
   const [roster, setRoster] = useState<Roster | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    let alive = true;
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const aliveRef = useRef(true);
+  const loadRoster = useCallback(() => {
     loadRosterAction().then((r) => {
-      if (!alive) return;
+      if (!aliveRef.current) return;
       if (!r.ok) {
-        setError(r.message);
+        setRosterError(r.message);
         return;
       }
       setRoster(r.roster);
-      if (mode === "regular" && groupId) setChecked(defaultCheckedFrom(r.roster, groupId, delivered));
+      const gid = groupIdRef.current;
+      if (mode === "regular" && gid) setChecked(defaultCheckedFrom(r.roster, gid, delivered));
     });
+  }, [mode, delivered]);
+  useEffect(() => {
+    if (!open) return;
+    aliveRef.current = true;
+    loadRoster();
     return () => {
-      alive = false;
+      aliveRef.current = false;
     };
-    // groupId/delivered 는 마운트 시점 값이면 충분 — 반을 바꾸면 pickGroup 이 다시 채운다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, loadRoster]);
   const students = useMemo(() => roster?.students ?? [], [roster]);
   const absent = useMemo(() => new Set(roster?.absentIds ?? []), [roster]);
 
@@ -98,6 +104,7 @@ export function DeliverSheet({
   const defaultChecked = (gid: string) => (roster ? defaultCheckedFrom(roster, gid, delivered) : new Set<string>());
 
   const pickGroup = (id: string) => {
+    groupIdRef.current = id;
     setGroupId(id);
     setChecked(defaultChecked(id));
     setResult(null);
@@ -220,7 +227,21 @@ export function DeliverSheet({
                     </div>
                   </div>
 
-                  {!roster ? (
+                  {rosterError ? (
+                    <div className="flex flex-col items-center gap-2 rounded-md border border-dashed px-3 py-6 text-center text-xs">
+                      <span className="text-destructive">{rosterError}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setRosterError(null);
+                          loadRoster();
+                        }}
+                      >
+                        다시 시도
+                      </Button>
+                    </div>
+                  ) : !roster ? (
                     <p className="text-muted-foreground rounded-md border border-dashed px-3 py-6 text-center text-xs">명단을 불러오는 중…</p>
                   ) : rows.length === 0 ? (
                     <p className="text-muted-foreground rounded-md border border-dashed px-3 py-6 text-center text-xs">

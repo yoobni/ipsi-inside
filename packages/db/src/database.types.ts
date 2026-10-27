@@ -1550,6 +1550,7 @@ export type Database = {
         Returns: Json;
       };
       sync_course_session_assignments: { Args: { p_session_id: string }; Returns: undefined };
+      move_course_session: { Args: { p_session_id: string; p_dir: "up" | "down" }; Returns: undefined };
       create_practice_set: {
         Args: { p_tag_kind: string; p_tag_id: string; p_size?: number; p_for_student?: string | null };
         Returns: string;
