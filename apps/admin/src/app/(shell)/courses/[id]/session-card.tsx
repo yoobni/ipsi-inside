@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Plus, Send, Trash2, UserPlus, X } from "lucide-react";
 import { COURSE_ITEM_KIND, COURSE_ITEM_KIND_LABEL, type CourseItemInput, type CourseItemKind, type DeliveryKind } from "@ipsi/types";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { deleteSessionAction, moveSessionAction, saveSessionAction } from "../actions";
+import { deleteSessionAction, loadItemRefsAction, moveSessionAction, saveSessionAction } from "../actions";
 import type { ItemRefs, SessionData } from "./course-detail-client";
 
 const AUDIENCE_LABEL = { all: "전체", student: "학생 전체", parent: "학부모 전체", targeted: "지정 학생", group: "그룹" } as const;
@@ -176,7 +176,7 @@ const nextKey = () => crypto.randomUUID();
 
 function SessionEditor({
   session,
-  refs,
+  refs: pageRefs,
   deliveredCount,
   onSaved,
   onError,
@@ -193,11 +193,47 @@ function SessionEditor({
   const [rows, setRows] = useState<Row[]>(() => session.items.map((input) => ({ key: nextKey(), input })));
   const [addKind, setAddKind] = useState<CourseItemKind>("material");
   const [saved, setSaved] = useState(false);
+  // 저장 직후의 항목(행 id 포함). 다음 저장이 id로 맞추게 하고, dirty 비교 기준도 이걸로 바꾼다
+  const [baseline, setBaseline] = useState<{ title: string; summary: string; items: CourseItemInput[] }>({
+    title: session.title,
+    summary: session.summary ?? "",
+    items: session.items,
+  });
+
+  // 피커 선택지 전체는 편집기를 열 때 한 번만 읽는다(페이지 진입 시엔 안 읽음)
+  const [allRefs, setAllRefs] = useState<ItemRefs | null>(null);
+  const [refsError, setRefsError] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadItemRefsAction().then((r) => {
+      if (!alive) return;
+      if (r.ok) setAllRefs(r.refs);
+      else setRefsError(r.message);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  // 표시용: 페이지가 준 "이 코스가 쓰는 참조" + 피커 전체(읽힌 뒤)
+  const refs = useMemo<ItemRefs>(() => {
+    if (!allRefs) return pageRefs;
+    const merge = <T extends { id: string }>(a: T[], b: T[]) => {
+      const m = new Map<string, T>();
+      [...a, ...b].forEach((x) => m.set(x.id, x));
+      return [...m.values()];
+    };
+    return {
+      materials: merge(pageRefs.materials, allRefs.materials),
+      tests: merge(pageRefs.tests, allRefs.tests),
+      drills: merge(pageRefs.drills, allRefs.drills),
+      guides: merge(pageRefs.guides, allRefs.guides),
+    };
+  }, [pageRefs, allRefs]);
 
   const dirty =
-    title !== session.title ||
-    summary !== (session.summary ?? "") ||
-    JSON.stringify(rows.map((r) => r.input)) !== JSON.stringify(session.items);
+    title !== baseline.title ||
+    summary !== baseline.summary ||
+    JSON.stringify(rows.map((r) => r.input)) !== JSON.stringify(baseline.items);
 
   const update = (next: Row[]) => {
     setRows(next);
@@ -221,6 +257,9 @@ function SessionEditor({
       });
       if (!r.ok) onError(r.message);
       else {
+        // 서버가 돌려준 행 id를 입혀 둔다 — 다음 저장에서 숙제 문구를 고쳐도 같은 행이 갱신된다
+        setRows(r.items.map((input) => ({ key: nextKey(), input })));
+        setBaseline({ title, summary, items: r.items });
         setSaved(true);
         onSaved();
       }
@@ -318,15 +357,19 @@ function SessionEditor({
         </div>
         {addKind === "homework" ? (
           <HomeworkAdder onAdd={(input) => update([...rows, { key: nextKey(), input }])} />
+        ) : refsError ? (
+          <p className="text-destructive py-4 text-center text-xs">{refsError}</p>
+        ) : !allRefs ? (
+          <p className="text-muted-foreground py-4 text-center text-xs">목록을 불러오는 중…</p>
         ) : (
-          <RefPicker kind={addKind} refs={refs} taken={taken} onAdd={(input) => update([...rows, { key: nextKey(), input }])} />
+          <RefPicker kind={addKind} refs={allRefs} taken={taken} onAdd={(input) => update([...rows, { key: nextKey(), input }])} />
         )}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-xs">
           {deliveredCount > 0
-            ? `이미 ${deliveredCount}명이 이 회차를 받았어요. 여기서 새로 담은 항목은 그 학생들에게 자동으로 가지 않아요.`
+            ? `이미 ${deliveredCount}명이 이 회차를 받았어요. 저장하면 새로 담은 자료·퀴즈도 그 학생들에게 바로 들어가요(알림은 안 가요).`
             : "배부 전이라 자유롭게 고쳐도 돼요."}
         </p>
         <div className="flex items-center gap-2 self-end">

@@ -30,20 +30,14 @@ export function CourseDetailClient({
   groups,
   sessions,
   refs,
-  students,
-  members,
   deliveries,
-  absentIds,
 }: {
   course: { id: string; title: string; description: string | null; archived: boolean };
   linkedGroupIds: string[];
   groups: GroupLite[];
   sessions: SessionData[];
   refs: ItemRefs;
-  students: StudentLite[];
-  members: { group_id: string; student_id: string }[];
   deliveries: DeliveryRow[];
-  absentIds: string[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -168,7 +162,7 @@ export function CourseDetailClient({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold">회차</h2>
           <p className="text-muted-foreground text-xs">
-            회차 구성을 바꿔도 <b>이미 받은 학생에게는 새 항목이 자동으로 가지 않아요.</b> 배부 시점에 담긴 것만 들어가요.
+            회차를 고쳐 저장하면 <b>이미 받은 학생에게도 새 항목이 바로 들어가요</b>(알림은 안 가요). 뺀 항목의 자료·시험 배정은 그대로 남아요.
           </p>
         </div>
 
@@ -200,7 +194,7 @@ export function CourseDetailClient({
             placeholder={`예) ${sessions.length + 1}주차`}
             onChange={(e) => setNewSession(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing && !pending) {
                 const t = newSession.trim() || `${sessions.length + 1}주차`;
                 run(() => addSessionAction(course.id, t), () => setNewSession(""));
               }
@@ -227,10 +221,7 @@ export function CourseDetailClient({
         session={sheetSession}
         groups={deliverGroups}
         usingFallbackGroups={linkedGroups.length === 0}
-        students={students}
-        members={members}
         delivered={sheet ? deliveredBySession.get(sheet.sessionId) ?? new Map() : new Map()}
-        absentIds={absentIds}
       />
     </div>
   );

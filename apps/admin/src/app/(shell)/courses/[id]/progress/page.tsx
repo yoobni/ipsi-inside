@@ -3,12 +3,11 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { DELIVERY_KIND_LABEL } from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { formatKstMonthDay } from "@/lib/kst";
 import { cn } from "@/lib/utils";
+import { studentLine } from "../../item-row";
 
 export const dynamic = "force-dynamic";
-
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" });
 
 /**
  * 진도표 — 학생 × 회차. 칸 = 배부일(수업/보강) + 숙제 완료 X/Y.
@@ -94,11 +93,7 @@ export default async function CourseProgressPage({ params }: { params: Promise<{
                   <tr key={st.id} className="border-b last:border-b-0">
                     <td className="bg-background sticky left-0 z-10 px-3 py-2">
                       <Link href={`/members/${st.id}`} className="font-medium hover:underline">{st.full_name}</Link>
-                      {(st.school || st.grade) && (
-                        <span className="text-muted-foreground block text-[11px]">
-                          {[st.school, st.grade ? `${st.grade}학년` : null].filter(Boolean).join(" · ")}
-                        </span>
-                      )}
+                      {studentLine(st) && <span className="text-muted-foreground block text-[11px]">{studentLine(st)}</span>}
                     </td>
                     <td className="px-3 py-2 text-center text-xs tabular-nums">
                       {got}/{sessionIds.length}
@@ -111,7 +106,7 @@ export default async function CourseProgressPage({ params }: { params: Promise<{
                       return (
                         <td key={s.id} className="px-3 py-2 text-center text-xs whitespace-nowrap">
                           <span className={cn("block font-medium", d.kind === "makeup" && "text-amber-600 dark:text-amber-400")}>
-                            {fmtDate(d.delivered_at)} {DELIVERY_KIND_LABEL[d.kind]}
+                            {formatKstMonthDay(d.delivered_at)} {DELIVERY_KIND_LABEL[d.kind]}
                           </span>
                           {hw.length > 0 && (
                             <span

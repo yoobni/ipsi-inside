@@ -1,72 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Table2 } from "lucide-react";
-import type { CourseItemInput } from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { todayKst } from "@/lib/kst";
-import { CourseDetailClient, type DeliveryRow, type ItemRefs, type SessionData, type StudentLite } from "./course-detail-client";
+import { itemRowToInput, type ItemDbRow } from "../item-row";
+import { CourseDetailClient, type DeliveryRow, type ItemRefs, type SessionData } from "./course-detail-client";
 
 export const dynamic = "force-dynamic";
 
-type ItemDbRow = {
-  session_id: string;
-  position: number;
-  kind: CourseItemInput["kind"];
-  material_id: string | null;
-  test_sheet_id: string | null;
-  drill_id: string | null;
-  guide_id: string | null;
-  title: string | null;
-  due_days: number | null;
-};
-
-function toInput(r: ItemDbRow): CourseItemInput[] {
-  switch (r.kind) {
-    case "material": return r.material_id ? [{ kind: "material", materialId: r.material_id }] : [];
-    case "test": return r.test_sheet_id ? [{ kind: "test", testSheetId: r.test_sheet_id }] : [];
-    case "drill": return r.drill_id ? [{ kind: "drill", drillId: r.drill_id }] : [];
-    case "guide": return r.guide_id ? [{ kind: "guide", guideId: r.guide_id }] : [];
-    case "homework": return r.title ? [{ kind: "homework", title: r.title, dueDays: r.due_days }] : [];
-  }
-}
-
+/**
+ * 코스 상세. 여기서는 **이 코스의 항목이 가리키는** 자료·시험지·훈련·가이드만 읽는다(제목·경고 표시용).
+ * 피커 선택지 전체와 학생 명단은 편집기·배부 시트가 열릴 때 액션으로 따로 읽는다.
+ */
 export default async function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
-  const today = todayKst();
 
-  const [
-    { data: course },
-    { data: links },
-    { data: groups },
-    { data: sessions },
-    { data: materials },
-    { data: tests },
-    { data: drills },
-    { data: guides },
-    { data: students },
-    { data: members },
-    { data: absents },
-  ] = await Promise.all([
+  const [{ data: course }, { data: links }, { data: groups }, { data: sessions }] = await Promise.all([
     supabase.from("courses").select("id, title, description, archived").eq("id", id).maybeSingle(),
     supabase.from("course_groups").select("group_id").eq("course_id", id),
     supabase.from("student_groups").select("id, name, archived").order("name"),
     supabase.from("course_sessions").select("id, title, summary, position").eq("course_id", id).order("position"),
-    supabase.from("materials").select("id, title, audience, is_published").order("created_at", { ascending: false }),
-    supabase.from("test_sheets").select("id, title").eq("kind", "regular").order("created_at", { ascending: false }),
-    supabase.from("drills").select("id, title, is_published").order("created_at", { ascending: false }),
-    supabase.from("guides").select("id, title, status").order("created_at", { ascending: false }),
-    supabase
-      .from("profiles")
-      .select("id, full_name, school, grade")
-      .eq("role", "student")
-      .eq("status", "approved")
-      .order("full_name"),
-    supabase.from("group_members").select("group_id, student_id"),
-    // 오늘(KST) 결석 표시된 학생 — 수업 진행 처리에서 기본 체크 해제. 'daily' 권한이 없으면 비어 온다.
-    supabase.from("daily_attendance").select("student_id").eq("date", today).eq("attendance", "absent"),
   ]);
   if (!course) notFound();
 
@@ -75,18 +30,30 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     ? await Promise.all([
         supabase
           .from("course_session_items")
-          .select("session_id, position, kind, material_id, test_sheet_id, drill_id, guide_id, title, due_days")
+          .select("id, session_id, position, kind, material_id, test_sheet_id, drill_id, guide_id, title, due_days")
           .in("session_id", sessionIds)
           .order("position"),
         supabase.from("course_session_deliveries").select("session_id, student_id, kind, delivered_at").in("session_id", sessionIds),
       ])
-    : [{ data: [] as ItemDbRow[] }, { data: [] as DeliveryRow[] }];
+    : [{ data: [] as (ItemDbRow & { session_id: string })[] }, { data: [] as DeliveryRow[] }];
+
+  const used = (k: "material_id" | "test_sheet_id" | "drill_id" | "guide_id") => [
+    ...new Set((items ?? []).flatMap((i) => (i[k] ? [i[k] as string] : []))),
+  ];
+  const [materialIds, sheetIds, drillIds, guideIds] = [used("material_id"), used("test_sheet_id"), used("drill_id"), used("guide_id")];
+  const none = Promise.resolve({ data: [] as never[] });
+  const [{ data: materials }, { data: tests }, { data: drills }, { data: guides }] = await Promise.all([
+    materialIds.length ? supabase.from("materials").select("id, title, audience, is_published").in("id", materialIds) : none,
+    sheetIds.length ? supabase.from("test_sheets").select("id, title").in("id", sheetIds) : none,
+    drillIds.length ? supabase.from("drills").select("id, title, is_published").in("id", drillIds) : none,
+    guideIds.length ? supabase.from("guides").select("id, title, status").in("id", guideIds) : none,
+  ]);
 
   const sessionData: SessionData[] = (sessions ?? []).map((s) => ({
     id: s.id,
     title: s.title,
     summary: s.summary,
-    items: (items ?? []).filter((i) => i.session_id === s.id).flatMap(toInput),
+    items: (items ?? []).filter((i) => i.session_id === s.id).flatMap(itemRowToInput),
   }));
 
   const refs: ItemRefs = {
@@ -96,7 +63,6 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     guides: (guides ?? []).map((g) => ({ id: g.id, title: g.title, published: g.status === "published" })),
   };
 
-  const studentList: StudentLite[] = (students ?? []).map((s) => ({ id: s.id, name: s.full_name, school: s.school, grade: s.grade }));
   const visibleGroups = (groups ?? []).map((g) => ({ id: g.id, name: g.name, archived: g.archived }));
   const linkedIds = new Set((links ?? []).map((l) => l.group_id));
 
@@ -128,10 +94,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
         groups={visibleGroups}
         sessions={sessionData}
         refs={refs}
-        students={studentList}
-        members={members ?? []}
         deliveries={(deliveries ?? []) as DeliveryRow[]}
-        absentIds={(absents ?? []).map((a) => a.student_id)}
       />
     </div>
   );

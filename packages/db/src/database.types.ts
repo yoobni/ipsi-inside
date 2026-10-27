@@ -1547,8 +1547,9 @@ export type Database = {
       course_session_visible: { Args: { p_session_id: string }; Returns: boolean };
       deliver_course_session: {
         Args: { p_session_id: string; p_student_ids: string[]; p_kind?: "regular" | "makeup" };
-        Returns: number;
+        Returns: Json;
       };
+      sync_course_session_assignments: { Args: { p_session_id: string }; Returns: undefined };
       create_practice_set: {
         Args: { p_tag_kind: string; p_tag_id: string; p_size?: number; p_for_student?: string | null };
         Returns: string;

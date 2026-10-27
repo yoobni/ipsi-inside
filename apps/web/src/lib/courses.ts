@@ -54,23 +54,35 @@ function isNew(deliveredAt: string, now = Date.now()) {
   return now - new Date(deliveredAt).getTime() < NEW_DAYS * 86400_000;
 }
 
-/** 홈 카드용 — 최근 배부 회차 몇 개(완료 판정 없이 7일 이내면 NEW) */
-export async function getRecentClassSessions(
-  supabase: Client,
-  studentId: string,
-  limit = 3,
-): Promise<{ sessionId: string; title: string; courseTitle: string; deliveredAt: string; isNew: boolean }[]> {
-  const { data: deliveries } = await supabase
+type DeliveredSession = {
+  sessionId: string;
+  courseId: string;
+  courseTitle: string;
+  title: string;
+  summary: string | null;
+  position: number;
+  deliveredAt: string;
+  deliveryKind: DeliveryKind;
+};
+
+/**
+ * 받은 회차 목록(최신 배부순) + 회차·코스 메타. 홈 카드와 강의실 화면이 같이 쓴다 —
+ * "받은 회차"의 정의(배부 행 기준)와 코스 제목 조회가 한 곳에만 있게.
+ */
+async function loadDeliveredSessions(supabase: Client, studentId: string, limit?: number): Promise<DeliveredSession[]> {
+  let q = supabase
     .from("course_session_deliveries")
-    .select("session_id, delivered_at")
+    .select("session_id, kind, delivered_at")
     .eq("student_id", studentId)
-    .order("delivered_at", { ascending: false })
-    .limit(limit);
+    .order("delivered_at", { ascending: false });
+  if (limit) q = q.limit(limit);
+  const { data: deliveries } = await q;
   const ds = deliveries ?? [];
   if (ds.length === 0) return [];
+
   const { data: sessions } = await supabase
     .from("course_sessions")
-    .select("id, title, course_id")
+    .select("id, course_id, position, title, summary")
     .in("id", ds.map((d) => d.session_id));
   const courseIds = [...new Set((sessions ?? []).map((s) => s.course_id))];
   const { data: courses } =
@@ -79,19 +91,39 @@ export async function getRecentClassSessions(
       : { data: [] as { id: string; title: string }[] };
   const sessionById = new Map((sessions ?? []).map((s) => [s.id, s] as const));
   const courseTitle = new Map((courses ?? []).map((c) => [c.id, c.title] as const));
+
   return ds.flatMap((d) => {
     const s = sessionById.get(d.session_id);
     if (!s) return [];
     return [
       {
         sessionId: s.id,
-        title: s.title,
+        courseId: s.course_id,
         courseTitle: courseTitle.get(s.course_id) ?? "",
+        title: s.title,
+        summary: s.summary,
+        position: s.position,
         deliveredAt: d.delivered_at,
-        isNew: isNew(d.delivered_at),
+        deliveryKind: d.kind,
       },
     ];
   });
+}
+
+/** 홈 카드용 — 최근 배부 회차 몇 개(완료 판정 없이 7일 이내면 NEW) */
+export async function getRecentClassSessions(
+  supabase: Client,
+  studentId: string,
+  limit = 3,
+): Promise<{ sessionId: string; title: string; courseTitle: string; deliveredAt: string; isNew: boolean }[]> {
+  const rows = await loadDeliveredSessions(supabase, studentId, limit);
+  return rows.map((r) => ({
+    sessionId: r.sessionId,
+    title: r.title,
+    courseTitle: r.courseTitle,
+    deliveredAt: r.deliveredAt,
+    isNew: isNew(r.deliveredAt),
+  }));
 }
 
 /**
@@ -103,29 +135,12 @@ export async function loadClassroom(
   studentId: string,
   viewerIsStudent: boolean,
 ): Promise<ClassCourse[]> {
-  const { data: deliveries } = await supabase
-    .from("course_session_deliveries")
-    .select("session_id, kind, delivered_at")
-    .eq("student_id", studentId)
-    .order("delivered_at", { ascending: false });
-  const ds = deliveries ?? [];
-  if (ds.length === 0) return [];
-  const sessionIds = ds.map((d) => d.session_id);
+  const delivered = await loadDeliveredSessions(supabase, studentId);
+  if (delivered.length === 0) return [];
+  const sessionIds = delivered.map((d) => d.sessionId);
 
-  // 2단계: 회차(+코스) · 항목 · 숙제 체크
-  const [sessionsAndCourses, { data: itemRows }, { data: checks }] = await Promise.all([
-    (async () => {
-      const { data: sessions } = await supabase
-        .from("course_sessions")
-        .select("id, course_id, position, title, summary")
-        .in("id", sessionIds);
-      const courseIds = [...new Set((sessions ?? []).map((s) => s.course_id))];
-      const { data: courses } =
-        courseIds.length > 0
-          ? await supabase.from("courses").select("id, title").in("id", courseIds)
-          : { data: [] as { id: string; title: string }[] };
-      return { sessions: sessions ?? [], courses: courses ?? [] };
-    })(),
+  // 2단계: 항목 · 숙제 체크
+  const [{ data: itemRows }, { data: checks }] = await Promise.all([
     supabase
       .from("course_session_items")
       .select("id, session_id, position, kind, material_id, test_sheet_id, drill_id, guide_id, title, due_days")
@@ -227,13 +242,13 @@ export async function loadClassroom(
   const stepDone = count(guideProgress);
   const checked = new Set((checks ?? []).map((c) => c.item_id));
 
-  const deliveryBySession = new Map(ds.map((d) => [d.session_id, d] as const));
+  const deliveredAtBySession = new Map(delivered.map((d) => [d.sessionId, d.deliveredAt] as const));
   const today = todayKst();
 
   const itemsBySession = new Map<string, ClassItem[]>();
   for (const i of items) {
-    const delivery = deliveryBySession.get(i.session_id);
-    if (!delivery) continue;
+    const deliveredAt = deliveredAtBySession.get(i.session_id);
+    if (!deliveredAt) continue;
     let it: ClassItem;
     switch (i.kind) {
       case "material": {
@@ -274,7 +289,7 @@ export async function loadClassroom(
       }
       case "homework": {
         const done = checked.has(i.id);
-        const dueDate = homeworkDueDate(delivery.delivered_at, i.due_days);
+        const dueDate = homeworkDueDate(deliveredAt, i.due_days);
         it = {
           id: i.id, kind: i.kind, refId: null, title: i.title ?? "", available: true, done,
           dueDate, overdue: !done && dueDate != null && dueDate < today,
@@ -288,31 +303,26 @@ export async function loadClassroom(
   }
 
   const now = Date.now();
-  const courseTitle = new Map(sessionsAndCourses.courses.map((c) => [c.id, c.title] as const));
   const byCourse = new Map<string, ClassCourse>();
-  // deliveries 가 최신순이라 코스·회차도 최신 배부순으로 쌓인다
-  for (const d of ds) {
-    const s = sessionsAndCourses.sessions.find((x) => x.id === d.session_id);
-    if (!s) continue;
-    const sItems = itemsBySession.get(s.id) ?? [];
+  // delivered 가 최신 배부순이라 코스·회차도 그 순서로 쌓인다
+  for (const d of delivered) {
+    const sItems = itemsBySession.get(d.sessionId) ?? [];
     // 완료 판정은 읽을 수 있고 추적 가능한 항목만
     const trackable = sItems.filter((x) => x.available && x.done !== null);
     const complete = trackable.length > 0 && trackable.every((x) => x.done);
-    const status: ClassSessionStatus = complete ? "done" : isNew(d.delivered_at, now) ? "new" : "active";
-    const course =
-      byCourse.get(s.course_id) ??
-      { id: s.course_id, title: courseTitle.get(s.course_id) ?? "강의", sessions: [] };
+    const status: ClassSessionStatus = complete ? "done" : isNew(d.deliveredAt, now) ? "new" : "active";
+    const course = byCourse.get(d.courseId) ?? { id: d.courseId, title: d.courseTitle || "강의", sessions: [] };
     course.sessions.push({
-      id: s.id,
-      title: s.title,
-      summary: s.summary,
-      position: s.position,
-      deliveredAt: d.delivered_at,
-      deliveryKind: d.kind,
+      id: d.sessionId,
+      title: d.title,
+      summary: d.summary,
+      position: d.position,
+      deliveredAt: d.deliveredAt,
+      deliveryKind: d.deliveryKind,
       status,
       items: sItems,
     });
-    byCourse.set(s.course_id, course);
+    byCourse.set(d.courseId, course);
   }
   return [...byCourse.values()];
 }

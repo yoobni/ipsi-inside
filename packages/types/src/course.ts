@@ -24,17 +24,32 @@ export const DELIVERY_KIND_LABEL: Record<DeliveryKind, string> = {
   makeup: '보강',
 };
 
+/**
+ * id = 이미 저장된 항목의 행 id. 저장 시 id가 있으면 그 행을 갱신한다 — 숙제 문구를 고쳐도
+ * 행이 유지돼 학생들의 완료 체크가 살아남는다. 새 항목은 null.
+ */
+const itemId = z.string().uuid().nullable().optional();
+
 export const courseItemInputSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('material'), materialId: z.string().uuid({ message: '자료를 골라주세요' }) }),
-  z.object({ kind: z.literal('test'), testSheetId: z.string().uuid({ message: '시험지를 골라주세요' }) }),
-  z.object({ kind: z.literal('drill'), drillId: z.string().uuid({ message: '훈련을 골라주세요' }) }),
-  z.object({ kind: z.literal('guide'), guideId: z.string().uuid({ message: '가이드를 골라주세요' }) }),
+  z.object({ kind: z.literal('material'), id: itemId, materialId: z.string().uuid({ message: '자료를 골라주세요' }) }),
+  z.object({ kind: z.literal('test'), id: itemId, testSheetId: z.string().uuid({ message: '시험지를 골라주세요' }) }),
+  z.object({ kind: z.literal('drill'), id: itemId, drillId: z.string().uuid({ message: '훈련을 골라주세요' }) }),
+  z.object({ kind: z.literal('guide'), id: itemId, guideId: z.string().uuid({ message: '가이드를 골라주세요' }) }),
   z.object({
     kind: z.literal('homework'),
+    id: itemId,
     title: z.string().trim().min(1, '숙제 내용을 입력해주세요').max(200),
     dueDays: z.number().int().min(0).max(60).nullable(),
   }),
 ]);
+
+/** deliver_course_session() 반환값 */
+export const courseDeliverResultSchema = z.object({
+  delivered: z.number().int(),
+  already: z.number().int(),
+  ineligible: z.number().int(),
+});
+export type CourseDeliverResult = z.infer<typeof courseDeliverResultSchema>;
 export type CourseItemInput = z.infer<typeof courseItemInputSchema>;
 
 export const courseSaveSchema = z.object({
@@ -44,7 +59,7 @@ export const courseSaveSchema = z.object({
 });
 export type CourseSaveInput = z.infer<typeof courseSaveSchema>;
 
-/** 회차 저장 — 항목은 통째로 교체(순서 = 배열 순서). 이미 배부된 학생에게 소급되지는 않는다. */
+/** 회차 저장 — 순서 = 배열 순서. id 있는 항목은 갱신, 없으면 추가, 빠진 행은 삭제. 자료·시험 배정은 이미 받은 학생에게도 채워진다. */
 export const courseSessionSaveSchema = z.object({
   title: z.string().trim().min(1, '회차 이름을 입력해주세요').max(60),
   summary: z.string().trim().max(500).nullable().optional(),

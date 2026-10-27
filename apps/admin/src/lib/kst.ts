@@ -25,3 +25,8 @@ export function nextKstSixAm(now: Date = new Date()): Date {
   if (todayKst6Utc > nowMs) return new Date(todayKst6Utc);
   return new Date(todayKst6Utc + 24 * 60 * 60 * 1000);
 }
+
+/** KST 기준 "10. 27." 꼴 — 표·배지에서 짧게 날짜만 보일 때 */
+export function formatKstMonthDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" });
+}

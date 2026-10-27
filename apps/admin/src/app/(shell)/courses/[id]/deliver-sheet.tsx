@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { DELIVERY_KIND_LABEL, type DeliveryKind } from "@ipsi/types";
@@ -16,14 +16,26 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { deliverSessionAction } from "../actions";
+import { formatKstMonthDay } from "@/lib/kst";
+import { deliverSessionAction, loadRosterAction, type Roster } from "../actions";
+import { studentLine } from "../item-row";
 import type { DeliveryRow, GroupLite, SessionData, StudentLite } from "./course-detail-client";
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" });
+function membersOfFrom(roster: Roster, groupId: string): StudentLite[] {
+  const byId = new Map(roster.students.map((s) => [s.id, s]));
+  return roster.members
+    .filter((m) => m.group_id === groupId)
+    .flatMap((m) => {
+      const s = byId.get(m.student_id);
+      return s ? [s] : [];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
 
-function studentLine(s: StudentLite): string {
-  return [s.school, s.grade ? `${s.grade}학년` : null].filter(Boolean).join(" · ");
+/** 기본 체크 = 아직 안 받았고 오늘 결석 아닌 반 학생 전부 */
+function defaultCheckedFrom(roster: Roster, groupId: string, delivered: Map<string, DeliveryRow>): Set<string> {
+  const absent = new Set(roster.absentIds);
+  return new Set(membersOfFrom(roster, groupId).filter((s) => !delivered.has(s.id) && !absent.has(s.id)).map((s) => s.id));
 }
 
 /**
@@ -38,10 +50,7 @@ export function DeliverSheet({
   session,
   groups,
   usingFallbackGroups,
-  students,
-  members,
   delivered,
-  absentIds,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -49,10 +58,7 @@ export function DeliverSheet({
   session: SessionData | null;
   groups: GroupLite[];
   usingFallbackGroups: boolean;
-  students: StudentLite[];
-  members: { group_id: string; student_id: string }[];
   delivered: Map<string, DeliveryRow>;
-  absentIds: string[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -60,24 +66,36 @@ export function DeliverSheet({
   const [result, setResult] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  const studentById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
-  const absent = useMemo(() => new Set(absentIds), [absentIds]);
-
-  const membersOf = (groupId: string): StudentLite[] =>
-    members
-      .filter((m) => m.group_id === groupId)
-      .flatMap((m) => {
-        const s = studentById.get(m.student_id);
-        return s ? [s] : [];
-      })
-      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-
-  // 기본 체크 = 아직 안 받았고 오늘 결석 아닌 학생 전부
-  const defaultChecked = (groupId: string) =>
-    new Set(membersOf(groupId).filter((s) => !delivered.has(s.id) && !absent.has(s.id)).map((s) => s.id));
-
+  // 명단은 시트가 열릴 때 읽는다(페이지 진입 시 학생 전체를 안 읽게). key 로 리마운트되니 한 번이면 된다
   const [groupId, setGroupId] = useState(groups[0]?.id ?? "");
-  const [checked, setChecked] = useState<Set<string>>(() => (mode === "regular" && groups[0] ? defaultChecked(groups[0].id) : new Set()));
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+
+  // 명단은 시트가 열릴 때 읽는다(페이지 진입 시 학생 전체를 안 읽게). key 로 리마운트되니 한 번이면 된다.
+  // 도착하면 기본 체크(반 전원 − 받은 학생 − 오늘 결석)도 같이 채운다
+  const [roster, setRoster] = useState<Roster | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    loadRosterAction().then((r) => {
+      if (!alive) return;
+      if (!r.ok) {
+        setError(r.message);
+        return;
+      }
+      setRoster(r.roster);
+      if (mode === "regular" && groupId) setChecked(defaultCheckedFrom(r.roster, groupId, delivered));
+    });
+    return () => {
+      alive = false;
+    };
+    // groupId/delivered 는 마운트 시점 값이면 충분 — 반을 바꾸면 pickGroup 이 다시 채운다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const students = useMemo(() => roster?.students ?? [], [roster]);
+  const absent = useMemo(() => new Set(roster?.absentIds ?? []), [roster]);
+
+  const membersOf = (gid: string): StudentLite[] => (roster ? membersOfFrom(roster, gid) : []);
+  const defaultChecked = (gid: string) => (roster ? defaultCheckedFrom(roster, gid, delivered) : new Set<string>());
 
   const pickGroup = (id: string) => {
     setGroupId(id);
@@ -113,7 +131,11 @@ export function DeliverSheet({
         setError(r.message);
         return;
       }
-      setResult(`${r.delivered}명에게 배부했어요${r.skipped > 0 ? ` (이미 받은 ${r.skipped}명 제외)` : ""}`);
+      const notes = [
+        r.already > 0 ? `이미 받은 ${r.already}명 제외` : null,
+        r.ineligible > 0 ? `배부할 수 없는 ${r.ineligible}명 제외(승인되지 않았거나 정지된 학생)` : null,
+      ].filter(Boolean);
+      setResult(`${r.delivered}명에게 배부했어요${notes.length ? ` (${notes.join(", ")})` : ""}`);
       setChecked(new Set());
       router.refresh();
     });
@@ -198,7 +220,9 @@ export function DeliverSheet({
                     </div>
                   </div>
 
-                  {rows.length === 0 ? (
+                  {!roster ? (
+                    <p className="text-muted-foreground rounded-md border border-dashed px-3 py-6 text-center text-xs">명단을 불러오는 중…</p>
+                  ) : rows.length === 0 ? (
                     <p className="text-muted-foreground rounded-md border border-dashed px-3 py-6 text-center text-xs">
                       {mode === "regular" ? "이 반에 학생이 없어요." : "학생이 없어요."}
                     </p>
@@ -222,7 +246,7 @@ export function DeliverSheet({
                               </div>
                               {got ? (
                                 <Badge variant="success" className="shrink-0">
-                                  받음 · {fmtDate(got.delivered_at)} {DELIVERY_KIND_LABEL[got.kind]}
+                                  받음 · {formatKstMonthDay(got.delivered_at)} {DELIVERY_KIND_LABEL[got.kind]}
                                 </Badge>
                               ) : absent.has(s.id) ? (
                                 <Badge variant="warning" className="shrink-0">오늘 결석</Badge>
@@ -241,7 +265,7 @@ export function DeliverSheet({
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
                 {result ? "닫기" : "취소"}
               </Button>
-              <Button onClick={submit} disabled={pending || checked.size === 0}>
+              <Button onClick={submit} disabled={pending || !roster || checked.size === 0}>
                 {pending ? "배부 중…" : `${checked.size}명 배부`}
               </Button>
             </SheetFooter>

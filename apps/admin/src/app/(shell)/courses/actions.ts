@@ -3,16 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
+  courseDeliverResultSchema,
   courseDeliverSchema,
   courseSaveSchema,
   courseSessionSaveSchema,
   type CourseDeliverInput,
+  type CourseDeliverResult,
   type CourseItemInput,
   type CourseSaveInput,
   type CourseSessionSaveInput,
 } from "@ipsi/types";
 import { friendlyDbError } from "@ipsi/lib";
 import { ensureStaff } from "@/lib/auth";
+import { todayKst } from "@/lib/kst";
+import type { ItemRefs, StudentLite } from "./[id]/course-detail-client";
+import { itemRowToInput } from "./item-row";
 
 type Result = { ok: true; id: string } | { ok: false; message: string };
 type ServerSupabase = Extract<Awaited<ReturnType<typeof ensureStaff>>, { supabase: unknown }>["supabase"];
@@ -25,22 +30,11 @@ function revalidateCourse(courseId: string) {
   revalidatePath(`/courses/${courseId}/progress`);
 }
 
-/**
- * 반 연결 갱신 — 이 교직원이 **볼 수 있는 반**만 건드린다. scoped 조교가 못 보는 반의 연결은
- * 화면에 안 나오므로, 통째로 지우고 다시 넣으면 남의 반 연결이 조용히 사라진다.
- */
+/** 반 연결 갱신 — 선택 안 된 연결은 지우고, 선택된 반은 넣는다(반 목록은 교직원 전체가 다 본다). */
 async function syncCourseGroups(supabase: ServerSupabase, courseId: string, groupIds: string[]): Promise<string | null> {
-  const { data: visible, error: vErr } = await supabase.from("student_groups").select("id");
-  if (vErr) return friendlyDbError(vErr);
-  const visibleIds = new Set((visible ?? []).map((g) => g.id));
-  if (groupIds.some((id) => !visibleIds.has(id))) return "볼 수 없는 반이 포함되어 있어요";
-
-  const selected = new Set(groupIds);
-  const drop = [...visibleIds].filter((id) => !selected.has(id));
-  if (drop.length > 0) {
-    const { error } = await supabase.from("course_groups").delete().eq("course_id", courseId).in("group_id", drop);
-    if (error) return friendlyDbError(error);
-  }
+  const del = supabase.from("course_groups").delete().eq("course_id", courseId);
+  const { error: dErr } = await (groupIds.length > 0 ? del.not("group_id", "in", `(${groupIds.join(",")})`) : del);
+  if (dErr) return friendlyDbError(dErr);
   if (groupIds.length > 0) {
     const { error } = await supabase
       .from("course_groups")
@@ -143,7 +137,10 @@ export async function addSessionAction(courseId: string, title: string): Promise
   return { ok: true, id: data.id };
 }
 
-/** 같은 코스 안에서 바로 위/아래 회차와 자리를 바꾼다. */
+/**
+ * 같은 코스 안에서 바로 위/아래 회차와 자리를 바꾼다.
+ * (course_id, position) 유니크라 바로 맞바꿀 수 없다 — 현재 회차를 임시 자리(0 이하)로 비켜 둔 뒤 바꾼다.
+ */
 export async function moveSessionAction(sessionId: string, dir: "up" | "down"): Promise<Result> {
   const check = await ensureStaff({ permission: "courses" });
   if ("error" in check) return check.error;
@@ -160,7 +157,12 @@ export async function moveSessionAction(sessionId: string, dir: "up" | "down"): 
     .maybeSingle();
   if (!other) return { ok: true, id: sessionId };
 
-  for (const [id, position] of [[cur.id, other.position], [other.id, cur.position]] as const) {
+  const steps: [string, number][] = [
+    [cur.id, -cur.position],
+    [other.id, cur.position],
+    [cur.id, other.position],
+  ];
+  for (const [id, position] of steps) {
     const { error } = await supabase.from("course_sessions").update({ position }).eq("id", id).eq("course_id", cur.course_id);
     if (error) return { ok: false, message: friendlyDbError(error) };
   }
@@ -181,44 +183,54 @@ export async function deleteSessionAction(sessionId: string): Promise<Result> {
   return { ok: true, id: sessionId };
 }
 
-function itemKey(it: CourseItemInput): string {
-  switch (it.kind) {
-    case "material": return `material:${it.materialId}`;
-    case "test": return `test:${it.testSheetId}`;
-    case "drill": return `drill:${it.drillId}`;
-    case "guide": return `guide:${it.guideId}`;
-    case "homework": return `homework:${it.title}`;
-  }
-}
+type SaveSessionResult = { ok: true; id: string; items: CourseItemInput[] } | { ok: false; message: string };
 
-type ItemRow = {
-  id: string;
-  kind: string;
-  material_id: string | null;
-  test_sheet_id: string | null;
-  drill_id: string | null;
-  guide_id: string | null;
-  title: string | null;
-};
-
-function rowKey(r: ItemRow): string {
-  if (r.kind === "homework") return `homework:${r.title ?? ""}`;
-  return `${r.kind}:${r.material_id ?? r.test_sheet_id ?? r.drill_id ?? r.guide_id}`;
+/**
+ * 항목이 가리키는 자료·시험지·훈련·가이드가 **이 교직원 세션으로 읽히는지** 확인한다.
+ * 배부는 definer RPC가 하므로, 못 보는 시험지 id를 직접 넣어 배정을 만드는 길을 여기서 막는다.
+ * 시험지는 정규(kind='regular')만 — 보충 세트는 학생별 자동 생성물이라 회차에 못 담는다.
+ */
+async function checkItemRefs(supabase: ServerSupabase, items: CourseItemInput[]): Promise<string | null> {
+  const pick = <K extends CourseItemInput["kind"]>(kind: K) =>
+    items.filter((it): it is Extract<CourseItemInput, { kind: K }> => it.kind === kind);
+  const materialIds = pick("material").map((it) => it.materialId);
+  const sheetIds = pick("test").map((it) => it.testSheetId);
+  const drillIds = pick("drill").map((it) => it.drillId);
+  const guideIds = pick("guide").map((it) => it.guideId);
+  const none = Promise.resolve({ data: [] as { id: string }[], error: null });
+  const [m, t, d, g] = await Promise.all([
+    materialIds.length ? supabase.from("materials").select("id").in("id", materialIds) : none,
+    sheetIds.length ? supabase.from("test_sheets").select("id").eq("kind", "regular").in("id", sheetIds) : none,
+    drillIds.length ? supabase.from("drills").select("id").in("id", drillIds) : none,
+    guideIds.length ? supabase.from("guides").select("id").in("id", guideIds) : none,
+  ]);
+  for (const r of [m, t, d, g]) if (r.error) return friendlyDbError(r.error);
+  const ok = (want: string[], got: { id: string }[] | null) => {
+    const have = new Set((got ?? []).map((r) => r.id));
+    return want.every((id) => have.has(id));
+  };
+  if (!ok(materialIds, m.data) || !ok(sheetIds, t.data) || !ok(drillIds, d.data) || !ok(guideIds, g.data))
+    return "볼 수 없거나 삭제된 항목이 있어요. 목록에서 다시 골라주세요.";
+  return null;
 }
 
 /**
- * 회차 저장 — 제목·요약 + 항목 목록 통째 교체(순서 = 배열 순서).
- * 같은 항목(같은 자료·시험지… / 같은 숙제 문구)은 기존 행을 살려 순서만 고친다 — 지웠다 다시
- * 넣으면 학생 숙제 완료 체크가 cascade 로 날아가기 때문. 빠진 항목만 지우고 새 항목만 넣는다.
- * 이미 배부받은 학생에게 새 항목이 소급 배부되지는 않는다.
+ * 회차 저장 — 제목·요약 + 항목(순서 = 배열 순서).
+ * id 있는 항목은 그 행을 갱신(문구·마감·순서), 없으면 추가, 목록에서 빠진 행은 삭제.
+ * 행을 지웠다 다시 넣으면 학생 숙제 완료 체크가 cascade 로 날아가므로 id 로 맞춘다.
+ * 저장 뒤 sync RPC 가 이미 받은 학생에게도 새 자료·시험 배정을 채운다(알림은 없음).
  */
-export async function saveSessionAction(sessionId: string, input: CourseSessionSaveInput): Promise<Result> {
+export async function saveSessionAction(sessionId: string, input: CourseSessionSaveInput): Promise<SaveSessionResult> {
   const check = await ensureStaff({ permission: "courses" });
   if ("error" in check) return check.error;
+  if (!uuid.safeParse(sessionId).success) return { ok: false, message: "잘못된 요청이에요" };
   const parsed = courseSessionSaveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "검증 실패" };
   const s = parsed.data;
   const { supabase } = check;
+
+  const refErr = await checkItemRefs(supabase, s.items);
+  if (refErr) return { ok: false, message: refErr };
 
   const { data: cur, error: sErr } = await supabase
     .from("course_sessions")
@@ -229,59 +241,43 @@ export async function saveSessionAction(sessionId: string, input: CourseSessionS
   if (sErr) return { ok: false, message: friendlyDbError(sErr) };
   if (!cur) return { ok: false, message: "회차를 찾을 수 없어요" };
 
-  const { data: existing, error: eErr } = await supabase
-    .from("course_session_items")
-    .select("id, kind, material_id, test_sheet_id, drill_id, guide_id, title")
-    .eq("session_id", sessionId);
+  const { data: existing, error: eErr } = await supabase.from("course_session_items").select("id").eq("session_id", sessionId);
   if (eErr) return { ok: false, message: friendlyDbError(eErr) };
+  const existingIds = new Set((existing ?? []).map((r) => r.id));
 
-  const pool = new Map<string, string[]>();
-  for (const r of existing ?? []) pool.set(rowKey(r), [...(pool.get(rowKey(r)) ?? []), r.id]);
-
-  const keep: { id: string; position: number; due_days: number | null }[] = [];
-  const inserts: {
-    session_id: string;
-    position: number;
-    kind: CourseItemInput["kind"];
-    material_id: string | null;
-    test_sheet_id: string | null;
-    drill_id: string | null;
-    guide_id: string | null;
-    title: string | null;
-    due_days: number | null;
-  }[] = [];
-  s.items.forEach((it, i) => {
-    const position = i + 1;
-    const due_days = it.kind === "homework" ? it.dueDays : null;
-    const reuse = pool.get(itemKey(it))?.shift();
-    if (reuse) {
-      keep.push({ id: reuse, position, due_days });
-      return;
-    }
-    inserts.push({
-      session_id: sessionId,
-      position,
-      kind: it.kind,
-      material_id: it.kind === "material" ? it.materialId : null,
-      test_sheet_id: it.kind === "test" ? it.testSheetId : null,
-      drill_id: it.kind === "drill" ? it.drillId : null,
-      guide_id: it.kind === "guide" ? it.guideId : null,
-      title: it.kind === "homework" ? it.title : null,
-      due_days,
-    });
+  const toRow = (it: CourseItemInput, position: number) => ({
+    session_id: sessionId,
+    position,
+    kind: it.kind,
+    material_id: it.kind === "material" ? it.materialId : null,
+    test_sheet_id: it.kind === "test" ? it.testSheetId : null,
+    drill_id: it.kind === "drill" ? it.drillId : null,
+    guide_id: it.kind === "guide" ? it.guideId : null,
+    title: it.kind === "homework" ? it.title : null,
+    due_days: it.kind === "homework" ? it.dueDays : null,
   });
 
-  const drop = [...pool.values()].flat();
+  // 다른 회차의 행 id를 끼워 넣어도 이 회차 것만 갱신되게, 이 회차에 실제 있는 id만 인정
+  const keepIds = new Set<string>();
+  const updates: { id: string; row: ReturnType<typeof toRow> }[] = [];
+  const inserts: ReturnType<typeof toRow>[] = [];
+  s.items.forEach((it, i) => {
+    const row = toRow(it, i + 1);
+    if (it.id && existingIds.has(it.id) && !keepIds.has(it.id)) {
+      keepIds.add(it.id);
+      updates.push({ id: it.id, row });
+    } else {
+      inserts.push(row);
+    }
+  });
+  const drop = [...existingIds].filter((id) => !keepIds.has(id));
+
   if (drop.length > 0) {
     const { error } = await supabase.from("course_session_items").delete().eq("session_id", sessionId).in("id", drop);
     if (error) return { ok: false, message: friendlyDbError(error) };
   }
-  for (const k of keep) {
-    const { error } = await supabase
-      .from("course_session_items")
-      .update({ position: k.position, due_days: k.due_days })
-      .eq("id", k.id)
-      .eq("session_id", sessionId);
+  for (const u of updates) {
+    const { error } = await supabase.from("course_session_items").update(u.row).eq("id", u.id).eq("session_id", sessionId);
     if (error) return { ok: false, message: friendlyDbError(error) };
   }
   if (inserts.length > 0) {
@@ -289,19 +285,23 @@ export async function saveSessionAction(sessionId: string, input: CourseSessionS
     if (error) return { ok: false, message: friendlyDbError(error) };
   }
 
+  const { error: syncErr } = await supabase.rpc("sync_course_session_assignments", { p_session_id: sessionId });
+  if (syncErr) return { ok: false, message: friendlyDbError(syncErr) };
+
+  // 저장된 행 id를 돌려줘 편집기가 다음 저장부터 id로 맞추게 한다
+  const { data: saved } = await supabase
+    .from("course_session_items")
+    .select("id, kind, material_id, test_sheet_id, drill_id, guide_id, title, due_days")
+    .eq("session_id", sessionId)
+    .order("position");
+
   revalidateCourse(cur.course_id);
-  return { ok: true, id: sessionId };
+  return { ok: true, id: sessionId, items: (saved ?? []).flatMap(itemRowToInput) };
 }
 
-// ─── 배부 ──────────────────────────────────────────────────────────────────
-
-/**
- * 수업 진행 처리 / 보강 배부. 범위 검사는 앞단(ensureStaff studentIds) + RPC 안 2중.
- * 이미 받은 학생은 RPC가 건너뛴다(멱등) — 돌아온 값 = 새로 배부된 인원.
- */
 export async function deliverSessionAction(
   input: CourseDeliverInput,
-): Promise<{ ok: true; delivered: number; skipped: number } | { ok: false; message: string }> {
+): Promise<({ ok: true } & CourseDeliverResult) | { ok: false; message: string }> {
   const parsed = courseDeliverSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "검증 실패" };
   const d = parsed.data;
@@ -323,7 +323,55 @@ export async function deliverSessionAction(
     const message = /[가-힣]/.test(error.message ?? "") ? error.message : friendlyDbError(error);
     return { ok: false, message };
   }
-  const delivered = typeof data === "number" ? data : 0;
+  const result = courseDeliverResultSchema.safeParse(data);
+  if (!result.success) return { ok: false, message: "배부 결과를 읽지 못했어요. 화면을 새로고침해 확인해주세요." };
   revalidateCourse(cur.course_id);
-  return { ok: true, delivered, skipped: studentIds.length - delivered };
+  return { ok: true, ...result.data };
+}
+
+// ─── 편집기·배부 시트가 열릴 때만 읽는 목록 ─────────────────────────────────────
+// 코스 상세 진입마다 자료·시험지·훈련·가이드·학생 전체를 읽지 않게 여기로 뺐다.
+
+/** 항목 피커 선택지 — 교직원이 볼 수 있는 것만(RLS). */
+export async function loadItemRefsAction(): Promise<{ ok: true; refs: ItemRefs } | { ok: false; message: string }> {
+  const check = await ensureStaff({ permission: "courses" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
+  const [{ data: materials }, { data: tests }, { data: drills }, { data: guides }] = await Promise.all([
+    supabase.from("materials").select("id, title, audience, is_published").order("created_at", { ascending: false }),
+    supabase.from("test_sheets").select("id, title").eq("kind", "regular").order("created_at", { ascending: false }),
+    supabase.from("drills").select("id, title, is_published").order("created_at", { ascending: false }),
+    supabase.from("guides").select("id, title, status").order("created_at", { ascending: false }),
+  ]);
+  return {
+    ok: true,
+    refs: {
+      materials: (materials ?? []).map((m) => ({ id: m.id, title: m.title, audience: m.audience, published: m.is_published })),
+      tests: (tests ?? []).map((t) => ({ id: t.id, title: t.title })),
+      drills: (drills ?? []).map((d) => ({ id: d.id, title: d.title, published: d.is_published })),
+      guides: (guides ?? []).map((g) => ({ id: g.id, title: g.title, published: g.status === "published" })),
+    },
+  };
+}
+
+export type Roster = { students: StudentLite[]; members: { group_id: string; student_id: string }[]; absentIds: string[] };
+
+/** 배부 시트용 명단 — 담당 범위 학생·반 멤버십·오늘(KST) 결석. 'daily' 권한이 없으면 결석은 비어 온다. */
+export async function loadRosterAction(): Promise<{ ok: true; roster: Roster } | { ok: false; message: string }> {
+  const check = await ensureStaff({ permission: "courses" });
+  if ("error" in check) return check.error;
+  const { supabase } = check;
+  const [{ data: students }, { data: members }, { data: absents }] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, school, grade").eq("role", "student").eq("status", "approved").order("full_name"),
+    supabase.from("group_members").select("group_id, student_id"),
+    supabase.from("daily_attendance").select("student_id").eq("date", todayKst()).eq("attendance", "absent"),
+  ]);
+  return {
+    ok: true,
+    roster: {
+      students: (students ?? []).map((s) => ({ id: s.id, name: s.full_name, school: s.school, grade: s.grade })),
+      members: members ?? [],
+      absentIds: (absents ?? []).map((a) => a.student_id),
+    },
+  };
 }
