@@ -24,6 +24,8 @@ export type ItemRefs = {
   guides: { id: string; title: string; published: boolean }[];
 };
 
+const EMPTY_DELIVERED: Map<string, DeliveryRow> = new Map();
+
 export function CourseDetailClient({
   course,
   linkedGroupIds,
@@ -86,6 +88,11 @@ export function CourseDetailClient({
     linkedGroupIds.some((g) => !meta.groupIds.has(g));
 
   const sheetSession = sheet ? sessions.find((s) => s.id === sheet.sessionId) ?? null : null;
+  // 매 렌더마다 새 Map 을 넘기면 시트의 명단 읽기 effect 가 다시 돌아 기본 체크를 덮어쓴다
+  const sheetDelivered = useMemo(
+    () => (sheet ? deliveredBySession.get(sheet.sessionId) ?? EMPTY_DELIVERED : EMPTY_DELIVERED),
+    [sheet, deliveredBySession],
+  );
 
   // 피커 선택지 전체(자료·시험지·훈련·가이드) — 첫 편집기를 열 때 한 번만 읽어 모든 카드가 같이 쓴다
   const [catalogRefs, setCatalogRefs] = useState<ItemRefs | null>(null);
@@ -100,6 +107,7 @@ export function CourseDetailClient({
         if (r.ok) setCatalogRefs(r.refs);
         else setCatalogError(r.message);
       })
+      .catch(() => setCatalogError("목록을 불러오지 못했어요. 다시 시도해주세요."))
       .finally(() => setCatalogLoading(false));
   }, [catalogRefs, catalogLoading]);
   const catalog: RefsCatalog = { refs: catalogRefs, error: catalogError, retry: loadCatalog };
@@ -240,7 +248,7 @@ export function CourseDetailClient({
         session={sheetSession}
         groups={deliverGroups}
         usingFallbackGroups={linkedGroups.length === 0}
-        delivered={sheet ? deliveredBySession.get(sheet.sessionId) ?? new Map() : new Map()}
+        delivered={sheetDelivered}
       />
     </div>
   );

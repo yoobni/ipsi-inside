@@ -10,6 +10,7 @@ import {
   PRIVACY_EFFECTIVE_DATE,
   PRIVACY_OFFICER,
   PRIVACY_PREVIOUS_EFFECTIVE_DATE,
+  PRIVACY_EFFECTIVE_DATE_2026_08_21,
   REQUIRED_REFUSAL_NOTICE,
   type CollectionRow,
 } from "@ipsi/types";
@@ -174,7 +175,8 @@ export default function PrivacyPage() {
             <li>
               <strong>즉시 파기</strong> — 이름, 휴대폰 번호, 학교, 학년, 동의
               이력, 학습 일지와 그에 달린 피드백, 플래너 지각 사유, 플래너
-              인증 사진, 학부모-자녀 연결 정보.
+              인증 사진, 질문·답변(Q&amp;A)과 첨부 사진, 훈련 결과에 적은
+              메모, 학부모-자녀 연결 정보.
             </li>
             <li>
               <strong>익명 처리 후 보존</strong> — 시험 응시·채점 결과, 출결,
@@ -312,12 +314,16 @@ export default function PrivacyPage() {
           <p className="mt-2 font-semibold text-foreground">변경 이력</p>
           <ul className="mt-1 list-disc space-y-1 pl-5">
             <li>
-              {PRIVACY_EFFECTIVE_DATE} — 개인정보 보호책임자 이메일 기재.
+              {PRIVACY_EFFECTIVE_DATE} — 탈퇴 시 즉시 파기 항목에 질문·답변(Q&amp;A)과
+              첨부 사진, 훈련 결과 메모를 명시(제6조).
+            </li>
+            <li>
+              {PRIVACY_PREVIOUS_EFFECTIVE_DATE} — 개인정보 보호책임자 이메일 기재.
               사업자 주소를 상세 주소까지 표기. 안전성 확보 조치에 접속기록
               보관·점검과 인증 시도 제한을 추가.
             </li>
             <li>
-              {PRIVACY_PREVIOUS_EFFECTIVE_DATE} — 만 14세 미만 아동, 국외 이전,
+              {PRIVACY_EFFECTIVE_DATE_2026_08_21} — 만 14세 미만 아동, 국외 이전,
               파기 절차·방법, 자동화된 결정에 대한 권리, 열람청구 접수 부서 항목
               신설. 수집 항목을 목적·보유기간과 함께 표로 정비.
             </li>

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { deleteSessionAction, moveSessionAction, saveSessionAction } from "../actions";
+import { deleteSessionAction, moveSessionAction, saveSessionAction, syncSessionAssignmentsAction } from "../actions";
 import type { ItemRefs, SessionData } from "./course-detail-client";
 
 const AUDIENCE_LABEL = { all: "전체", student: "학생 전체", parent: "학부모 전체", targeted: "지정 학생", group: "그룹" } as const;
@@ -180,11 +180,6 @@ export function SessionCard({
           catalog={catalog}
           deliveredCount={deliveredCount}
           onSaved={() => router.refresh()}
-          onReset={() => {
-            // 일부만 써진 저장 — 갖고 있던 행(id 없음)으로 다시 저장하면 중복이 생기니 닫고 새로 읽는다
-            setOpen(false);
-            router.refresh();
-          }}
           onError={onError}
         />
       )}
@@ -201,7 +196,6 @@ function SessionEditor({
   catalog,
   deliveredCount,
   onSaved,
-  onReset,
   onError,
 }: {
   session: SessionData;
@@ -209,7 +203,6 @@ function SessionEditor({
   catalog: RefsCatalog;
   deliveredCount: number;
   onSaved: () => void;
-  onReset: () => void;
   onError: (msg: string | null) => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -218,6 +211,16 @@ function SessionEditor({
   const [rows, setRows] = useState<Row[]>(() => session.items.map((input) => ({ key: nextKey(), input })));
   const [addKind, setAddKind] = useState<CourseItemKind>("material");
   const [saved, setSaved] = useState(false);
+  // 저장은 됐는데 배정 동기화만 실패 — 저장 버튼은 비활성(dirty 아님)이라 따로 재시도 버튼을 둔다
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
+  const retrySync = () => {
+    onError(null);
+    startTransition(async () => {
+      const r = await syncSessionAssignmentsAction(session.id);
+      if (!r.ok) onError(r.message);
+      else setSyncWarning(null);
+    });
+  };
   // 저장 직후의 항목(행 id 포함). 다음 저장이 id로 맞추게 하고, dirty 비교 기준도 이걸로 바꾼다
   const [baseline, setBaseline] = useState<{ title: string; summary: string; items: CourseItemInput[] }>({
     title: session.title,
@@ -269,14 +272,13 @@ function SessionEditor({
       });
       if (!r.ok) {
         onError(r.message);
-        if (r.written) onReset();
         return;
       }
       // 서버가 돌려준 행 id를 입혀 둔다 — 다음 저장에서 숙제 문구를 고쳐도 같은 행이 갱신된다
       setRows(r.items.map((input) => ({ key: nextKey(), input })));
       setBaseline({ title, summary, items: r.items });
       setSaved(true);
-      if (r.warning) onError(r.warning);
+      setSyncWarning(r.warning ?? null);
       onSaved();
     });
   };
@@ -390,8 +392,16 @@ function SessionEditor({
             ? `이미 ${deliveredCount}명이 이 회차를 받았어요. 저장하면 새로 담은 자료·퀴즈도 그 학생들에게 바로 들어가요(알림은 안 가요).`
             : "배부 전이라 자유롭게 고쳐도 돼요."}
         </p>
-        <div className="flex items-center gap-2 self-end">
-          {saved && !dirty && <span className="text-xs text-emerald-600">저장됨</span>}
+        <div className="flex flex-wrap items-center gap-2 self-end">
+          {syncWarning && (
+            <>
+              <span className="text-xs text-amber-600 dark:text-amber-400">{syncWarning}</span>
+              <Button size="sm" variant="outline" disabled={pending} onClick={retrySync}>
+                배정 다시 채우기
+              </Button>
+            </>
+          )}
+          {saved && !dirty && !syncWarning && <span className="text-xs text-emerald-600">저장됨</span>}
           <Button size="sm" onClick={save} disabled={pending || !dirty || !title.trim()}>
             {pending ? "저장 중…" : "회차 저장"}
           </Button>

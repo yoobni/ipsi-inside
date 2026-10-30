@@ -228,6 +228,9 @@ export async function withdrawAction(
       .remove(qnaImgs.map((f) => `${user.id}/${f.name}`));
   }
 
+  // 훈련 결과 보내기 메모(자유서술) 파기 — 응시·점수는 정량 이력이라 익명 보존.
+  await admin.from("drill_attempts").update({ share_note: null }).eq("student_id", user.id);
+
   // 동의 이력 파기 — profiles의 동의 시각 컬럼을 null로 지우는 것과 같은 기준.
   // 처리방침에 고지한 보유기간이 "회원 탈퇴 시까지"다.
   await admin.from("consent_records").delete().eq("user_id", user.id);

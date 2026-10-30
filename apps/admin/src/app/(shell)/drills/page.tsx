@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MessageSquareText, Plus } from "lucide-react";
 import { DRILL_KIND_LABEL, PASSAGE_SOURCE_LABEL, type DrillKind, type PassageSource } from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
+import { formatKstMonthDay } from "@/lib/kst";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DrillsList, type DrillRow } from "./drills-list";
@@ -91,9 +92,7 @@ export default async function DrillsPage() {
                   <span className="text-muted-foreground min-w-0 flex-1 truncate">{drillTitle.get(a.drill_id) ?? "훈련"}</span>
                   <span className="tabular-nums">{a.correct ?? 0}/{a.total ?? 0}</span>
                   {a.share_note && <Badge variant="outline">메모</Badge>}
-                  <span className="text-muted-foreground text-xs">
-                    {new Date(a.shared_at!).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })}
-                  </span>
+                  <span className="text-muted-foreground text-xs">{formatKstMonthDay(a.shared_at!)}</span>
                   {a.share_ack_at ? <Badge variant="success">확인</Badge> : <Badge variant="warning">미확인</Badge>}
                 </Link>
               </li>

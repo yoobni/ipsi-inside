@@ -72,22 +72,30 @@ export function DeliverSheet({
   // 명단이 도착하는 사이 반을 바꿨을 수 있다 — 기본 체크는 그때의 반이 아니라 **지금 고른 반**으로 채운다
   const groupIdRef = useRef(groupId);
 
-  // 명단은 시트가 열릴 때 읽는다(페이지 진입 시 학생 전체를 안 읽게). key 로 리마운트되니 한 번이면 된다.
-  // 도착하면 기본 체크(반 전원 − 받은 학생 − 오늘 결석)도 같이 채운다
   const [roster, setRoster] = useState<Roster | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const aliveRef = useRef(true);
+  // 기본 체크는 명단이 **처음** 도착했을 때 한 번만 — 배부 뒤 화면을 새로 읽어 effect 가 다시 돌아도
+  // 원장이 손으로 푼 체크를 덮어쓰지 않게
+  const seededRef = useRef(false);
   const loadRoster = useCallback(() => {
-    loadRosterAction().then((r) => {
-      if (!aliveRef.current) return;
-      if (!r.ok) {
-        setRosterError(r.message);
-        return;
-      }
-      setRoster(r.roster);
-      const gid = groupIdRef.current;
-      if (mode === "regular" && gid) setChecked(defaultCheckedFrom(r.roster, gid, delivered));
-    });
+    loadRosterAction()
+      .then((r) => {
+        if (!aliveRef.current) return;
+        if (!r.ok) {
+          setRosterError(r.message);
+          return;
+        }
+        setRoster(r.roster);
+        const gid = groupIdRef.current;
+        if (!seededRef.current && mode === "regular" && gid) {
+          seededRef.current = true;
+          setChecked(defaultCheckedFrom(r.roster, gid, delivered));
+        }
+      })
+      .catch(() => {
+        if (aliveRef.current) setRosterError("명단을 불러오지 못했어요. 다시 시도해주세요.");
+      });
   }, [mode, delivered]);
   useEffect(() => {
     if (!open) return;
@@ -100,7 +108,9 @@ export function DeliverSheet({
   const students = useMemo(() => roster?.students ?? [], [roster]);
   const absent = useMemo(() => new Set(roster?.absentIds ?? []), [roster]);
 
-  const membersOf = (gid: string): StudentLite[] => (roster ? membersOfFrom(roster, gid) : []);
+  // 현재 반 명단은 roster·groupId 가 바뀔 때만 다시 만든다(검색·체크마다 재정렬하지 않게)
+  const currentMembers = useMemo(() => (roster && groupId ? membersOfFrom(roster, groupId) : []), [roster, groupId]);
+  const membersOf = (gid: string): StudentLite[] => (gid === groupId ? currentMembers : roster ? membersOfFrom(roster, gid) : []);
   const defaultChecked = (gid: string) => (roster ? defaultCheckedFrom(roster, gid, delivered) : new Set<string>());
 
   const pickGroup = (id: string) => {

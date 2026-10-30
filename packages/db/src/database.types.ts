@@ -1553,6 +1553,7 @@ export type Database = {
       move_course_session: { Args: { p_session_id: string; p_dir: "up" | "down" }; Returns: undefined };
       share_drill_attempt: { Args: { p_attempt_id: string; p_note?: string | null }; Returns: Json };
       ack_drill_share: { Args: { p_attempt_id: string }; Returns: undefined };
+      save_course_session_items: { Args: { p_session_id: string; p_title: string; p_summary: string | null; p_items: Json }; Returns: Json };
       create_practice_set: {
         Args: { p_tag_kind: string; p_tag_id: string; p_size?: number; p_for_student?: string | null };
         Returns: string;

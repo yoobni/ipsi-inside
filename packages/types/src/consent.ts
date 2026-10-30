@@ -35,15 +35,17 @@ export const CONSENT_DOC_VERSIONS = {
   terms: "2026-08-25",
   // 2026-08-25: 보호책임자 이메일 기재, 사업자 주소 상세화, 안전성 확보
   //             조치에 접속기록 보관·점검과 인증 시도 제한 추가
-  privacy: "2026-08-25",
+  // 2026-10-30: 파기 항목에 Q&A·훈련 메모 명시(제6조)
+  privacy: "2026-10-30",
   age14: "2026-08-21",
   child_info: "2026-08-21",
   marketing: "2026-08-21",
 } as const satisfies Record<ConsentKind, string>;
 
 /** 처리방침 시행일 — /privacy 머리말과 변경 이력이 같이 쓴다. */
-export const PRIVACY_EFFECTIVE_DATE = "2026년 8월 25일";
-export const PRIVACY_PREVIOUS_EFFECTIVE_DATE = "2026년 8월 21일";
+export const PRIVACY_EFFECTIVE_DATE = "2026년 10월 30일";
+export const PRIVACY_PREVIOUS_EFFECTIVE_DATE = "2026년 8월 25일";
+export const PRIVACY_EFFECTIVE_DATE_2026_08_21 = "2026년 8월 21일";
 
 /** 이용약관 시행일 — /terms 머리말과 부칙이 같이 쓴다. */
 export const TERMS_EFFECTIVE_DATE = "2026년 8월 25일";
