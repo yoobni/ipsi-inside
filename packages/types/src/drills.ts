@@ -116,3 +116,11 @@ export const drillFinishSchema = z.object({
   wrong_item_ids: z.array(z.string().uuid()),
 });
 export type DrillFinish = z.infer<typeof drillFinishSchema>;
+
+/** 쌤에게 결과 보내기 — 메모는 선택, 300자 */
+export const drillShareInputSchema = z.object({
+  attemptId: z.string().uuid(),
+  note: z.string().trim().max(300, '메모는 300자까지예요').nullable(),
+});
+export const drillShareResultSchema = z.object({ shared_at: z.string(), already: z.boolean() });
+export type DrillShareResult = z.infer<typeof drillShareResultSchema>;

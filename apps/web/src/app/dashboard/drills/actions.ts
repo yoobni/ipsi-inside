@@ -1,6 +1,14 @@
 "use server";
 
-import { drillAnswerResultSchema, drillFinishSchema, type DrillAnswerResult, type DrillFinish } from "@ipsi/types";
+import {
+  drillAnswerResultSchema,
+  drillFinishSchema,
+  drillShareInputSchema,
+  drillShareResultSchema,
+  type DrillAnswerResult,
+  type DrillFinish,
+  type DrillShareResult,
+} from "@ipsi/types";
 import { createServerSupabaseClient } from "@ipsi/lib/supabase/server";
 
 type Fail = { ok: false; message: string };
@@ -37,4 +45,19 @@ export async function finishDrillAction(attemptId: string): Promise<{ ok: true; 
   const parsed = drillFinishSchema.safeParse(data);
   if (error || !parsed.success) return { ok: false, message: "결과를 저장하지 못했어요." };
   return { ok: true, result: parsed.data };
+}
+
+/** 쌤에게 결과 보내기 — 본인 응시·끝낸 것만, 알림은 RPC 안에서(두 번 눌러도 한 번만). */
+export async function shareDrillAttemptAction(attemptId: string, note: string | null): Promise<{ ok: true; result: DrillShareResult } | Fail> {
+  const parsed = drillShareInputSchema.safeParse({ attemptId, note });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "잘못된 요청이에요" };
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("share_drill_attempt", {
+    p_attempt_id: parsed.data.attemptId,
+    p_note: parsed.data.note || null,
+  });
+  if (error) return { ok: false, message: /[가-힣]/.test(error.message ?? "") ? error.message : "보내지 못했어요. 다시 시도해주세요." };
+  const result = drillShareResultSchema.safeParse(data);
+  if (!result.success) return { ok: false, message: "보내지 못했어요. 다시 시도해주세요." };
+  return { ok: true, result: result.data };
 }

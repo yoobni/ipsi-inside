@@ -165,9 +165,9 @@ export type Database = {
         Relationships: [];
       };
       drill_attempts: {
-        Row: { id: string; student_id: string; drill_id: string; started_at: string; finished_at: string | null; correct: number | null; total: number | null };
-        Insert: { id?: string; student_id: string; drill_id: string; started_at?: string; finished_at?: string | null; correct?: number | null; total?: number | null };
-        Update: { id?: string; student_id?: string; drill_id?: string; started_at?: string; finished_at?: string | null; correct?: number | null; total?: number | null };
+        Row: { id: string; student_id: string; drill_id: string; started_at: string; finished_at: string | null; correct: number | null; total: number | null; shared_at: string | null; share_note: string | null; share_ack_by: string | null; share_ack_at: string | null };
+        Insert: { id?: string; student_id: string; drill_id: string; started_at?: string; finished_at?: string | null; correct?: number | null; total?: number | null; shared_at?: string | null; share_note?: string | null; share_ack_by?: string | null; share_ack_at?: string | null };
+        Update: { id?: string; student_id?: string; drill_id?: string; started_at?: string; finished_at?: string | null; correct?: number | null; total?: number | null; shared_at?: string | null; share_note?: string | null; share_ack_by?: string | null; share_ack_at?: string | null };
         Relationships: [];
       };
       drill_item_results: {
@@ -1551,6 +1551,8 @@ export type Database = {
       };
       sync_course_session_assignments: { Args: { p_session_id: string }; Returns: undefined };
       move_course_session: { Args: { p_session_id: string; p_dir: "up" | "down" }; Returns: undefined };
+      share_drill_attempt: { Args: { p_attempt_id: string; p_note?: string | null }; Returns: Json };
+      ack_drill_share: { Args: { p_attempt_id: string }; Returns: undefined };
       create_practice_set: {
         Args: { p_tag_kind: string; p_tag_id: string; p_size?: number; p_for_student?: string | null };
         Returns: string;

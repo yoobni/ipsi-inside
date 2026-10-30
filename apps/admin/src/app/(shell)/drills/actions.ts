@@ -118,3 +118,14 @@ export async function deleteDrillAction(id: string): Promise<Result> {
   revalidatePath("/drills");
   return { ok: true, id };
 }
+
+/** 학생이 보낸 훈련 결과 "확인" — 담당 범위 검사는 RPC 안(처음 확인한 사람만 기록). */
+export async function ackDrillShareAction(attemptId: string): Promise<Result> {
+  const check = await ensureStaff({ permission: "passages" });
+  if ("error" in check) return check.error;
+  const { error } = await check.supabase.rpc("ack_drill_share", { p_attempt_id: attemptId });
+  if (error) return { ok: false, message: /[가-힣]/.test(error.message ?? "") ? error.message : friendlyDbError(error) };
+  revalidatePath("/drills");
+  revalidatePath(`/drills/attempts/${attemptId}`);
+  return { ok: true, id: attemptId };
+}

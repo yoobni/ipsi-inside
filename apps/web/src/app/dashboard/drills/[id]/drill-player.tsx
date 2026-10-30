@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Check, ChevronLeft, RotateCcw, X } from "lucide-react";
+import { Check, ChevronLeft, RotateCcw, Send, X } from "lucide-react";
 import type { DrillAnswerResult, DrillFinish, DrillPlay, DrillPlayItem } from "@ipsi/types";
 import { cn } from "@/lib/utils";
-import { answerDrillAction, finishDrillAction, startDrillAction } from "../actions";
+import { answerDrillAction, finishDrillAction, shareDrillAttemptAction, startDrillAction } from "../actions";
 
 type Phase = "intro" | "play" | "done";
 type Pending = { item: DrillPlayItem; result: DrillAnswerResult; answer: Record<string, unknown> } | null;
@@ -170,6 +170,7 @@ export function DrillPlayer({ play }: { play: DrillPlay }) {
                 ? "한 번에 전부 맞혔어요! 🎉"
                 : `${finish.wrong_item_ids.length}개는 다시 풀어서 맞혔어요. 내일 한 번 더 해봐요.`}
             </p>
+            {attemptId && <ShareToTeacher attemptId={attemptId} />}
             <div className="flex gap-2">
               <button type="button" onClick={restart} className="border-hairline inline-flex flex-1 items-center justify-center gap-1 rounded-md border px-4 py-3 text-sm font-medium">
                 <RotateCcw className="size-4" /> 다시 풀기
@@ -275,6 +276,71 @@ function Feedback({ fb, kind, onNext, pending, isLast }: { fb: NonNullable<Pendi
       <button type="button" onClick={onNext} disabled={pending} className="bg-primary text-primary-foreground w-full rounded-md px-4 py-3 text-sm font-bold disabled:opacity-60">
         {pending ? "..." : isLast ? "결과 보기" : "다음"}
       </button>
+    </div>
+  );
+}
+
+/**
+ * 쌤에게 결과 보내기 — 점수와 틀린 항목은 이미 서버에 있으니 "보낼지"와 메모만 정한다.
+ * 보내면 원장·담당 조교에게 알림이 간다. 같은 응시는 한 번만(서버가 막음).
+ */
+function ShareToTeacher({ attemptId }: { attemptId: string }) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const send = () => {
+    setErr(null);
+    startTransition(async () => {
+      const r = await shareDrillAttemptAction(attemptId, note.trim() || null);
+      if (!r.ok) setErr(r.message);
+      else setSent(true);
+    });
+  };
+
+  if (sent) {
+    return (
+      <p className="inline-flex items-center justify-center gap-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+        <Check className="size-4" /> 선생님께 보냈어요
+      </p>
+    );
+  }
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-primary inline-flex items-center justify-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+      >
+        <Send className="size-4" /> 쌤에게 결과 보내기
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-2 text-left">
+      <label htmlFor="share-note" className="text-muted-foreground text-xs font-bold">
+        한마디 (선택) — 헷갈린 부분이나 묻고 싶은 것
+      </label>
+      <textarea
+        id="share-note"
+        value={note}
+        maxLength={300}
+        rows={3}
+        placeholder="예) 3번 보기가 왜 틀린지 모르겠어요"
+        onChange={(e) => setNote(e.target.value)}
+        className="border-hairline bg-background w-full rounded-md border px-3 py-2 text-base sm:text-sm"
+      />
+      {err && <p className="text-destructive text-xs">{err}</p>}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => setOpen(false)} disabled={pending} className="border-hairline inline-flex flex-1 items-center justify-center rounded-md border px-4 py-2.5 text-sm font-medium">
+          취소
+        </button>
+        <button type="button" onClick={send} disabled={pending} className="bg-primary text-primary-foreground inline-flex flex-1 items-center justify-center gap-1 rounded-md px-4 py-2.5 text-sm font-bold disabled:opacity-60">
+          <Send className="size-4" /> {pending ? "보내는 중…" : "보내기"}
+        </button>
+      </div>
     </div>
   );
 }
